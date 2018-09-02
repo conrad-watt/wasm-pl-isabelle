@@ -60,18 +60,11 @@ record t_context =
   types_t :: "tf list"
   func_t :: "tf list"
   global :: "tg list"
-  table :: "nat option"
-  memory :: "nat option"
+  table :: bool
+  memory :: bool
   local :: "t list"
   label :: "(t list) list"
   return :: "(t list) option"
-
-record s_context =
-  s_inst :: "t_context list"
-  s_funcs :: "tf list"
-  s_tab  :: "nat list"
-  s_mem  :: "nat list"
-  s_globs :: "tg list"
 
 datatype
   sx = S | U
@@ -148,16 +141,16 @@ datatype \<comment> \<open>basic instructions\<close>
     | Relop t relop
     | Cvtop t cvtop t "sx option"
 
-datatype cl = \<comment> \<open>function closures\<close>
-  Func_native i tf "t list" "b_e list"
-| Func_host tf host
-
 record inst = \<comment> \<open>instances\<close>
   types :: "tf list"
   funcs :: "i list"
   tab :: "i option"
   mem :: "i option"
   globs :: "i list"
+
+datatype cl = \<comment> \<open>function closures\<close>
+  Func_native inst tf "t list" "b_e list"
+| Func_host tf host
 
 type_synonym tabinst = "(cl option) list"
 
@@ -166,7 +159,6 @@ record global =
   g_val :: v
 
 record s = \<comment> \<open>store\<close>
-  inst :: "inst list"
   funcs :: "cl list"
   tab :: "tabinst list"
   mem :: "mem list"
@@ -177,7 +169,7 @@ datatype e = \<comment> \<open>administrative instruction\<close>
   | Trap
   | Callcl cl
   | Label nat "e list" "e list"
-  | Local nat i "v list" "e list"
+  | Local nat inst "v list" "e list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>

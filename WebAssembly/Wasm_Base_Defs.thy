@@ -285,37 +285,37 @@ definition cl_type :: "cl \<Rightarrow> tf" where
 definition rglob_is_mut :: "global \<Rightarrow> bool" where
   "rglob_is_mut g = (g_mut g = T_mut)"
 
-definition stypes :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> tf" where
-  "stypes s i j = ((types ((inst s)!i))!j)"
+definition stypes :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> tf" where
+  "stypes s i j = ((types i)!j)"
   
-definition sfunc_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "sfunc_ind s i j = ((inst.funcs ((inst s)!i))!j)"
+definition sfunc_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
+  "sfunc_ind s i j = ((inst.funcs i)!j)"
 
-definition sfunc :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl" where
+definition sfunc :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl" where
   "sfunc s i j = (funcs s)!(sfunc_ind s i j)"
 
-definition sglob_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "sglob_ind s i j = ((inst.globs ((inst s)!i))!j)"
+definition sglob_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
+  "sglob_ind s i j = ((inst.globs i)!j)"
   
-definition sglob :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> global" where
+definition sglob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> global" where
   "sglob s i j = (globs s)!(sglob_ind s i j)"
 
-definition sglob_val :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v" where
+definition sglob_val :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v" where
   "sglob_val s i j = g_val (sglob s i j)"
 
-definition smem_ind :: "s \<Rightarrow> nat \<Rightarrow> nat option" where
-  "smem_ind s i = (inst.mem ((inst s)!i))"
+definition smem_ind :: "s \<Rightarrow> inst \<Rightarrow> nat option" where
+  "smem_ind s i = (inst.mem i)"
 
 definition stab_s :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl option" where
   "stab_s s i j = (let stabinst = ((tab s)!i) in  (if (length (stabinst) > j) then (stabinst!j) else None))"
 
-definition stab :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab s i j = (case (inst.tab ((inst s)!i)) of Some k => stab_s s k j | None => None)"
+definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl option" where
+  "stab s i j = (case (inst.tab i) of Some k => stab_s s k j | None => None)"
 
 definition supdate_glob_s :: "s \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
   "supdate_glob_s s k v = s\<lparr>globs := (globs s)[k:=((globs s)!k)\<lparr>g_val := v\<rparr>]\<rparr>"
 
-definition supdate_glob :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
+definition supdate_glob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
   "supdate_glob s i j v = (let k = sglob_ind s i j in supdate_glob_s s k v)"
 
 definition is_const :: "e \<Rightarrow> bool" where
@@ -324,10 +324,16 @@ definition is_const :: "e \<Rightarrow> bool" where
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
+definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
+  "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2"
+
+definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
+  "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"
+
 inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
-"\<lbrakk>insts = insts'; fs = fs'; tclss = tclss'; list_all2 (\<lambda>bs bs'. mem_size bs \<le> mem_size bs') bss bss'; gs = gs'\<rbrakk> \<Longrightarrow>
-  store_extension \<lparr>s.inst = insts, s.funcs = fs, s.tab = tclss, s.mem = bss, s.globs = gs\<rparr>
-                    \<lparr>s.inst = insts', s.funcs = fs', s.tab = tclss', s.mem = bss', s.globs = gs'\<rparr>"
+"\<lbrakk>fs = fs'; tclss = tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'\<rbrakk> \<Longrightarrow>
+  store_extension \<lparr>s.funcs = fs, s.tab = tclss, s.mem = bss, s.globs = gs\<rparr>
+                    \<lparr>s.funcs = fs', s.tab = tclss', s.mem = bss', s.globs = gs'\<rparr>"
 
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
@@ -451,9 +457,9 @@ lemma int_float_disjoint: "is_int_t t = -(is_float_t t)"
 
 lemma stab_unfold:
   assumes "stab s i j = Some cl"
-  shows "\<exists>k. inst.tab ((inst s)!i) = Some k \<and> length ((tab s)!k) > j \<and>((tab s)!k)!j = Some cl"
+  shows "\<exists>k. inst.tab i = Some k \<and> length ((tab s)!k) > j \<and>((tab s)!k)!j = Some cl"
 proof -
-  obtain k where have_k:"(inst.tab ((inst s)!i)) = Some k"
+  obtain k where have_k:"(inst.tab i) = Some k"
     using assms
     unfolding stab_def
     by fastforce

@@ -34,7 +34,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>i < length(func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call i] : tf"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); (table \<C>) \<noteq> None\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_i32] _> t2s)"
+| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); (table \<C>) = True\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_i32] _> t2s)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_local i] : ([] _> [t])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -46,13 +46,13 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>set_global\<close>\<close>
 | set_global:"\<lbrakk>i < length(global \<C>); tg_t ((global \<C>)!i) = t; is_mut ((global \<C>)!i)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Set_global i] : ([t] _> [])"
   \<comment> \<open>\<open>load\<close>\<close>
-| load:"\<lbrakk>(memory \<C>) = Some n; load_store_t_bounds a (option_projl tp_sx) t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load t tp_sx a off] : ([T_i32] _> [t])"
+| load:"\<lbrakk>(memory \<C>) = True; load_store_t_bounds a (option_projl tp_sx) t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load t tp_sx a off] : ([T_i32] _> [t])"
   \<comment> \<open>\<open>store\<close>\<close>
-| store:"\<lbrakk>(memory \<C>) = Some n; load_store_t_bounds a tp t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Store t tp a off] : ([T_i32,t] _> [])"
+| store:"\<lbrakk>(memory \<C>) = True; load_store_t_bounds a tp t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Store t tp a off] : ([T_i32,t] _> [])"
   \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"(memory \<C>) = Some n \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_i32])"
+| current_memory:"(memory \<C>) = True \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_i32])"
   \<comment> \<open>\<open>Grow_memory\<close>\<close>
-| grow_memory:"(memory \<C>) = Some n \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_i32] _> [T_i32])"
+| grow_memory:"(memory \<C>) = True \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_i32] _> [T_i32])"
   \<comment> \<open>\<open>empty program\<close>\<close>
 | empty:"\<C> \<turnstile> [] : ([] _> [])"
   \<comment> \<open>\<open>composition\<close>\<close>
@@ -60,13 +60,32 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>weakening\<close>\<close>
 | weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
 
-inductive cl_typing :: "[s_context, cl, tf] \<Rightarrow> bool" where
-   "\<lbrakk>i < length (s_inst \<S>); ((s_inst \<S>)!i) = \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := (local \<C>) @ t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing \<S> (Func_native i tf ts es) (t1s _> t2s)"
-|  "cl_typing \<S> (Func_host tf h) tf"
+definition "glob_agree g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
+
+definition "globi_agree gs n g = (n < length gs \<and> glob_agree (gs!n) g)"
+
+definition "tabi_agree ts j is_t =
+  (case j of
+    Some i \<Rightarrow> i < length ts \<and> is_t = True
+  | None \<Rightarrow> is_t = False)"
+
+definition "memi_agree ms j is_t =
+  (case j of
+    Some i \<Rightarrow> i < length ms \<and> is_t = True
+  | None \<Rightarrow> is_t = False)"
+
+definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
+
+inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
+  "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs; list_all2 (globi_agree (globs s)) gs tgs; tabi_agree (tab s) i is_t; memi_agree (mem s) j is_m\<rbrakk> \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tab = i, mem = j, globs = gs\<rparr> \<lparr>types_t = ts, func_t = tfs, global = tgs, table = is_t, memory = is_m, local = [], label = [], return = None\<rparr>"
+
+inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
+   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := (local \<C>) @ t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
+ |  "cl_typing s (Func_host tf h) tf"
 
 (* lifting the b_e_typing relation to the administrative operators *)
-inductive e_typing :: "[s_context, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
-and       s_typing :: "[s_context, (t list) option, nat, v list, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>'_ _ _;_ : _" 60) where
+inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
+and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>'_ _ _;_ : _" 60) where
 (* section: e_typing *)
   (* lifting *)
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
@@ -83,28 +102,15 @@ and       s_typing :: "[s_context, (t list) option, nat, v list, e list, t list]
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
 (* section: s_typing *)
-| "\<lbrakk>i < (length (s_inst \<S>)); tvs = map typeof vs; \<C> =((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i) @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile>_i vs;es : ts"
+| "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile>_i vs;es : ts"
 
-definition "globi_agree gs n g = (n < length gs \<and> gs!n = g)"
+definition "tab_agree s tcl = (case tcl of None \<Rightarrow> True | Some cl \<Rightarrow> \<exists>tf. cl_typing s cl tf)"
 
-definition "memi_agree sm j m = ((\<exists>j' m'. j = Some j' \<and> j' < length sm \<and>  m = Some m' \<and> sm!j' = m') \<or> j = None \<and> m = None)"
+inductive store_typing :: "s \<Rightarrow> bool" where
+  "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s); list_all (list_all (tab_agree s)) (tab s)\<rbrakk> \<Longrightarrow> store_typing s"
 
-definition "funci_agree fs n f = (n < length fs \<and> fs!n = f)"
-
-inductive inst_typing :: "[s_context, inst, t_context] \<Rightarrow> bool" where
-  "\<lbrakk>list_all2 (funci_agree (s_funcs \<S>)) fs tfs; list_all2 (globi_agree (s_globs \<S>)) gs tgs; (i = Some i' \<and> i' < length (s_tab \<S>) \<and> (s_tab \<S>)!i' = (the n)) \<or> (i = None \<and> n = None); memi_agree (s_mem \<S>) j m\<rbrakk> \<Longrightarrow> inst_typing \<S> \<lparr>types = ts, funcs = fs, tab = i, mem = j, globs = gs\<rparr> \<lparr>types_t = ts, func_t = tfs, global = tgs, table = n, memory = m, local = [], label = [], return = None\<rparr>"
-
-definition "glob_agree g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
-
-definition "tab_agree \<S> tcl = (case tcl of None \<Rightarrow> True | Some cl \<Rightarrow> \<exists>tf. cl_typing \<S> cl tf)"
-
-definition "mem_agree bs m = (\<lambda> bs m. m \<le> mem_size bs) bs m"
-
-inductive store_typing :: "[s, s_context] \<Rightarrow> bool" where
-  "\<lbrakk>\<S> = \<lparr>s_inst = \<C>s, s_funcs = tfs, s_tab = ns, s_mem = ms, s_globs = tgs\<rparr>; list_all2 (inst_typing \<S>) insts \<C>s; list_all2 (cl_typing \<S>) fs tfs; list_all (tab_agree \<S>) (concat tclss); list_all2 (\<lambda> tcls n. n \<le> length tcls) tclss ns; list_all2 mem_agree bss ms; list_all2 glob_agree gs tgs\<rbrakk> \<Longrightarrow> store_typing \<lparr>s.inst = insts, s.funcs = fs, s.tab = tclss, s.mem = bss, s.globs = gs\<rparr> \<S>"
-
-inductive config_typing :: "[nat, s, v list, e list, t list] \<Rightarrow> bool" ("\<turnstile>'_ _ _;_;_ : _" 60) where
-  "\<lbrakk>store_typing s \<S>; \<S>\<bullet>None \<tturnstile>_i vs;es : ts\<rbrakk> \<Longrightarrow> \<turnstile>_i s;vs;es : ts"
+inductive config_typing :: "[inst, s, v list, e list, t list] \<Rightarrow> bool" ("\<turnstile>'_ _ _;_;_ : _" 60) where
+  "\<lbrakk>store_typing s; s\<bullet>None \<tturnstile>_i vs;es : ts\<rbrakk> \<Longrightarrow> \<turnstile>_i s;vs;es : ts"
 
 (* REDUCTION RELATION *)
 
@@ -160,7 +166,7 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | trap:"\<lbrakk>es \<noteq> [Trap]; Lfilled 0 lholed [Trap] es\<rbrakk> \<Longrightarrow> \<lparr>es\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
 
 (* full reduction rule *)
-inductive reduce :: "[s, v list, e list, nat, s, v list, e list] \<Rightarrow> bool" ("\<lparr>_;_;_\<rparr> \<leadsto>'_ _ \<lparr>_;_;_\<rparr>" 60) where
+inductive reduce :: "[s, v list, e list, inst, s, v list, e list] \<Rightarrow> bool" ("\<lparr>_;_;_\<rparr> \<leadsto>'_ _ \<lparr>_;_;_\<rparr>" 60) where
   \<comment> \<open>\<open>lifting basic reduction\<close>\<close>
   basic:"\<lparr>e\<rparr> \<leadsto> \<lparr>e'\<rparr> \<Longrightarrow> \<lparr>s;vs;e\<rparr> \<leadsto>_i \<lparr>s;vs;e'\<rparr>"
   \<comment> \<open>\<open>call\<close>\<close>

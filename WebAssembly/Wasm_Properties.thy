@@ -14,189 +14,94 @@ lemma t_cvt: assumes "cvt t sx v = Some v'" shows "t = typeof v'"
   apply (simp add: option.case_eq_if, metis option.discI option.inject v.simps(20))
   done
 
-lemma store_preserved1:
+lemma reduce_store_extension:
   assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
-          "store_typing s \<S>"
-          "\<S>\<bullet>\<C> \<turnstile> es : (ts _> ts')"
-          "\<C> = ((s_inst \<S>)!i)\<lparr>local := local ((s_inst \<S>)!i) @ (map typeof vs), label := arb_label, return := arb_return\<rparr>"
-          "i < length (s_inst \<S>)"
-  shows "store_typing s' \<S>"
+          "store_typing s"
+          "inst_typing s i \<C>i"
+          "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+          "\<C> = \<C>i\<lparr>local := local \<C>i @ (map typeof vs), label := arb_label, return := arb_return\<rparr>"
+  shows "store_extension s s'"
   using assms
-proof (induction arbitrary: \<C> arb_label arb_return ts ts' rule: reduce.induct)
+proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.induct)
   case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
-  using callcl_host_Some(8) e_type_comp
-  by fastforce
-  have ves_c:"const_list ves"
-    using is_const_list[OF callcl_host_Some(2)]
-    by simp
-  then obtain tvs where tvs_def:"ts'' = ts @ tvs"
-                                "length t1s = length tvs"
-                                "\<S>\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
-    using ts''_def(1) e_type_const_list[of ves \<S> \<C> ts ts''] callcl_host_Some
-    by fastforce
-  hence "ts'' = ts @ t1s"
-        "ts' = ts @ t2s"
-    using e_type_callcl_host[OF ts''_def(2) callcl_host_Some(1)]
-    by auto
-  moreover
-  hence "list_all2 types_agree t1s vcs"
-    using e_typing_imp_list_types_agree[where ?ts' = "[]"] callcl_host_Some(2) tvs_def(1,3)
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')"
+                    "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+    using e_type_comp[OF callcl_host_Some(9)]
+    by blast
+  then obtain ts''' where ts'''_def:"ts'' = ts'''@t1s"
+    using e_type_callcl_host callcl_host_Some(1)
+    by blast
+  hence "s\<bullet>\<C> \<turnstile> ves : ([] _> t1s)"
+    using ts'''_def callcl_host_Some(2,3,4)
+          e_type_const_list[OF is_const_list[OF callcl_host_Some(2)] ts''_def(1)]
     by fastforce
   thus ?case
-    using store_extension_imp_store_typing
-          host_apply_preserve_store[OF _ callcl_host_Some(6)] callcl_host_Some(7)
-    by fastforce
+    using host_apply_preserve_store[OF _ callcl_host_Some(6)] callcl_host_Some(2)
+    by (metis append_Nil e_typing_imp_list_types_agree)
 next
   case (set_global s i j v s' vs)
-  obtain insts fs clss bss gs where "s = \<lparr>inst = insts, funcs = fs, tab = clss, mem = bss, globs = gs\<rparr>"
-    using s.cases
-    by blast
-  moreover
-  obtain insts' fs' clss' bss' gs' where "s' = \<lparr>inst = insts', funcs = fs', tab = clss', mem = bss', globs = gs'\<rparr>"
-    using s.cases
-    by blast
-  moreover
-  obtain \<C>s tfs ns ms tgs where "\<S> = \<lparr>s_inst = \<C>s, s_funcs = tfs, s_tab = ns, s_mem = ms, s_globs = tgs\<rparr>"
-    using s_context.cases
-    by blast
-  moreover
-  
-  note s_S_defs = calculation
-
-  (* Prove that inst, tab and mem are not altered. *)
-  have
-  "insts = insts'"
-  "fs = fs'"
-  "clss = clss'"
-  "bss = bss'"
-    using set_global(1) s_S_defs(1,2)
-    unfolding supdate_glob_def supdate_glob_s_def
-    by (metis s.ext_inject s.update_convs(5))+
-  hence
-  "list_all2 (inst_typing \<S>) insts' \<C>s"
-  "list_all2 (cl_typing \<S>) fs' tfs"
-  "list_all (tab_agree \<S>) (concat clss')"
-  "list_all2 (\<lambda>cls n. n \<le> length cls) clss' ns"
-  "list_all2 mem_agree bss' ms"
-    using set_global(2) s_S_defs
-    unfolding store_typing.simps
-    by auto
-  moreover
-  have "list_all2 glob_agree gs' tgs"
-  proof -
-    have gs_agree:"list_all2 glob_agree gs tgs"
-      using set_global(2) s_S_defs
-      unfolding store_typing.simps
-      by auto
-    have "length gs = length gs'"
-      using s_S_defs(1,2) set_global(1)
-      unfolding supdate_glob_def supdate_glob_s_def
-      by (metis length_list_update s.select_convs(5) s.update_convs(5))
-    moreover
-    obtain k where k_def:"(sglob_ind s i j) = k"
-      by blast
-    hence "\<And>j'. \<lbrakk>j' \<noteq> k; j' < length gs\<rbrakk> \<Longrightarrow> gs!j' = gs'!j'"
-      using s_S_defs(1,2) set_global(1)
-      unfolding supdate_glob_def supdate_glob_s_def
-      by auto
-    hence "\<And>j'. \<lbrakk>j' \<noteq> k; j' < length gs\<rbrakk> \<Longrightarrow> glob_agree (gs'!j') (tgs!j')"
-      using gs_agree
-      by (metis list_all2_conv_all_nth)
-    moreover
-    have "glob_agree (gs'!k) (tgs!k)"
-    proof -
-      obtain ts'' where ts''_def:"\<C> \<turnstile> [C v] : (ts _> ts'')" "\<C> \<turnstile> [Set_global j] : (ts'' _> ts')"
-        by (metis b_e_type_comp2_unlift set_global.prems(2))
-      have b_es:"ts'' = ts@[typeof v]"
-                "ts = ts'"
-                "global \<C> ! j = \<lparr>tg_mut = T_mut, tg_t = typeof v\<rparr>"
-                "j < length (global \<C>)"
-        using b_e_type_value[OF ts''_def(1)] b_e_type_set_global[OF ts''_def(2)]
-        by auto
-      hence "j < length (global ((s_inst \<S>)!i))"
-        using set_global(4)
-        by fastforce
-      hence globs_agree:"k < length (s_globs \<S>)"
-                        "glob_agree (gs!k) (tgs!k)"
-                        "(tgs!k) = (global \<C>)!j"
-        using store_typing_imp_glob_agree[OF set_global(2,5)] b_es(4) s_S_defs(1,3) k_def set_global(4)
-        unfolding sglob_def
-        by auto
-      hence "g_mut (gs!k) = T_mut"
-            "typeof (g_val (gs!k)) = typeof v"
-        using b_es(3)
-        unfolding glob_agree_def
-        by auto
-      hence "g_mut (gs'!k) = T_mut"
-            "typeof (g_val (gs'!k)) = typeof v"
-        using set_global(1) k_def globs_agree(1) store_typing_imp_glob_length_eq[OF set_global(2)] s_S_defs(1,2)
-        unfolding supdate_glob_def supdate_glob_s_def
-        by auto
-      thus ?thesis
-        using globs_agree(3) b_es(3)
-        unfolding glob_agree_def
-        by fastforce 
-    qed
-    ultimately
-    show ?thesis
-      using gs_agree
-      unfolding list_all2_conv_all_nth
-      by fastforce
-  qed
-  ultimately
-  show ?case
-    using store_typing.intros
-    by simp
+  have "tg_t (global \<C>i ! j) = typeof v"
+       "tg_mut (global \<C>i ! j) = T_mut"
+       "j < length (global \<C>i)"
+    using types_preserved_set_global_aux(2,3,4)[OF set_global(4)] set_global(5)
+    by simp_all
+  thus ?case
+    using update_glob_store_extension[OF set_global(1)]
+    by (metis glob_agree_def set_global.prems(2) sglob_def store_typing_imp_glob_agree(2))
 next
-  (* The following are all special cases of store_preserved_mem. *)
   case (store_Some t v s i j m k off mem' vs a)
   show ?case
-    using store_preserved_mem[OF store_Some(5) _ _ store_Some(3)] store_size[OF store_Some(4)]
-    by fastforce
-next
-  case (store_packed_Some t v s i j m k off tp mem' vs a)
-  thus ?case
-    using store_preserved_mem[OF store_packed_Some(5) _ _ store_packed_Some(3)] store_packed_size[OF store_packed_Some(4)]
+    using store_size[OF store_Some(4)] store_extension_mem_leq[OF store_Some(3)]
     by simp
 next
-  case (grow_memory s i j n mem c mem' vs)
+  case (store_packed_Some t v s i j m k off tp mem' vs a)
   show ?case
-    using store_preserved_mem[OF grow_memory(5)_ _ grow_memory(2)] mem_grow_size[OF grow_memory(4)]
+    using store_size store_packed_Some(4) store_extension_mem_leq[OF store_packed_Some(3)]
+    unfolding store_packed_def
+    by simp
+next
+  case (grow_memory s i j m n c mem' vs)
+  show ?case
+    using store_extension_mem_leq[OF grow_memory(2)]
+          mem_grow_size[OF grow_memory(4)]
     by simp
 next
   case (label s vs es i s' vs' es' k lholed les les')
-  obtain \<C>' t1s t2s arb_label' arb_return' where es_def:"\<C>' = \<C>\<lparr>label := arb_label', return := arb_return'\<rparr>" "\<S>\<bullet>\<C>' \<turnstile> es : (t1s _> t2s)"
-    using types_exist_lfilled_weak[OF label(2,6)]
-    by fastforce
-  thus ?case
-    using label(4)[OF label(5) es_def(2) _ label(8)] label(7)
+  show ?case
+    using types_exist_lfilled_weak[OF label(2,7)]
+          label(4)[OF label(5,6)] label(8)
     by fastforce
 next
   case (local s vs es i s' vs' es' v0s n j)
-  obtain tls where t_local:"(\<S>\<bullet>((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i)) @ (map typeof vs), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))"
-                           "ts' = ts @ tls" "i < length (s_inst \<S>)"
-    using e_type_local[OF local(4)]
-    by blast+
-  show ?case
-    using local(2)[OF local(3) t_local(1) _ t_local(3), of "(Some tls)" "label ((s_inst \<S>)!i)" ]
-    by fastforce
-qed (simp_all)
+  obtain tls \<C>i' where tls_def:"inst_typing s i \<C>i'"
+                               "length tls = n"
+                               "s\<bullet>\<C>i'\<lparr>local := local \<C>i' @ map typeof vs,return := Some tls\<rparr> \<turnstile> es : ([] _> tls)"
+                               "ts' = ts @ tls"
+    using e_type_local[OF local(5)]
+    by blast
+  thus ?case
+    using local(2)[OF local(3) tls_def(1,3), of _  "(label \<C>i')"]
+    by force
+qed (auto simp add: store_extension_refl store_extension.intros)
+
 
 lemma store_preserved:
   assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
-          "store_typing s \<S>"
-          "\<S>\<bullet>None \<tturnstile>_i vs;es : ts"
-  shows "store_typing s' \<S>"
+          "store_typing s"
+          "s\<bullet>None \<tturnstile>_i vs;es : ts"
+  shows "store_extension s s'"
 proof -
-  show ?thesis
-    using store_preserved1[OF assms(1,2), of _ "[]" "ts" None "label (s_inst \<S>!i)"]
-          s_type_unfold[OF assms(3)]
+  obtain \<C>i where \<C>i_def:"inst_typing s i \<C>i"
+                         "s\<bullet>(\<C>i\<lparr>local := local \<C>i @ map typeof vs, return := None\<rparr>) \<turnstile> es : ([] _> ts)"
+    using s_type_unfold[OF assms(3)]
+    by fastforce
+  thus ?thesis
+    using reduce_store_extension[OF assms(1,2) \<C>i_def(1,2), of None "label \<C>i"]
     by fastforce
 qed
 
 lemma typeof_unop_testop:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
           "(e = (Unop t uop)) \<or> (e = (Testop t top'))"
   shows "(typeof v) = t"
         "e = Unop t uop \<Longrightarrow> unop_t_agree uop t"
@@ -216,7 +121,7 @@ proof -
 qed
 
 lemma typeof_cvtop:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
           "e = Cvtop t1 cvtop t sx"
   shows "(typeof v) = t"
         "cvtop = Convert \<Longrightarrow> (t1 \<noteq> t) \<and> ((sx = None) = ((is_float_t t1 \<and> is_float_t t) \<or> (is_int_t t1 \<and> is_int_t t \<and> (t_length t1 < t_length t))))"
@@ -237,9 +142,9 @@ qed
 
 lemma types_preserved_unop_testop_cvtop:
   assumes "\<lparr>[$C v, $e]\<rparr> \<leadsto> \<lparr>[$C v']\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
           "(e = (Unop t op)) \<or> (e = (Testop t testop))  \<or> (e = (Cvtop t2 cvtop t sx))"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts')"
 proof -
   have  "\<C> \<turnstile> [C v, e] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -261,14 +166,14 @@ proof -
     using b_e_typing.const
     by metis
   ultimately
-  show "\<S>\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts')"
+  show "s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts')"
     using e_typing_s_typing.intros(1)
           b_e_typing.weakening[of \<C> "[C v']" "[]" "[arity_1_result e]" ts]
     by fastforce
 qed
 
 lemma typeof_binop_relop:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v1, $C v2, $e] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $e] : (ts _> ts')"
           "e = Binop t bop \<or> e = Relop t rop"
   shows "typeof v1 = t"
         "typeof v2 = t"
@@ -296,9 +201,9 @@ qed
 
 lemma types_preserved_binop_relop:
   assumes "\<lparr>[$C v1, $C v2, $e]\<rparr> \<leadsto> \<lparr>[$C v']\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C v1, $C v2, $e] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $e] : (ts _> ts')"
           "e = Binop t bop \<or> e = Relop t rop"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C v1, C v2, e] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -334,9 +239,9 @@ qed
 
 lemma types_preserved_drop:
   assumes "\<lparr>[$C v, $e]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C v, $e] : (ts _> ts')"
           "(e = (Drop))"
-  shows "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C v, e] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -360,9 +265,9 @@ qed
 
 lemma types_preserved_select:
   assumes "\<lparr>[$C v1, $C v2, $C vn, $e]\<rparr> \<leadsto> \<lparr>[$C v3]\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn, $e] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn, $e] : (ts _> ts')"
           "(e = Select)"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C v1, C v2, C vn, e] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -395,16 +300,16 @@ qed
 
 lemma types_preserved_block:
   assumes "\<lparr>vs @ [$Block (tn _> tm) es]\<rparr> \<leadsto> \<lparr>[Label m [] (vs @ ($* es))]\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> vs @ [$Block (tn _> tm) es] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> vs @ [$Block (tn _> tm) es] : (ts _> ts')"
           "const_list vs"
           "length vs = n"
           "length tn = n"
           "length tm = m"
-  shows "\<S>\<bullet>\<C> \<turnstile> [Label m [] (vs @ ($* es))] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [Label m [] (vs @ ($* es))] : (ts _> ts')"
 proof -
   obtain \<C>' where c_def:"\<C>' = \<C>\<lparr>label := [tm] @ label \<C>\<rparr>" by blast
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> vs : (ts _> ts'')" "\<S>\<bullet>\<C> \<turnstile> [$Block (tn _> tm) es] : (ts'' _> ts')"
-    using assms(2) e_type_comp[of \<S> \<C> vs "$Block (tn _> tm) es" ts ts']
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> vs : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [$Block (tn _> tm) es] : (ts'' _> ts')"
+    using assms(2) e_type_comp[of s \<C> vs "$Block (tn _> tm) es" ts ts']
     by fastforce
   hence "\<C> \<turnstile> [Block (tn _> tm) es] : (ts'' _> ts')"
     using unlift_b_e
@@ -415,31 +320,31 @@ proof -
   hence tfn_l:"length tfn = n"
     using assms(5)
     by simp
-  obtain tvs' where tvs'_def:"ts'' = ts@tvs'" "length tvs' = n" "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tvs')"
+  obtain tvs' where tvs'_def:"ts'' = ts@tvs'" "length tvs' = n" "s\<bullet>\<C>' \<turnstile> vs : ([] _> tvs')"
     using e_type_const_list assms(3,4) ts''_def(1)
     by fastforce
-  hence "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tn)" "\<S>\<bullet>\<C>' \<turnstile> $*es : (tn _> tm)"
+  hence "s\<bullet>\<C>' \<turnstile> vs : ([] _> tn)" "s\<bullet>\<C>' \<turnstile> $*es : (tn _> tm)"
     using ts_c_def tvs'_def tfn_l ts''_def c_def e_typing_s_typing.intros(1)
     by simp_all
-  hence "\<S>\<bullet>\<C>' \<turnstile> (vs @ ($* es)) : ([] _> tm)" using e_type_comp_conc
+  hence "s\<bullet>\<C>' \<turnstile> (vs @ ($* es)) : ([] _> tm)" using e_type_comp_conc
     by simp
   moreover
-  have "\<S>\<bullet>\<C> \<turnstile> [] : (tm _> tm)"
+  have "s\<bullet>\<C> \<turnstile> [] : (tm _> tm)"
     using b_e_type_empty[of \<C> "[]" "[]"]
           e_typing_s_typing.intros(1)[where ?b_es = "[]"]
-          e_typing_s_typing.intros(3)[of \<S> \<C> "[]" "[]" "[]" "tm"]
+          e_typing_s_typing.intros(3)[of s \<C> "[]" "[]" "[]" "tm"]
     by fastforce
   ultimately
   show ?thesis
-    using e_typing_s_typing.intros(7)[of \<S> \<C> "[]" tm _ "vs @ ($* es)" m]
+    using e_typing_s_typing.intros(7)[of s \<C> "[]" tm _ "vs @ ($* es)" m]
           ts_c_def tvs'_def assms(5,6) e_typing_s_typing.intros(3) c_def
     by fastforce
 qed
 
 lemma types_preserved_if:
   assumes "\<lparr>[$C ConstInt32 n, $If tf e1s e2s]\<rparr> \<leadsto> \<lparr>[$Block tf es']\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 n, $If tf e1s e2s] : (ts _> ts')"
-  shows   "\<S>\<bullet>\<C> \<turnstile> [$Block tf es'] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C ConstInt32 n, $If tf e1s e2s] : (ts _> ts')"
+  shows   "s\<bullet>\<C> \<turnstile> [$Block tf es'] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C ConstInt32 n, If tf e1s e2s] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -473,9 +378,9 @@ qed
 
 lemma types_preserved_tee_local:
   assumes "\<lparr>[v, $Tee_local i]\<rparr> \<leadsto> \<lparr>[v, v, $Set_local i]\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [v, $Tee_local i] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [v, $Tee_local i] : (ts _> ts')"
           "is_const v"
-  shows   "\<S>\<bullet>\<C> \<turnstile> [v, v, $Set_local i] : (ts _> ts')"
+  shows   "s\<bullet>\<C> \<turnstile> [v, v, $Set_local i] : (ts _> ts')"
 proof -
   obtain bv where bv_def:"v = $C bv"
     using e_type_const_unwrap assms(3)
@@ -514,14 +419,14 @@ qed
 
 lemma types_preserved_loop:
   assumes "\<lparr>vs @ [$Loop (t1s _> t2s) es]\<rparr> \<leadsto> \<lparr>[Label n [$Loop (t1s _> t2s) es] (vs @ ($* es))]\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> vs @ [$Loop (t1s _> t2s) es] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> vs @ [$Loop (t1s _> t2s) es] : (ts _> ts')"
           "const_list vs"
           "length vs = n"
           "length t1s = n"
           "length t2s = m"
-  shows "\<S>\<bullet>\<C> \<turnstile> [Label n [$Loop (t1s _> t2s) es] (vs @ ($* es))] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [Label n [$Loop (t1s _> t2s) es] (vs @ ($* es))] : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> vs : (ts _> ts'')" "\<S>\<bullet>\<C> \<turnstile> [$Loop (t1s _> t2s) es] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> vs : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [$Loop (t1s _> t2s) es] : (ts'' _> ts')"
     using assms(2) e_type_comp
     by fastforce
   then have "\<C> \<turnstile> [Loop (t1s _> t2s) es] : (ts'' _> ts')"
@@ -534,25 +439,25 @@ proof -
                                            "(\<C>' \<turnstile> es : (tfn _> tfm))"
     using b_e_type_loop[of \<C> "Loop (t1s _> t2s) es" ts'' ts']
     by fastforce
-  obtain tvs where tvs_def:"ts'' = ts @ tvs" "length vs = length tvs" "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tvs)"
+  obtain tvs where tvs_def:"ts'' = ts @ tvs" "length vs = length tvs" "s\<bullet>\<C>' \<turnstile> vs : ([] _> tvs)"
     using e_type_const_list assms(3) ts''_def(1)
     by fastforce
   then have tvs_eq:"tvs = t1s" "tfn = t1s"
     using assms(4,5) t_loop(1,2)
     by simp_all
-  have "\<S>\<bullet>\<C> \<turnstile> [$Loop (t1s _> t2s) es] : (t1s _> t2s)"
+  have "s\<bullet>\<C> \<turnstile> [$Loop (t1s _> t2s) es] : (t1s _> t2s)"
     using t_loop b_e_typing.loop e_typing_s_typing.intros(1)
     by fastforce
   moreover
-  have "\<S>\<bullet>\<C>' \<turnstile> $*es : (t1s _> t2s)"
+  have "s\<bullet>\<C>' \<turnstile> $*es : (t1s _> t2s)"
     using t_loop e_typing_s_typing.intros(1)
     by fastforce
-  then have "\<S>\<bullet>\<C>' \<turnstile> vs@($*es) : ([] _> t2s)"
+  then have "s\<bullet>\<C>' \<turnstile> vs@($*es) : ([] _> t2s)"
     using tvs_eq tvs_def(3) e_type_comp_conc
     by blast
   ultimately
-  have "\<S>\<bullet>\<C> \<turnstile> [Label n [$Loop (t1s _> t2s) es] (vs @ ($* es))] : ([] _> t2s)"
-    using e_typing_s_typing.intros(7)[of \<S> \<C> "[$Loop (t1s _> t2s) es]" t1s t2s "vs @ ($* es)"]
+  have "s\<bullet>\<C> \<turnstile> [Label n [$Loop (t1s _> t2s) es] (vs @ ($* es))] : ([] _> t2s)"
+    using e_typing_s_typing.intros(7)[of s \<C> "[$Loop (t1s _> t2s) es]" t1s t2s "vs @ ($* es)"]
           t_loop(4) assms(5)
     by fastforce
   then show ?thesis
@@ -562,26 +467,26 @@ qed
 
 lemma types_preserved_label_value:
   assumes "\<lparr>[Label n es0 vs]\<rparr> \<leadsto> \<lparr>vs\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [Label n es0 vs] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [Label n es0 vs] : (ts _> ts')"
           "const_list vs"
-  shows "\<S>\<bullet>\<C> \<turnstile> vs : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> vs : (ts _> ts')"
 proof -
   obtain tls t2s where t2s_def:"(ts' = (ts@t2s))"
-                           "(\<S>\<bullet>\<C> \<turnstile> es0 : (tls _> t2s))"
-                           "(\<S>\<bullet>\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr> \<turnstile> vs : ([] _> t2s))"
+                           "(s\<bullet>\<C> \<turnstile> es0 : (tls _> t2s))"
+                           "(s\<bullet>\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr> \<turnstile> vs : ([] _> t2s))"
     using assms e_type_label
     by fastforce
   thus ?thesis
-    using e_type_const_list[of vs \<S> "\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr>" "[]" t2s]
+    using e_type_const_list[of vs s "\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr>" "[]" t2s]
           assms(3) e_typing_s_typing.intros(3)
     by fastforce
 qed
 
 lemma types_preserved_br_if:
   assumes "\<lparr>[$C ConstInt32 n, $Br_if i]\<rparr> \<leadsto> \<lparr>e\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 n, $Br_if i] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C ConstInt32 n, $Br_if i] : (ts _> ts')"
           "e = [$Br i] \<or> e = []"
-  shows   "\<S>\<bullet>\<C> \<turnstile> e : (ts _> ts')"
+  shows   "s\<bullet>\<C> \<turnstile> e : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C ConstInt32 n, Br_if i] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -616,9 +521,9 @@ qed
 
 lemma types_preserved_br_table:
   assumes "\<lparr>[$C ConstInt32 c, $Br_table is i]\<rparr> \<leadsto> \<lparr>[$Br i']\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Br_table is i] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Br_table is i] : (ts _> ts')"
           "(i' = (is ! nat_of_int c) \<and> length is > nat_of_int c) \<or> i' = i"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$Br i'] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [$Br i'] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C ConstInt32 c, Br_table is i] : (ts _> ts')"
     using unlift_b_e assms(2)
@@ -644,16 +549,16 @@ qed
 
 lemma types_preserved_local_const:
   assumes "\<lparr>[Local n i vs es]\<rparr> \<leadsto> \<lparr>es\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [Local n i vs es] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [Local n i vs es] : (ts _> ts')"
           "const_list es"
-  shows "\<S>\<bullet>\<C> \<turnstile> es: (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> es: (ts _> ts')"
 proof -
-  obtain tls where "(\<S>\<bullet>((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i)) @ (map typeof vs), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))"
+  obtain tls \<C>i where "(s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof vs), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))"
                    "ts' = ts @ tls"
     using e_type_local[OF assms(2)]
     by blast+
   moreover
-  then have "\<S>\<bullet>\<C> \<turnstile> es : ([] _> tls)"
+  then have "s\<bullet>\<C> \<turnstile> es : ([] _> tls)"
     using assms(3) e_type_const_list
     by fastforce
   ultimately
@@ -664,7 +569,7 @@ qed
 
 lemma typing_map_typeof:
   assumes "ves = $$* vs"
-          "\<S>\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
+          "s\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
   shows "tvs = map typeof vs"
   using assms
 proof (induction ves arbitrary: vs tvs rule: List.rev_induct)
@@ -680,7 +585,7 @@ next
   obtain vs' v' where vs'_def:"ves @ [a] = $$* (vs'@[v'])" "vs = vs'@[v']"
     using snoc(2)
     by (metis Nil_is_map_conv append_is_Nil_conv list.distinct(1) rev_exhaust)
-  obtain tvs' where tvs'_def:"\<S>\<bullet>\<C> \<turnstile> ves: ([] _> tvs')" "\<S>\<bullet>\<C> \<turnstile> [a] : (tvs' _> tvs)"
+  obtain tvs' where tvs'_def:"s\<bullet>\<C> \<turnstile> ves: ([] _> tvs')" "s\<bullet>\<C> \<turnstile> [a] : (tvs' _> tvs)"
     using snoc(3) e_type_comp
     by fastforce
   hence "tvs' = map typeof vs'"
@@ -691,14 +596,14 @@ next
     using vs'_def
     unfolding is_const_def
     by auto
-  then obtain t where t_def:"tvs = tvs' @ [t]" "\<S>\<bullet>\<C> \<turnstile> [a] : ([] _> [t])"
-    using tvs'_def(2)  e_type_const[of a \<S> \<C> tvs' tvs]
+  then obtain t where t_def:"tvs = tvs' @ [t]" "s\<bullet>\<C> \<turnstile> [a] : ([] _> [t])"
+    using tvs'_def(2)  e_type_const[of a s \<C> tvs' tvs]
     by fastforce
   have "a = $ C v'"
     using vs'_def(1)
     by auto
   hence "t = typeof v'"
-    using t_def unlift_b_e[of \<S> \<C> "[C v']" "([] _> [t])"] b_e_type_value[of \<C> "C v'" "[]" "[t]" v']
+    using t_def unlift_b_e[of s \<C> "[C v']" "([] _> [t])"] b_e_type_value[of \<C> "C v'" "[]" "[t]" v']
     by fastforce
   ultimately
   show ?case
@@ -707,68 +612,62 @@ next
 qed
 
 lemma types_preserved_call_indirect_Some:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Call_indirect j] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Call_indirect j] : (ts _> ts')"
           "stab s i' (nat_of_int c) = Some cl"
           "stypes s i' j = tf"
           "cl_type cl = tf"
-          "store_typing s \<S>"
-          "i' < length (inst s)"
-          "\<C> = (s_inst \<S> ! i') \<lparr>local := local (s_inst \<S> ! i') @ tvs, label := arb_labs, return := arb_return\<rparr>"
-  shows "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (ts _> ts')"
+          "store_typing s"
+          "inst_typing s i' \<C>i"
+          "\<C> = \<C>i\<lparr>local := local \<C>i @ tvs, label := arb_labs, return := arb_return\<rparr>"
+  shows "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts _> ts')"
 proof -
   obtain t1s t2s where tf_def:"tf = (t1s _> t2s)"
     using tf.exhaust by blast
   obtain ts'' where ts''_def:"\<C> \<turnstile> [C ConstInt32 c] : (ts _> ts'')"
                              "\<C> \<turnstile> [Call_indirect j] : (ts'' _> ts')"
-    using e_type_comp[of \<S> \<C> "[$C ConstInt32 c]" "$Call_indirect j" ts ts']
+    using e_type_comp[of s \<C> "[$C ConstInt32 c]" "$Call_indirect j" ts ts']
           assms(1)
-          unlift_b_e[of \<S> \<C> "[C ConstInt32 c]"]
-          unlift_b_e[of \<S> \<C> "[Call_indirect j]"]
+          unlift_b_e[of s \<C> "[C ConstInt32 c]"]
+          unlift_b_e[of s \<C> "[Call_indirect j]"]
     by fastforce
   hence "ts'' = ts@[(T_i32)]"
     using b_e_type_value
     unfolding typeof_def
     by fastforce
   moreover
-  have "i' < length (s_inst \<S>)"
-    using assms(5,6) store_typing_imp_inst_length_eq
-    by fastforce
-  hence stypes_eq:"types_t (s_inst \<S> ! i') = types (inst s ! i')"
-    using store_typing_imp_inst_typing[OF assms(5)] store_typing_imp_inst_length_eq[OF assms(5)]
-    unfolding inst_typing.simps
-    by fastforce
   obtain ts''a where ts''a_def:"j < length (types_t \<C>)"
                                "ts'' = ts''a @ t1s @ [T_i32]"
                                "ts' = ts''a @ t2s"
                                "types_t \<C> ! j = (t1s _> t2s)"
-    using b_e_type_call_indirect[OF ts''_def(2), of j] tf_def assms(3,7) stypes_eq
+    using b_e_type_call_indirect[OF ts''_def(2), of j] tf_def assms(3,7)
+          store_typing_imp_types_eq[OF assms(6)]
     unfolding stypes_def
     by fastforce
   moreover
-  obtain tf' where tf'_def:"cl_typing \<S> cl tf'"
+  obtain tf' where tf'_def:"cl_typing s cl tf'"
     using assms(2,5,6) stab_typed_some_imp_cl_typed
     by blast
-  hence "cl_typing \<S> cl tf"
+  hence "cl_typing s cl tf"
     using assms(4)
     unfolding cl_typing.simps cl_type_def
     by auto
-  hence "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : tf"
+  hence "s\<bullet>\<C> \<turnstile> [Callcl cl] : tf"
     using e_typing_s_typing.intros(6) assms(6,7) ts''a_def(1)
     by fastforce
   ultimately
-  show "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (ts _> ts')"
+  show "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts _> ts')"
     using tf_def e_typing_s_typing.intros(3)
     by auto
 qed
 
 lemma types_preserved_call_indirect_None:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Call_indirect j] : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> [Trap] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Call_indirect j] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [Trap] : (ts _> ts')"
   using e_typing_s_typing.intros(4)
   by blast
 
 lemma types_preserved_callcl_native:
-  assumes "\<S>\<bullet>\<C> \<turnstile> ves @ [Callcl cl] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> ves @ [Callcl cl] : (ts _> ts')"
           "cl = Func_native i (t1s _> t2s) tfs es"
           "ves = $$* vs"
           "length vs = n"
@@ -776,10 +675,10 @@ lemma types_preserved_callcl_native:
           "length t1s = n"
           "length t2s = m"
           "n_zeros tfs = zs"
-          "store_typing s \<S>"
-  shows "\<S>\<bullet>\<C> \<turnstile> [Local m i (vs @ zs) [$Block ([] _> t2s) es]] : (ts _> ts')"
+          "store_typing s"
+  shows "s\<bullet>\<C> \<turnstile> [Local m i (vs @ zs) [$Block ([] _> t2s) es]] : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
   using assms(1) e_type_comp
   by fastforce
   have ves_c:"const_list ves"
@@ -787,25 +686,20 @@ proof -
     by simp
   then obtain tvs where tvs_def:"ts'' = ts @ tvs"
                                 "length t1s = length tvs"
-                                "\<S>\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
-    using ts''_def(1) e_type_const_list[of ves \<S> \<C> ts ts''] assms
+                                "s\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
+    using ts''_def(1) e_type_const_list[of ves s \<C> ts ts''] assms
     by fastforce    
   obtain ts_c \<C>' where ts_c_def:"(ts'' = ts_c @ t1s)"
                                 "(ts' = ts_c @ t2s)"
-                                "i < length (s_inst \<S>)"
-                                "\<C>' = ((s_inst \<S>)!i)"
+                                "inst_typing s i \<C>'"
                                 "(\<C>'\<lparr>local := (local \<C>') @ t1s @ tfs, label := ([t2s] @ (label \<C>')), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
     using e_type_callcl_native[OF ts''_def(2) assms(2)]
     by fastforce
-  have "inst_typing \<S> (inst s ! i) (s_inst \<S> ! i)"
-    using store_typing_imp_inst_length_eq[OF assms(9)] store_typing_imp_inst_typing[OF assms(9)]
-          ts_c_def(3)
-    by simp
   obtain \<C>'' where c''_def:"\<C>'' = \<C>'\<lparr>local := (local \<C>') @ t1s @ tfs, return := Some t2s\<rparr>"
     by blast
   hence "\<C>''\<lparr>label := ([t2s] @ (label \<C>''))\<rparr>  = \<C>'\<lparr>local := (local \<C>') @ t1s @ tfs, label := ([t2s] @ (label \<C>')), return := Some t2s\<rparr>"
     by fastforce
-  hence "\<S>\<bullet>\<C>'' \<turnstile> [$Block ([] _> t2s) es] : ([] _> t2s)"
+  hence "s\<bullet>\<C>'' \<turnstile> [$Block ([] _> t2s) es] : ([] _> t2s)"
     using ts_c_def b_e_typing.block[of "([] _> t2s)" "[]" "t2s" _ es] e_typing_s_typing.intros(1)[of _ "[Block ([] _> t2s) es]"]
     by fastforce
   moreover
@@ -822,7 +716,7 @@ proof -
     using 1
     by simp
   ultimately
-  have "\<S>\<bullet>Some t2s \<tturnstile>_i (vs @ zs);([$Block ([] _> t2s) es]) : t2s"
+  have "s\<bullet>Some t2s \<tturnstile>_i (vs @ zs);([$Block ([] _> t2s) es]) : t2s"
     using e_typing_s_typing.intros(8) ts_c_def c''_def
     by fastforce
   thus ?thesis
@@ -831,17 +725,17 @@ proof -
 qed
 
 lemma types_preserved_callcl_host_some:
-  assumes "\<S>\<bullet>\<C> \<turnstile> ves @ [Callcl cl] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> ves @ [Callcl cl] : (ts _> ts')"
           "cl = Func_host (t1s _> t2s) f"
           "ves = $$* vcs"
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
           "host_apply s (t1s _> t2s) f vcs hs = Some (s', vcs')"
-          "store_typing s \<S>"
-  shows "\<S>\<bullet>\<C> \<turnstile> $$* vcs' : (ts _> ts')"
+          "store_typing s"
+  shows "s'\<bullet>\<C> \<turnstile> $$* vcs' : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
   using assms(1) e_type_comp
   by fastforce
   have ves_c:"const_list ves"
@@ -849,8 +743,8 @@ proof -
     by simp
   then obtain tvs where tvs_def:"ts'' = ts @ tvs"
                                 "length t1s = length tvs"
-                                "\<S>\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
-    using ts''_def(1) e_type_const_list[of ves \<S> \<C> ts ts''] assms
+                                "s\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
+    using ts''_def(1) e_type_const_list[of ves s \<C> ts ts''] assms
     by fastforce
   hence "ts'' = ts @ t1s"
         "ts' = ts @ t2s"
@@ -860,7 +754,7 @@ proof -
   hence "list_all2 types_agree t1s vcs"
     using e_typing_imp_list_types_agree[where ?ts' = "[]"] assms(3) tvs_def(1,3)
     by fastforce
-  hence "\<S>\<bullet>\<C> \<turnstile> $$* vcs' : ([] _> t2s)"
+  hence "s'\<bullet>\<C> \<turnstile> $$* vcs' : ([] _> t2s)"
     using list_types_agree_imp_e_typing host_apply_respect_type[OF _ assms(7)]
     by fastforce
   ultimately
@@ -870,16 +764,16 @@ proof -
 qed
 
 lemma types_imp_concat:
-  assumes "\<S>\<bullet>\<C> \<turnstile> es @ [e] @ es' : (ts _> ts')"
-          "\<And>tes tes'. ((\<S>\<bullet>\<C> \<turnstile> [e] : (tes _> tes')) \<Longrightarrow> (\<S>\<bullet>\<C> \<turnstile> [e'] : (tes _> tes')))"
-  shows "\<S>\<bullet>\<C> \<turnstile> es @ [e'] @ es' : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> es @ [e] @ es' : (ts _> ts')"
+          "\<And>tes tes'. ((s\<bullet>\<C> \<turnstile> [e] : (tes _> tes')) \<Longrightarrow> (s\<bullet>\<C> \<turnstile> [e'] : (tes _> tes')))"
+  shows "s\<bullet>\<C> \<turnstile> es @ [e'] @ es' : (ts _> ts')"
 proof -
-  obtain ts'' where "\<S>\<bullet>\<C> \<turnstile> es : (ts _> ts'')"
-                    "\<S>\<bullet>\<C> \<turnstile> [e] @ es' : (ts'' _> ts')"
+  obtain ts'' where "s\<bullet>\<C> \<turnstile> es : (ts _> ts'')"
+                    "s\<bullet>\<C> \<turnstile> [e] @ es' : (ts'' _> ts')"
     using e_type_comp_conc1[of _ _ es "[e] @ es'"] assms(1)
     by fastforce
   moreover
-  then obtain ts''' where "\<S>\<bullet>\<C> \<turnstile> [e] : (ts'' _> ts''')" "\<S>\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
+  then obtain ts''' where "s\<bullet>\<C> \<turnstile> [e] : (ts'' _> ts''')" "s\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
     using e_type_comp_conc1[of _ _ "[e]" es' ts'' ts'] assms
     by fastforce
   ultimately
@@ -893,27 +787,27 @@ lemma type_const_return:
   assumes "Lfilled i lholed (vs @ [$Return]) LI"
           "(return \<C>) = Some tcs"
           "length tcs = length vs"
-          "\<S>\<bullet>\<C> \<turnstile> LI : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> LI : (ts _> ts')"
           "const_list vs"
-  shows "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tcs)"
+  shows "s\<bullet>\<C>' \<turnstile> vs : ([] _> tcs)"
   using assms
 proof (induction i arbitrary: ts ts' lholed \<C> LI \<C>')
   case 0
   obtain vs' es' where "LI = (vs' @ (vs @ [$Return]) @ es')"
     using Lfilled.simps[of 0 lholed "(vs @ [$Return])" LI] 0(1)
     by fastforce
-  then obtain ts'' ts''' where "\<S>\<bullet>\<C> \<turnstile> vs' : (ts _> ts'')"
-                               "\<S>\<bullet>\<C> \<turnstile> (vs @ [$Return]) : (ts'' _> ts''')"
-                               "\<S>\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
-    using e_type_comp_conc2[of \<S> \<C> vs' "(vs @ [$Return])" es'] 0(4)
+  then obtain ts'' ts''' where "s\<bullet>\<C> \<turnstile> vs' : (ts _> ts'')"
+                               "s\<bullet>\<C> \<turnstile> (vs @ [$Return]) : (ts'' _> ts''')"
+                               "s\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
+    using e_type_comp_conc2[of s \<C> vs' "(vs @ [$Return])" es'] 0(4)
     by fastforce
-  then obtain ts_b where ts_b_def:"\<S>\<bullet>\<C> \<turnstile> vs : (ts'' _> ts_b)" "\<S>\<bullet>\<C> \<turnstile> [$Return] : (ts_b _> ts''')"
+  then obtain ts_b where ts_b_def:"s\<bullet>\<C> \<turnstile> vs : (ts'' _> ts_b)" "s\<bullet>\<C> \<turnstile> [$Return] : (ts_b _> ts''')"
     using e_type_comp_conc1
     by fastforce
   then obtain ts_c where ts_c_def:"ts_b = ts_c @ tcs" "(return \<C>) = Some tcs"
-    using 0(2) b_e_type_return[of \<C>] unlift_b_e[of \<S> \<C> "[Return]" "ts_b _> ts'''"]
+    using 0(2) b_e_type_return[of \<C>] unlift_b_e[of s \<C> "[Return]" "ts_b _> ts'''"]
     by fastforce
-  obtain tcs' where "ts_b = ts'' @ tcs'" "length vs = length tcs'" "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tcs')"
+  obtain tcs' where "ts_b = ts'' @ tcs'" "length vs = length tcs'" "s\<bullet>\<C>' \<turnstile> vs : ([] _> tcs')"
     using ts_b_def(1) e_type_const_list 0(5)
     by fastforce
   thus ?case
@@ -926,16 +820,16 @@ next
                                            "LI = (vs' @ [Label n les LK] @ les')"
     using Lfilled.simps[of "(Suc i)" lholed "(vs @ [$Return])" LI] Suc(2)
     by fastforce
-  then obtain ts'' ts''' where "\<S>\<bullet>\<C> \<turnstile> [Label n les LK] : (ts'' _> ts''')"
-    using e_type_comp_conc2[of \<S> \<C> vs' "[Label n les LK]" les'] Suc(5)
+  then obtain ts'' ts''' where "s\<bullet>\<C> \<turnstile> [Label n les LK] : (ts'' _> ts''')"
+    using e_type_comp_conc2[of s \<C> vs' "[Label n les LK]" les'] Suc(5)
     by fastforce
   then obtain tls t2s where
        "ts''' = ts'' @ t2s"
        "length tls = n"
-       "\<S>\<bullet>\<C> \<turnstile> les : (tls _> t2s)"
-       "\<S>\<bullet>\<C>\<lparr>label := [tls] @ label \<C>\<rparr> \<turnstile> LK : ([] _> t2s)"
+       "s\<bullet>\<C> \<turnstile> les : (tls _> t2s)"
+       "s\<bullet>\<C>\<lparr>label := [tls] @ label \<C>\<rparr> \<turnstile> LK : ([] _> t2s)"
        "return (\<C>\<lparr>label := [tls] @ label \<C>\<rparr>) = Some tcs"
-    using e_type_label[of \<S> \<C> n les LK ts'' ts'''] Suc(3)
+    using e_type_label[of s \<C> n les LK ts'' ts'''] Suc(3)
     by fastforce
   then show ?case
     using Suc(1)[OF es_def(2) _ assms(3) _ assms(5)]
@@ -944,20 +838,21 @@ qed
 
 lemma types_preserved_return:
   assumes "\<lparr>[Local n i vls LI]\<rparr> \<leadsto> \<lparr>ves\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [Local n i vls LI] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [Local n i vls LI] : (ts _> ts')"
           "const_list ves"
           "length ves = n"
           "Lfilled j lholed (ves @ [$Return]) LI"
-  shows "\<S>\<bullet>\<C> \<turnstile> ves : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> ves : (ts _> ts')"
 proof -
-  obtain tls \<C>' where l_def:"i < length (s_inst \<S>)"
-                        "\<C>' = ((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i)) @ (map typeof vls), return := Some tls\<rparr>"
-                        "\<S>\<bullet>\<C>' \<turnstile> LI : ([] _> tls)"
+  obtain tls \<C>' \<C>i where l_def:
+                        "inst_typing s i \<C>i"
+                        "\<C>' = \<C>i\<lparr>local := (local \<C>i) @ (map typeof vls), return := Some tls\<rparr>"
+                        "s\<bullet>\<C>' \<turnstile> LI : ([] _> tls)"
                         "ts' = ts @ tls"
                         "length tls = n"
     using e_type_local[OF assms(2)]
     by blast
-  hence "\<S>\<bullet>\<C> \<turnstile> ves : ([] _> tls)"
+  hence "s\<bullet>\<C> \<turnstile> ves : ([] _> tls)"
     using type_const_return[OF assms(5) _ _ l_def(3)] assms(3-5)
     by fastforce
   thus ?thesis
@@ -970,27 +865,27 @@ lemma type_const_br:
           "length (label \<C>) > k"
           "(label \<C>)!k = tcs"
           "length tcs = length vs"
-          "\<S>\<bullet>\<C> \<turnstile> LI : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> LI : (ts _> ts')"
           "const_list vs"
-  shows "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tcs)"
+  shows "s\<bullet>\<C>' \<turnstile> vs : ([] _> tcs)"
   using assms
 proof (induction i arbitrary: k ts ts' lholed \<C> LI \<C>')
   case 0
   obtain vs' es' where "LI = (vs' @ (vs @ [$Br (0+k)]) @ es')"
     using Lfilled.simps[of 0 lholed "(vs @ [$Br (0 + k)])" LI] 0(1)
     by fastforce
-  then obtain ts'' ts''' where "\<S>\<bullet>\<C> \<turnstile> vs' : (ts _> ts'')"
-                               "\<S>\<bullet>\<C> \<turnstile> (vs @ [$Br (0+k)]) : (ts'' _> ts''')"
-                               "\<S>\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
-    using e_type_comp_conc2[of \<S> \<C> vs' "(vs @ [$Br (0+k)])" es'] 0(5)
+  then obtain ts'' ts''' where "s\<bullet>\<C> \<turnstile> vs' : (ts _> ts'')"
+                               "s\<bullet>\<C> \<turnstile> (vs @ [$Br (0+k)]) : (ts'' _> ts''')"
+                               "s\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
+    using e_type_comp_conc2[of s \<C> vs' "(vs @ [$Br (0+k)])" es'] 0(5)
     by fastforce
-  then obtain ts_b where ts_b_def:"\<S>\<bullet>\<C> \<turnstile> vs : (ts'' _> ts_b)" "\<S>\<bullet>\<C> \<turnstile> [$Br (0+k)] : (ts_b _> ts''')"
+  then obtain ts_b where ts_b_def:"s\<bullet>\<C> \<turnstile> vs : (ts'' _> ts_b)" "s\<bullet>\<C> \<turnstile> [$Br (0+k)] : (ts_b _> ts''')"
     using e_type_comp_conc1
     by fastforce
   then obtain ts_c where ts_c_def:"ts_b = ts_c @ tcs" "(label \<C>)!k = tcs"
-    using 0(3) b_e_type_br[of \<C> "Br (0 + k)"] unlift_b_e[of \<S> \<C> "[Br (0 + k)]" "ts_b _> ts'''"]
+    using 0(3) b_e_type_br[of \<C> "Br (0 + k)"] unlift_b_e[of s \<C> "[Br (0 + k)]" "ts_b _> ts'''"]
     by fastforce
-  obtain tcs' where "ts_b = ts'' @ tcs'" "length vs = length tcs'" "\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tcs')"
+  obtain tcs' where "ts_b = ts'' @ tcs'" "length vs = length tcs'" "s\<bullet>\<C>' \<turnstile> vs : ([] _> tcs')"
     using ts_b_def(1) e_type_const_list 0(6)
     by fastforce
   thus ?case
@@ -1003,14 +898,14 @@ next
                                            "LI = (vs' @ [Label n les LK] @ les')"
     using Lfilled.simps[of "(Suc i)" lholed "(vs @ [$Br ((Suc i) + k)])" LI] Suc(2)
     by fastforce
-  then obtain ts'' ts''' where "\<S>\<bullet>\<C> \<turnstile> [Label n les LK] : (ts'' _> ts''')"
-    using e_type_comp_conc2[of \<S> \<C> vs' "[Label n les LK]" les'] Suc(6)
+  then obtain ts'' ts''' where "s\<bullet>\<C> \<turnstile> [Label n les LK] : (ts'' _> ts''')"
+    using e_type_comp_conc2[of s \<C> vs' "[Label n les LK]" les'] Suc(6)
     by fastforce
   moreover
-  then obtain lts \<C>'' ts'''' where "\<S>\<bullet>\<C>'' \<turnstile> LK : ([] _> ts'''')" "\<C>'' = \<C>\<lparr>label := [lts] @ (label \<C>)\<rparr>"
+  then obtain lts \<C>'' ts'''' where "s\<bullet>\<C>'' \<turnstile> LK : ([] _> ts'''')" "\<C>'' = \<C>\<lparr>label := [lts] @ (label \<C>)\<rparr>"
                              "length (label \<C>'') > (Suc k)"
                              "(label \<C>'')!(Suc k) = tcs"
-    using e_type_label[of \<S> \<C> n les LK ts'' ts'''] Suc(3,4)
+    using e_type_label[of s \<C> n les LK ts'' ts'''] Suc(3,4)
     by fastforce
   then show ?case
     using Suc(1) es_def(2) assms(4,6)
@@ -1019,22 +914,22 @@ qed
 
 lemma types_preserved_br:
   assumes "\<lparr>[Label n es0 LI]\<rparr> \<leadsto> \<lparr>vs @ es0\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> [Label n es0 LI] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [Label n es0 LI] : (ts _> ts')"
           "const_list vs"
           "length vs = n"
           "Lfilled i lholed (vs @ [$Br i]) LI"
-  shows "\<S>\<bullet>\<C> \<turnstile> (vs @ es0) : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> (vs @ es0) : (ts _> ts')"
 proof -
   obtain tls t2s \<C>' where l_def:"(ts' = (ts@t2s))"
-                            "(\<S>\<bullet>\<C> \<turnstile> es0 : (tls _> t2s))"
+                            "(s\<bullet>\<C> \<turnstile> es0 : (tls _> t2s))"
                             "\<C>' = \<C>\<lparr>label := [tls] @ (label \<C>)\<rparr>"
                             "length (label \<C>') > 0"
                             "(label \<C>')!0 = tls"
                             "length tls = n"
-                            "(\<S>\<bullet>\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr> \<turnstile> LI : ([] _> t2s))"
-    using e_type_label[of \<S> \<C> n es0 LI ts ts'] assms(2)
+                            "(s\<bullet>\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr> \<turnstile> LI : ([] _> t2s))"
+    using e_type_label[of s \<C> n es0 LI ts ts'] assms(2)
     by fastforce
-  hence "\<S>\<bullet>\<C> \<turnstile> vs : ([] _> tls)"
+  hence "s\<bullet>\<C> \<turnstile> vs : ([] _> tls)"
     using assms(3-5) type_const_br[of i lholed vs 0 LI \<C>' tls]
     by fastforce
   thus ?thesis
@@ -1043,29 +938,17 @@ proof -
 qed
 
 lemma store_local_label_empty:
-  assumes "i < length (s_inst \<S>)"
-          "store_typing s \<S>"
-  shows "label ((s_inst \<S>)!i) = []" "local ((s_inst \<S>)!i) = []"
-proof -
-  obtain insts where inst_typ:"list_all2 (inst_typing \<S>) insts (s_inst \<S>)"
-    using assms(2)
-    unfolding store_typing.simps
-    by auto
-  thus "label ((s_inst \<S>)!i) = []"
-    using assms(1)
-    unfolding inst_typing.simps List.list_all2_conv_all_nth
-    by fastforce
-  show "local ((s_inst \<S>)!i) = []"
-    using assms(1) inst_typ
-    unfolding inst_typing.simps List.list_all2_conv_all_nth
-    by fastforce
-qed
+  assumes "inst_typing s i \<C>"
+  shows "label \<C> = []" "local \<C> = []"
+  using assms
+  unfolding inst_typing.simps
+  by auto
 
 lemma types_preserved_b_e1:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
-          "store_typing s \<S>"
-          "\<S>\<bullet>\<C> \<turnstile> es : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> es' : (ts _> ts')"
+          "store_typing s"
+          "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> es' : (ts _> ts')"
   using assms(1)
 proof (cases rule: reduce_simple.cases)
   case (unop c oop)
@@ -1219,62 +1102,61 @@ qed
 
 lemma types_preserved_b_e:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
-          "store_typing s \<S>"
-          "\<S>\<bullet>None \<tturnstile>_i vs;es : ts"
-  shows "\<S>\<bullet>None \<tturnstile>_i vs;es' : ts"
+          "store_typing s"
+          "s\<bullet>None \<tturnstile>_i vs;es : ts"
+  shows "s\<bullet>None \<tturnstile>_i vs;es' : ts"
 proof -
-  have "i < (length (s_inst \<S>))"
-    using assms(3) s_typing.cases
-    by blast
-  moreover
-  obtain tvs \<C> where defs: "tvs = map typeof vs" "\<C> = ((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i) @ tvs), return := None\<rparr>" "\<S>\<bullet>\<C> \<turnstile> es : ([] _> ts)"
+  obtain tvs \<C> \<C>i where defs:"tvs = map typeof vs"
+                             "inst_typing s i \<C>i"
+                             "\<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := None\<rparr>"
+                             "s\<bullet>\<C> \<turnstile> es : ([] _> ts)"
     using assms(3)
     unfolding s_typing.simps
     by blast
-  have "\<S>\<bullet>\<C> \<turnstile> es' : ([] _> ts)"
-    using assms(1,2) defs(3) types_preserved_b_e1
+  have "s\<bullet>\<C> \<turnstile> es' : ([] _> ts)"
+    using assms(1,2) defs(4) types_preserved_b_e1
     by simp
-  ultimately show ?thesis
+  thus ?thesis
     using defs
     unfolding s_typing.simps
     by auto
 qed
 
 lemma types_preserved_store:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 k, $C v, $Store t tp a off] : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C ConstInt32 k, $C v, $Store t tp a off] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
         "types_agree t v"
 proof -
-  obtain ts'' ts''' where ts_def:"\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 k] : (ts _> ts'')"
-                                 "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts'' _> ts''')"
-                                 "\<S>\<bullet>\<C> \<turnstile> [$Store t tp a off] : (ts''' _> ts')"
-    using assms e_type_comp_conc2[of \<S> \<C> "[$C ConstInt32 k]" "[$C v]" "[$Store t tp a off]"]
+  obtain ts'' ts''' where ts_def:"s\<bullet>\<C> \<turnstile> [$C ConstInt32 k] : (ts _> ts'')"
+                                 "s\<bullet>\<C> \<turnstile> [$C v] : (ts'' _> ts''')"
+                                 "s\<bullet>\<C> \<turnstile> [$Store t tp a off] : (ts''' _> ts')"
+    using assms e_type_comp_conc2[of s \<C> "[$C ConstInt32 k]" "[$C v]" "[$Store t tp a off]"]
     by fastforce
   then have "ts'' = ts@[(T_i32)]"
     using b_e_type_value[of \<C> "C ConstInt32 k" "ts" ts'']
-          unlift_b_e[of \<S> \<C> "[C (ConstInt32 k)]" "(ts _> ts'')"]
+          unlift_b_e[of s \<C> "[C (ConstInt32 k)]" "(ts _> ts'')"]
     unfolding typeof_def
     by fastforce
   hence "ts''' = ts@[(T_i32), (typeof v)]"
     using ts_def(2) b_e_type_value[of \<C> "C v" ts'' ts''']
-          unlift_b_e[of \<S> \<C> "[C v]" "(ts'' _> ts''')"]
+          unlift_b_e[of s \<C> "[C v]" "(ts'' _> ts''')"]
     by fastforce
   hence "ts = ts'" "types_agree t v"
     using ts_def(3) b_e_type_store[of \<C> "Store t tp a off" ts''' ts']
-          unlift_b_e[of \<S> \<C> "[Store t tp a off]" "(ts''' _> ts')"]
+          unlift_b_e[of s \<C> "[Store t tp a off]" "(ts''' _> ts')"]
     unfolding types_agree_def
     by fastforce+
-  thus "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')" "types_agree t v"
+  thus "s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')" "types_agree t v"
     using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_s_typing.intros(1)
     by fastforce+
 qed
 
 lemma types_preserved_current_memory:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$Current_memory] : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$Current_memory] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [$C ConstInt32 c] : (ts _> ts')"
 proof -
   have "ts' = ts@[T_i32]"
-    using assms b_e_type_current_memory unlift_b_e[of \<S> \<C> "[Current_memory]"]
+    using assms b_e_type_current_memory unlift_b_e[of s \<C> "[Current_memory]"]
     by fastforce
   thus ?thesis
     using b_e_typing.const[of \<C> "ConstInt32 c"] e_typing_s_typing.intros(1,3)
@@ -1283,87 +1165,69 @@ proof -
 qed
 
 lemma types_preserved_grow_memory:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Grow_memory] : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c'] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Grow_memory] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [$C ConstInt32 c'] : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c] : (ts _> ts'')" 
-                             "\<S>\<bullet>\<C> \<turnstile> [$Grow_memory] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C ConstInt32 c] : (ts _> ts'')" 
+                             "s\<bullet>\<C> \<turnstile> [$Grow_memory] : (ts'' _> ts')"
     using e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
   have "ts'' = ts@[(T_i32)]"
     using b_e_type_value[of \<C> "C ConstInt32 c" ts ts'']
-          unlift_b_e[of \<S> \<C> "[C ConstInt32 c]"] ts''_def(1)
+          unlift_b_e[of s \<C> "[C ConstInt32 c]"] ts''_def(1)
     unfolding typeof_def
     by fastforce
   moreover
   hence "ts'' = ts'"
-    using ts''_def b_e_type_grow_memory[of _ _ ts'' ts'] unlift_b_e[of \<S> \<C> "[Grow_memory]"]
+    using ts''_def b_e_type_grow_memory[of _ _ ts'' ts'] unlift_b_e[of s \<C> "[Grow_memory]"]
     by fastforce
   ultimately
-  show "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 c'] : (ts _> ts')"
+  show "s'\<bullet>\<C> \<turnstile> [$C ConstInt32 c'] : (ts _> ts')"
     using e_typing_s_typing.intros(1,3)
           b_e_typing.const[of \<C> "ConstInt32 c'"]
     unfolding typeof_def
     by fastforce
 qed
 
-lemma types_preserved_set_global:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v, $Set_global j] : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
-        "tg_t (global \<C> ! j) = typeof v"
-proof -
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts'')" 
-                             "\<S>\<bullet>\<C> \<turnstile> [$Set_global j] : (ts'' _> ts')"
-    using e_type_comp assms
-    by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
-  hence "ts'' = ts@[typeof v]"
-    using b_e_type_value unlift_b_e[of \<S> \<C> "[C v]"]
-    by fastforce
-  hence "ts = ts'" "tg_t (global \<C> ! j) = typeof v"
-    using b_e_type_set_global ts''_def(2) unlift_b_e[of \<S> \<C> "[Set_global j]"]
-    by fastforce+
-  thus "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')" "tg_t (global \<C> ! j) = typeof v"
-    using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_s_typing.intros(1)
-    by fastforce+
-qed
+lemmas types_preserved_set_global = types_preserved_set_global_aux
 
 lemma types_preserved_load:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 k, $Load t tp a off] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C ConstInt32 k, $Load t tp a off] : (ts _> ts')"
           "typeof v = t"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> [$C ConstInt32 k] : (ts _> ts'')" 
-                             "\<S>\<bullet>\<C> \<turnstile> [$Load t tp a off] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C ConstInt32 k] : (ts _> ts'')" 
+                             "s\<bullet>\<C> \<turnstile> [$Load t tp a off] : (ts'' _> ts')"
     using e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
   hence "ts'' = ts@[(T_i32)]"
-    using b_e_type_value unlift_b_e[of \<S> \<C> "[C ConstInt32 k]"]
+    using b_e_type_value unlift_b_e[of s \<C> "[C ConstInt32 k]"]
     unfolding typeof_def
     by fastforce
   hence ts_def:"ts' = ts@[t]" "load_store_t_bounds a (option_projl tp) t" 
-    using ts''_def(2) b_e_type_load unlift_b_e[of \<S> \<C> "[Load t tp a off]"]
+    using ts''_def(2) b_e_type_load unlift_b_e[of s \<C> "[Load t tp a off]"]
     by fastforce+
   moreover
   hence "\<C> \<turnstile> [C v] : (ts _> ts@[t])"
     using assms(2) b_e_typing.const b_e_typing.weakening
     by fastforce
   ultimately
-  show "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+  show "s'\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
     using e_typing_s_typing.intros(1)
     by fastforce
 qed
 
 lemma types_preserved_get_local:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$Get_local i] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$Get_local i] : (ts _> ts')"
           "length vi = i"
           "(local \<C>) = map typeof (vi @ [v] @ vs)"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
 proof -
   have "(local \<C>)!i = typeof v"
     using assms(2,3)
     by (metis (no_types, hide_lams) append_Cons length_map list.simps(9) map_append nth_append_length)
   hence "ts' = ts@[typeof v]"
-    using assms(1) unlift_b_e[of \<S> \<C> "[Get_local i]"] b_e_type_get_local
+    using assms(1) unlift_b_e[of s \<C> "[Get_local i]"] b_e_type_get_local
     by fastforce
   thus ?thesis
     using b_e_typing.const e_typing_s_typing.intros(1,3)
@@ -1371,23 +1235,23 @@ proof -
 qed
 
 lemma types_preserved_set_local:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v', $Set_local i] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [$C v', $Set_local i] : (ts _> ts')"
           "length vi = i"
           "(local \<C>) = map typeof (vi @ [v] @ vs)"
-  shows "(\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')) \<and> map typeof (vi @ [v] @ vs) = map typeof (vi @ [v'] @ vs)"
+  shows "(s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')) \<and> map typeof (vi @ [v] @ vs) = map typeof (vi @ [v'] @ vs)"
 proof -
   have v_type:"(local \<C>)!i = typeof v"
     using assms(2,3)
     by (metis (no_types, hide_lams) append_Cons length_map list.simps(9) map_append nth_append_length)
-  obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
-                             "\<S>\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
+                             "s\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
     using e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
   hence "ts'' = ts@[typeof v']"
-    using b_e_type_value unlift_b_e[of \<S> \<C> "[C v']"]
+    using b_e_type_value unlift_b_e[of s \<C> "[C v']"]
     by fastforce
   hence "typeof v = typeof v'" "ts' = ts"
-    using v_type b_e_type_set_local[of \<C> "Set_local i" ts'' ts'] ts''_def(2) unlift_b_e[of \<S> \<C> "[Set_local i]"]
+    using v_type b_e_type_set_local[of \<C> "Set_local i" ts'' ts'] ts''_def(2) unlift_b_e[of s \<C> "[Set_local i]"]
     by fastforce+
   thus ?thesis
     using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_s_typing.intros(1)
@@ -1396,8 +1260,8 @@ qed
 
 lemma types_preserved_get_global:
   assumes "typeof (sglob_val s i j) = tg_t (global \<C> ! j)"
-          "\<S>\<bullet>\<C> \<turnstile> [$Get_global j] : (ts _> ts')"
-  shows "\<S>\<bullet>\<C> \<turnstile> [$C sglob_val s i j] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$Get_global j] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [$C sglob_val s i j] : (ts _> ts')"
 proof -
   have "ts' = ts@[tg_t (global \<C> ! j)]"
     using b_e_type_get_global assms(2) unlift_b_e[of _ _ "[Get_global j]"]
@@ -1410,27 +1274,28 @@ qed
 lemma lholed_same_type:
   assumes "Lfilled k lholed es les"
           "Lfilled k lholed es' les'"
-          "\<S>\<bullet>\<C> \<turnstile> les : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> les : (ts _> ts')"
           "\<And>arb_labs ts ts'.
-           \<S>\<bullet>(\<C>\<lparr>label := arb_labs@(label \<C>)\<rparr>) \<turnstile> es : (ts _> ts')
-             \<Longrightarrow> \<S>\<bullet>(\<C>\<lparr>label := arb_labs@(label \<C>)\<rparr>) \<turnstile> es' : (ts _> ts')"
-  shows "(\<S>\<bullet>\<C> \<turnstile> les' : (ts _> ts'))"
+           s\<bullet>(\<C>\<lparr>label := arb_labs@(label \<C>)\<rparr>) \<turnstile> es : (ts _> ts')
+             \<Longrightarrow> s'\<bullet>(\<C>\<lparr>label := arb_labs@(label \<C>)\<rparr>) \<turnstile> es' : (ts _> ts')"
+          "store_extension s s'"
+  shows "(s'\<bullet>\<C> \<turnstile> les' : (ts _> ts'))"
   using assms
 proof (induction arbitrary: ts ts' es' \<C> les' rule: Lfilled.induct)
   case (L0 vs lholed es' es ts ts' es'')
-  obtain ts'' ts''' where "\<S>\<bullet>\<C> \<turnstile> vs : (ts _> ts'')"
-                          "\<S>\<bullet>\<C> \<turnstile> es : (ts'' _> ts''')"
-                          "\<S>\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
+  obtain ts'' ts''' where "s\<bullet>\<C> \<turnstile> vs : (ts _> ts'')"
+                          "s\<bullet>\<C> \<turnstile> es : (ts'' _> ts''')"
+                          "s\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
     using e_type_comp_conc2 L0(4)
     by blast
   moreover
-  hence "(\<S>\<bullet>\<C> \<turnstile> es'' : (ts'' _> ts'''))"
+  hence "(s'\<bullet>\<C> \<turnstile> es'' : (ts'' _> ts'''))"
     using L0(5)[of "[]" ts'' ts''']
     by fastforce
   ultimately
-  have "(\<S>\<bullet>\<C> \<turnstile> vs @ es'' @ es' : (ts _> ts'))"
+  have "(s'\<bullet>\<C> \<turnstile> vs @ es'' @ es' : (ts _> ts'))"
     using e_type_comp_conc
-    by fastforce
+    by (meson assms(5) e_typing_s_typing_store_extension_inv(1))
   thus ?case
     using L0(2,3) Lfilled.simps[of 0 lholed es'' les']
     by fastforce
@@ -1439,51 +1304,51 @@ next
   obtain lfilledk' where l'_def:"Lfilled k l es''' lfilledk'" "les' = vs @ [Label n es' lfilledk'] @ es''"
     using LN Lfilled.simps[of "k+1" lholed es''' les']
     by fastforce
-  obtain ts' ts'' where lab_def:"\<S>\<bullet>\<C> \<turnstile> vs : (t1s _> ts')"
-                                "\<S>\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (ts' _> ts'')"
-                                "\<S>\<bullet>\<C> \<turnstile> es'' : (ts'' _> t2s)"
+  obtain ts' ts'' where lab_def:"s\<bullet>\<C> \<turnstile> vs : (t1s _> ts')"
+                                "s\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (ts' _> ts'')"
+                                "s\<bullet>\<C> \<turnstile> es'' : (ts'' _> t2s)"
   using e_type_comp_conc2[OF LN(6)]
   by blast
   obtain tls ts_c \<C>_int where int_def:" ts'' = ts' @ ts_c"
                                  "length tls = n"
-                                 "\<S>\<bullet>\<C> \<turnstile> es' : (tls _> ts_c)"
+                                 "s\<bullet>\<C> \<turnstile> es' : (tls _> ts_c)"
                                  "\<C>_int = \<C>\<lparr>label := [tls] @ label \<C>\<rparr>"
-                                 "\<S>\<bullet>\<C>_int \<turnstile> lfilledk : ([] _> ts_c)"
+                                 "s\<bullet>\<C>_int \<turnstile> lfilledk : ([] _> ts_c)"
     using e_type_label[OF lab_def(2)]
     by blast
   have "(\<And>\<C>' arb_labs' ts ts'.
         \<C>' = \<C>_int\<lparr>label := arb_labs' @ label \<C>_int\<rparr> \<Longrightarrow>
-        \<S>\<bullet>\<C>' \<turnstile> es : (ts _> ts') \<Longrightarrow>
-        (\<S>\<bullet>\<C>' \<turnstile> es''' : (ts _> ts')))"
+        s\<bullet>\<C>' \<turnstile> es : (ts _> ts') \<Longrightarrow>
+        (s'\<bullet>\<C>' \<turnstile> es''' : (ts _> ts')))"
   proof -
     fix \<C>'' arb_labs'' tts tts'
     assume "\<C>'' = \<C>_int\<lparr>label := arb_labs'' @ label \<C>_int\<rparr>"
-           "\<S>\<bullet>\<C>'' \<turnstile> es : (tts _> tts')"
-    thus "(\<S>\<bullet>\<C>'' \<turnstile> es''' : (tts _> tts'))"
+           "s\<bullet>\<C>'' \<turnstile> es : (tts _> tts')"
+    thus "(s'\<bullet>\<C>'' \<turnstile> es''' : (tts _> tts'))"
       using LN(7)[of "arb_labs'' @ [tls]" tts tts'] int_def(4)
       by fastforce
   qed
-  hence "(\<S>\<bullet>\<C>_int \<turnstile> lfilledk' : ([] _> ts_c))"
-    using LN(4)[OF l'_def(1) int_def(5)]
-    by fastforce
-  hence "(\<S>\<bullet>\<C> \<turnstile> [Label n es' lfilledk'] : (ts' _> ts''))"
-    using int_def e_typing_s_typing.intros(3,7)
+  hence "(s'\<bullet>\<C>_int \<turnstile> lfilledk' : ([] _> ts_c))"
+    using LN(4)[OF l'_def(1) int_def(5)] assms(5)
+    by blast
+  hence "(s'\<bullet>\<C> \<turnstile> [Label n es' lfilledk'] : (ts' _> ts''))"
+    using int_def e_typing_s_typing.intros(3,7) e_typing_s_typing_store_extension_inv(1)[OF assms(5)]
     by (metis append.right_neutral)
   thus ?case
-    using lab_def e_type_comp_conc l'_def(2)
+    using lab_def e_type_comp_conc l'_def(2) e_typing_s_typing_store_extension_inv(1)[OF assms(5)]
     by blast
 qed
 
 lemma types_preserved_e1:
   assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
-          "store_typing s \<S>"
+          "store_typing s"
+          "inst_typing s i \<C>i"
           "tvs = map typeof vs"
-          "i < length (inst s)"
-          "\<C> = ((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i) @ tvs), label := arb_labs, return := arb_return\<rparr>"
-          "\<S>\<bullet>\<C> \<turnstile> es : (ts _> ts')"
-  shows "(\<S>\<bullet>\<C> \<turnstile> es' : (ts _> ts')) \<and> (map typeof vs = map typeof vs')"
+          "\<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), label := arb_labs, return := arb_return\<rparr>"
+          "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+  shows "(s'\<bullet>\<C> \<turnstile> es' : (ts _> ts')) \<and> (map typeof vs = map typeof vs')"
   using assms
-proof (induction arbitrary: tvs \<C> ts ts' arb_labs arb_return rule: reduce.induct)
+proof (induction arbitrary: tvs \<C> \<C>i ts ts' arb_labs arb_return rule: reduce.induct)
   case (basic e e' s vs i)
   then show ?case
     using types_preserved_b_e1[OF basic(1,2)]
@@ -1497,16 +1362,12 @@ next
     using b_e_type_call[of \<C> "Call j" ts ts' j] call(5)
           unlift_b_e[of _ _ "[Call j]" "(ts _> ts')"]
     by fastforce
-  have "i < length (s_inst \<S>)"
-    using call(3) store_typing_imp_inst_length_eq[OF call(1)]
-    by simp
-  moreover
-  have "j < length (func_t (s_inst \<S> ! i))"
+  have "j < length (func_t \<C>i)"
     using l_func_t(1) call(4)
     by simp
-  ultimately
-  have "cl_typing \<S> (sfunc s i j) (tf1 _> tf2)"
-    using store_typing_imp_func_agree[OF call(1)] l_func_t(4) call(4)
+  hence "cl_typing s (sfunc s i j) (tf1 _> tf2)"
+    using l_func_t(4) call(4) store_typing_imp_func_agree[OF call(1,2)]
+          inst_typing_func_length[OF call(2)]
     by fastforce
   thus ?case
     using e_typing_s_typing.intros(3,6) l_func_t
@@ -1515,8 +1376,8 @@ next
   case (call_indirect_Some s i' c cl j tf vs)
   show ?case
     using types_preserved_call_indirect_Some[OF call_indirect_Some(8,1)]
-          call_indirect_Some(2,3,4,6,7)
-    by fastforce
+          call_indirect_Some(2,3,4,5,7)
+    by blast
 next
   case (call_indirect_None s i c cl j vs)
   thus ?case
@@ -1539,10 +1400,7 @@ next
     by blast
 next
   case (get_local vi j s v vs i)
-  hence "i < length (s_inst \<S>)"
-    unfolding list_all2_conv_all_nth store_typing.simps
-    by fastforce
-  then have "local \<C> = tvs"
+  have "local \<C> = tvs"
     using store_local_label_empty assms(2) get_local
     by fastforce
   then show ?case
@@ -1550,10 +1408,7 @@ next
     by fastforce
 next
   case (set_local vi j s v vs v' i)
-  hence "i < length (s_inst \<S>)"
-    unfolding list_all2_conv_all_nth store_typing.simps
-    by fastforce
-  hence "local \<C> = tvs"
+  have "local \<C> = tvs"
     using store_local_label_empty assms(2) set_local
     by fastforce
   thus ?case
@@ -1565,7 +1420,7 @@ next
     using b_e_type_get_global get_global(5) unlift_b_e[of _ _ "[Get_global j]" "(ts _> ts')"]
     by fastforce
   hence "glob_agree (sglob s i j) ((global \<C>)!j)"
-    using get_global(3,4) store_typing_imp_glob_agree[OF get_global(1)] store_typing_imp_inst_length_eq[OF get_global(1)]
+    using get_global(3,4) store_typing_imp_glob_agree[OF get_global(2)]
     by fastforce
   hence "typeof (g_val (sglob s i j)) = tg_t (global \<C> ! j)"
     unfolding glob_agree_def
@@ -1639,18 +1494,21 @@ next
   {
     fix \<C>' arb_labs' ts ts'
     assume local_assms:"\<C>' = \<C>\<lparr>label := arb_labs'@(label \<C>), return := (return \<C>)\<rparr>"
-    hence "(\<S>\<bullet>\<C>' \<turnstile> es : (ts _> ts')) \<Longrightarrow> (\<S>\<bullet>\<C>' \<turnstile> es' : (ts _> ts')) \<and> map typeof vs = map typeof vs'"
-      using label(4)[OF label(5,6,7)] label(8)
+    hence "(s\<bullet>\<C>' \<turnstile> es : (ts _> ts')) \<Longrightarrow>
+             ((s'\<bullet>\<C>' \<turnstile> es' : (ts _> ts')) \<and> map typeof vs = map typeof vs' \<and> store_extension s s')"
+      using label(4)[OF label(5,6,7,8)] label(4,5,6,7,8)
+            reduce_store_extension[OF label(1,5,6), of \<C>' _ _ "return \<C>'" "label \<C>'"]
       by fastforce
-    hence "(\<S>\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es : (ts _> ts'))
-               \<Longrightarrow> (\<S>\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es' : (ts _> ts')) \<and>
-                     map typeof vs = map typeof vs'"
+    hence "(s\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es : (ts _> ts'))
+               \<Longrightarrow> (s'\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es' : (ts _> ts')) \<and>
+                     map typeof vs = map typeof vs'  \<and> store_extension s s'"
       using local_assms
       by simp
   }
-  hence "\<And>arb_labs' ts ts'. \<S>\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es : (ts _> ts')
-                              \<Longrightarrow> (\<S>\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es' : (ts _> ts'))"
+  hence "\<And>arb_labs' ts ts'. s\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es : (ts _> ts')
+                              \<Longrightarrow> (s'\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es' : (ts _> ts'))"
        "map typeof vs = map typeof vs'"
+       "store_extension s s'"
     using types_exist_lfilled[OF label(2,9)]
     by auto
   thus ?case
@@ -1658,27 +1516,27 @@ next
     by fastforce
 next
   case (local s vls es i s' vs' es' vs n j)
-  obtain \<C>' tls where es_def:"i < length (s_inst \<S>)"
+  obtain \<C>' tls \<C>i' where es_def:"inst_typing s i \<C>i'"
                           "length tls = n"
-                          "\<C>' = (s_inst \<S> ! i) \<lparr>local := local(s_inst \<S> ! i) @ map typeof vls, label := label (s_inst \<S> ! i), return := Some tls\<rparr>"
-                          "\<S>\<bullet>\<C>' \<turnstile> es : ([] _> tls)"
+                          "\<C>' =  \<C>i'\<lparr>local := local \<C>i' @ map typeof vls, label := label  \<C>i', return := Some tls\<rparr>"
+                          "s\<bullet>\<C>' \<turnstile> es : ([] _> tls)"
                           "ts' = ts @ tls"
     using e_type_local[OF local(7)]
     by fastforce
   moreover
-  obtain ts'' where "ts' = ts@ts''" "(\<S>\<bullet>(Some ts'') \<tturnstile>_i vls;es : ts'')"
+  obtain ts'' where "ts' = ts@ts''" "(s\<bullet>(Some ts'') \<tturnstile>_i vls;es : ts'')"
     using e_type_local_shallow local(7)
     by fastforce
-  moreover
-  have "inst_typing \<S> ((inst s)!i) ((s_inst \<S>)!i)" "i < length (inst s)"
-    using local es_def(1)
-    unfolding store_typing.simps list_all2_conv_all_nth
-    by fastforce+
   ultimately
-  have "\<S>\<bullet>\<C>' \<turnstile> es' : ([] _> tls)" "map typeof vls = map typeof vs'"
-    using local(2)[OF local(3) _ _ _ es_def(4), of "map typeof vls" "Some tls" "label (s_inst \<S> ! i)"]
-    by fastforce+
-  hence "\<S>\<bullet>(Some tls) \<tturnstile>_ i vs';es' : tls"
+  have "s'\<bullet>\<C>' \<turnstile> es' : ([] _> tls)" "map typeof vls = map typeof vs'"
+    using local(2,3)
+    by blast+
+  moreover
+  have "inst_typing s' i \<C>i'"
+    using inst_typing_store_extension_inv[OF es_def(1)] reduce_store_extension[OF local(1,3) es_def(1,4,3)]
+    by blast
+  ultimately
+  have "s'\<bullet>(Some tls) \<tturnstile>_ i vs';es' : tls"
     using e_typing_s_typing.intros(8) es_def(1,3)
     by fastforce
   thus ?case
@@ -1688,29 +1546,27 @@ qed
 
 lemma types_preserved_e:
   assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
-          "store_typing s \<S>"
-          "\<S>\<bullet>None \<tturnstile>_i vs;es : ts"
-  shows "\<S>\<bullet>None \<tturnstile>_i vs';es' : ts"
+          "store_typing s"
+          "s\<bullet>None \<tturnstile>_i vs;es : ts"
+  shows "s'\<bullet>None \<tturnstile>_i vs';es' : ts"
   using assms
 proof -
-  have "i < (length (s_inst \<S>))"
-    using assms(3) s_typing.cases
-    by blast
-  moreover
-  hence i_bound:"i < length (inst s)"
-    using assms(2)
-    unfolding list_all2_conv_all_nth store_typing.simps
-    by fastforce
-  obtain tvs \<C> where defs: "tvs = map typeof vs"
-                           "\<C> = ((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i) @ tvs), label := (label ((s_inst \<S>)!i)), return := None\<rparr>"
-                           "\<S>\<bullet>\<C> \<turnstile> es : ([] _> ts)"
+  obtain tvs \<C> \<C>i where defs: "tvs = map typeof vs"
+                              "inst_typing s i \<C>i"
+                              "\<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), label := (label \<C>i), return := None\<rparr>"
+                              "s\<bullet>\<C> \<turnstile> es : ([] _> ts)"
     using assms(3)
     unfolding s_typing.simps
     by fastforce
-  have "(\<S>\<bullet>\<C> \<turnstile> es' : ([] _> ts)) \<and> (map typeof vs = map typeof vs')"
-    using types_preserved_e1[OF assms(1,2) defs(1) i_bound defs(2,3)]
+  have "(s'\<bullet>\<C> \<turnstile> es' : ([] _> ts)) \<and> (map typeof vs = map typeof vs')"
+    using types_preserved_e1[OF assms(1,2) defs(2,1,3,4)]
     by simp
-  ultimately show ?thesis
+  moreover
+  have "inst_typing s' i \<C>i"
+    using defs(2) store_preserved[OF assms] inst_typing_store_extension_inv
+    by blast
+  ultimately
+  show ?thesis
     using defs
     unfolding s_typing.simps
     by auto
@@ -1872,46 +1728,46 @@ qed
 
 lemma progress_LN:
   assumes "(Lfilled j lholed [$Br (j+k)] es)"
-          "\<S>\<bullet>\<C> \<turnstile> es : ([] _> ts)"
+          "s\<bullet>\<C> \<turnstile> es : ([] _> ts)"
           "(label \<C>)!k = tvs"
   shows "\<exists>lholed' vs \<C>'. (Lfilled j lholed' (vs@[$Br (j+k)]) es)
-                    \<and> (\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tvs))
+                    \<and> (s\<bullet>\<C>' \<turnstile> vs : ([] _> tvs))
                     \<and> const_list vs"
   using assms
 proof (induction "[$Br (j+k)]" es arbitrary: k \<C> ts rule: Lfilled.induct)
   case (L0 vs lholed es')
-  obtain ts' ts'' where ts_def:"\<S>\<bullet>\<C> \<turnstile> vs : ([] _> ts')"
-                                 "\<S>\<bullet>\<C> \<turnstile> [$Br k] : (ts' _> ts'')"
-                                 "\<S>\<bullet>\<C> \<turnstile> es' : (ts'' _> ts)"
+  obtain ts' ts'' where ts_def:"s\<bullet>\<C> \<turnstile> vs : ([] _> ts')"
+                                 "s\<bullet>\<C> \<turnstile> [$Br k] : (ts' _> ts'')"
+                                 "s\<bullet>\<C> \<turnstile> es' : (ts'' _> ts)"
     using e_type_comp_conc2[OF L0(3)]
     by fastforce
   obtain ts_c where "ts' = ts_c @ tvs"
     using b_e_type_br[of \<C> "Br k" ts' ts''] L0(3,4) ts_def(2) unlift_b_e
     by fastforce
-  then obtain vs1 vs2 where vs_def:"\<S>\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
-                                   "\<S>\<bullet>\<C> \<turnstile> vs2 : (ts_c _> (ts_c@tvs))"
+  then obtain vs1 vs2 where vs_def:"s\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
+                                   "s\<bullet>\<C> \<turnstile> vs2 : (ts_c _> (ts_c@tvs))"
                                    "vs = vs1@vs2"
                                    "const_list vs1"
                                    "const_list vs2"
     using e_type_const_list_cons[OF L0(1)] ts_def(1)
     by fastforce
-  hence "\<S>\<bullet>\<C> \<turnstile> vs2 : ([] _> tvs)"
+  hence "s\<bullet>\<C> \<turnstile> vs2 : ([] _> tvs)"
     using e_type_const_list by blast
   thus ?case
     using Lfilled.intros(1)[OF vs_def(4), of _ es' "vs2@[$Br k]"] vs_def(3,5)
     by fastforce
 next
   case (LN vs lholed n es' l es'' j lfilledk)
-  obtain t1s t2s where ts_def:"\<S>\<bullet>\<C> \<turnstile> vs : ([] _> t1s)"
-                               "\<S>\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (t1s _> t2s)"
-                               "\<S>\<bullet>\<C> \<turnstile> es'' : (t2s _> ts)"
+  obtain t1s t2s where ts_def:"s\<bullet>\<C> \<turnstile> vs : ([] _> t1s)"
+                               "s\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (t1s _> t2s)"
+                               "s\<bullet>\<C> \<turnstile> es'' : (t2s _> ts)"
   using e_type_comp_conc2[OF LN(5)]
   by fastforce
-  obtain ts' ts_l where ts_l_def:"\<S>\<bullet>\<C>\<lparr>label := [ts'] @ label \<C>\<rparr> \<turnstile> lfilledk : ([] _> ts_l)"
+  obtain ts' ts_l where ts_l_def:"s\<bullet>\<C>\<lparr>label := [ts'] @ label \<C>\<rparr> \<turnstile> lfilledk : ([] _> ts_l)"
     using e_type_label[OF ts_def(2)]
     by fastforce
   obtain lholed' vs' \<C>' where lfilledk_def:"Lfilled j lholed' (vs' @ [$Br (j + (1 + k))]) lfilledk"
-                                          "\<S>\<bullet>\<C>' \<turnstile> vs' : ([] _> tvs)"
+                                          "s\<bullet>\<C>' \<turnstile> vs' : ([] _> tvs)"
                                           "const_list vs'"
     using LN(4)[OF _ ts_l_def, of "1 + k"] LN(5,6)
     by fastforce
@@ -1922,46 +1778,46 @@ qed
 
 lemma progress_LN_return:
   assumes "(Lfilled j lholed [$Return] es)"
-          "\<S>\<bullet>\<C> \<turnstile> es : ([] _> ts)"
+          "s\<bullet>\<C> \<turnstile> es : ([] _> ts)"
           "(return \<C>) = Some tvs"
   shows "\<exists>lholed' vs \<C>'. (Lfilled j lholed' (vs@[$Return]) es)
-                    \<and> (\<S>\<bullet>\<C>' \<turnstile> vs : ([] _> tvs))
+                    \<and> (s\<bullet>\<C>' \<turnstile> vs : ([] _> tvs))
                     \<and> const_list vs"
   using assms
 proof (induction "[$Return]" es arbitrary: k \<C> ts rule: Lfilled.induct)
   case (L0 vs lholed es')
-  obtain ts' ts'' where ts_def:"\<S>\<bullet>\<C> \<turnstile> vs : ([] _> ts')"
-                                 "\<S>\<bullet>\<C> \<turnstile> [$Return] : (ts' _> ts'')"
-                                 "\<S>\<bullet>\<C> \<turnstile> es' : (ts'' _> ts)"
+  obtain ts' ts'' where ts_def:"s\<bullet>\<C> \<turnstile> vs : ([] _> ts')"
+                                 "s\<bullet>\<C> \<turnstile> [$Return] : (ts' _> ts'')"
+                                 "s\<bullet>\<C> \<turnstile> es' : (ts'' _> ts)"
     using e_type_comp_conc2[OF L0(3)]
     by fastforce
   obtain ts_c where "ts' = ts_c @ tvs"
     using b_e_type_return[of \<C> "Return" ts' ts''] L0(3,4) ts_def(2) unlift_b_e
     by fastforce
-  then obtain vs1 vs2 where vs_def:"\<S>\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
-                                   "\<S>\<bullet>\<C> \<turnstile> vs2 : (ts_c _> (ts_c@tvs))"
+  then obtain vs1 vs2 where vs_def:"s\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
+                                   "s\<bullet>\<C> \<turnstile> vs2 : (ts_c _> (ts_c@tvs))"
                                    "vs = vs1@vs2"
                                    "const_list vs1"
                                    "const_list vs2"
     using e_type_const_list_cons[OF L0(1)] ts_def(1)
     by fastforce
-  hence "\<S>\<bullet>\<C> \<turnstile> vs2 : ([] _> tvs)"
+  hence "s\<bullet>\<C> \<turnstile> vs2 : ([] _> tvs)"
     using e_type_const_list by blast
   thus ?case
     using Lfilled.intros(1)[OF vs_def(4), of _ es' "vs2@[$Return]"] vs_def(3,5)
     by fastforce
 next
   case (LN vs lholed n es' l es'' j lfilledk)
-  obtain t1s t2s where ts_def:"\<S>\<bullet>\<C> \<turnstile> vs : ([] _> t1s)"
-                               "\<S>\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (t1s _> t2s)"
-                               "\<S>\<bullet>\<C> \<turnstile> es'' : (t2s _> ts)"
+  obtain t1s t2s where ts_def:"s\<bullet>\<C> \<turnstile> vs : ([] _> t1s)"
+                               "s\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (t1s _> t2s)"
+                               "s\<bullet>\<C> \<turnstile> es'' : (t2s _> ts)"
   using e_type_comp_conc2[OF LN(5)]
   by fastforce
-  obtain ts' ts_l where ts_l_def:"\<S>\<bullet>\<C>\<lparr>label := [ts'] @ label \<C>\<rparr> \<turnstile> lfilledk : ([] _> ts_l)"
+  obtain ts' ts_l where ts_l_def:"s\<bullet>\<C>\<lparr>label := [ts'] @ label \<C>\<rparr> \<turnstile> lfilledk : ([] _> ts_l)"
     using e_type_label[OF ts_def(2)]
     by fastforce
   obtain lholed' vs' \<C>' where lfilledk_def:"Lfilled j lholed' (vs' @ [$Return]) lfilledk"
-                                          "\<S>\<bullet>\<C>' \<turnstile> vs' : ([] _> tvs)"
+                                          "s\<bullet>\<C>' \<turnstile> vs' : ([] _> tvs)"
                                           "const_list vs'"
     using LN(4)[OF ts_l_def] LN(6)
     by fastforce
@@ -1972,14 +1828,14 @@ qed
 
 lemma progress_LN1:
   assumes "(Lfilled j lholed [$Br (j+k)] es)"
-          "\<S>\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
   shows "length (label \<C>) > k"
   using assms
 proof (induction "[$Br (j+k)]" es arbitrary: k \<C> ts ts' rule: Lfilled.induct)
   case (L0 vs lholed es')
-  obtain ts'' ts''' where ts_def:"\<S>\<bullet>\<C> \<turnstile> vs : (ts _> ts'')"
-                               "\<S>\<bullet>\<C> \<turnstile> [$Br k] : (ts'' _> ts''')"
-                               "\<S>\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
+  obtain ts'' ts''' where ts_def:"s\<bullet>\<C> \<turnstile> vs : (ts _> ts'')"
+                               "s\<bullet>\<C> \<turnstile> [$Br k] : (ts'' _> ts''')"
+                               "s\<bullet>\<C> \<turnstile> es' : (ts''' _> ts')"
     using e_type_comp_conc2[OF L0(3)]
     by fastforce
   thus ?case
@@ -1987,12 +1843,12 @@ proof (induction "[$Br (j+k)]" es arbitrary: k \<C> ts ts' rule: Lfilled.induct)
     by fastforce
 next
   case (LN vs lholed n es' l es'' k' lfilledk)
-  obtain t1s t2s where ts_def:"\<S>\<bullet>\<C> \<turnstile> vs : (ts _> t1s)"
-                               "\<S>\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (t1s _> t2s)"
-                               "\<S>\<bullet>\<C> \<turnstile> es'' : (t2s _> ts')"
+  obtain t1s t2s where ts_def:"s\<bullet>\<C> \<turnstile> vs : (ts _> t1s)"
+                               "s\<bullet>\<C> \<turnstile> [Label n es' lfilledk] : (t1s _> t2s)"
+                               "s\<bullet>\<C> \<turnstile> es'' : (t2s _> ts')"
   using e_type_comp_conc2[OF LN(5)]
   by fastforce
-  obtain ts'' ts_l where ts_l_def:"\<S>\<bullet>\<C>\<lparr>label := [ts''] @ label \<C>\<rparr> \<turnstile> lfilledk : ([] _> ts_l)"
+  obtain ts'' ts_l where ts_l_def:"s\<bullet>\<C>\<lparr>label := [ts''] @ label \<C>\<rparr> \<turnstile> lfilledk : ([] _> ts_l)"
     using e_type_label[OF ts_def(2)]
     by fastforce
   thus ?case
@@ -2027,7 +1883,7 @@ lemma const_of_const_list:
 
 lemma const_of_i32:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [(T_i32)])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [(T_i32)])"
   shows "\<exists>c. cs = [$C ConstInt32 c]"
 proof -                    
   obtain v where "cs = [$C v]"
@@ -2051,7 +1907,7 @@ qed
 
 lemma const_of_i64:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [(T_i64)])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [(T_i64)])"
   shows "\<exists>c. cs = [$C ConstInt64 c]"
 proof -                    
   obtain v where "cs = [$C v]"
@@ -2075,7 +1931,7 @@ qed
 
 lemma const_of_f32:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [T_f32])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [T_f32])"
   shows "\<exists>c. cs = [$C ConstFloat32 c]"
 proof -                    
   obtain v where "cs = [$C v]"
@@ -2099,7 +1955,7 @@ qed
 
 lemma const_of_f64:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [T_f64])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [T_f64])"
   shows "\<exists>c. cs = [$C ConstFloat64 c]"
 proof -                    
   obtain v where "cs = [$C v]"
@@ -2123,7 +1979,7 @@ qed
 
 lemma const_of_typed_const_1:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [t])"
   shows "\<exists>v. cs = [$C v]"
   using assms(2)
   apply (cases t)
@@ -2134,7 +1990,7 @@ lemma const_of_typed_const_1:
   done
 
 lemma progress_testop:
-  assumes "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t])"
+  assumes "s\<bullet>\<C> \<turnstile> cs : ([] _> [t])"
           "const_list cs"
           "e = Testop t testop"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs@([$e])\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
@@ -2142,7 +1998,7 @@ lemma progress_testop:
   by fastforce
 
 lemma progress_unop:
-  assumes "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t])"
+  assumes "s\<bullet>\<C> \<turnstile> cs : ([] _> [t])"
           "const_list cs"
           "e = Unop t iop"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs@([$e])\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
@@ -2151,9 +2007,9 @@ lemma progress_unop:
 
 lemma const_list_split_2:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t1, t2])"
-  shows "\<exists>c1 c2. (\<S>\<bullet>\<C> \<turnstile> [c1] : ([] _> [t1]))
-                 \<and> (\<S>\<bullet>\<C> \<turnstile> [c2] : ([] _> [t2]))
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [t1, t2])"
+  shows "\<exists>c1 c2. (s\<bullet>\<C> \<turnstile> [c1] : ([] _> [t1]))
+                 \<and> (s\<bullet>\<C> \<turnstile> [c2] : ([] _> [t2]))
                  \<and> cs = [c1, c2]
                  \<and> const_list [c1]
                  \<and> const_list [c2]"
@@ -2167,17 +2023,17 @@ proof -
     using assms e_type_const_conv_vs typing_map_typeof
     by fastforce
   thus ?thesis
-    using assms e_type_comp[of \<S> \<C> "[c1]" c2] e_type_const[of c2 \<S> \<C> _ "[t1,t2]"]
+    using assms e_type_comp[of s \<C> "[c1]" c2] e_type_const[of c2 s \<C> _ "[t1,t2]"]
     unfolding const_list_def
     by fastforce
 qed
 
 lemma const_list_split_3:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t1, t2, t3])"
-  shows "\<exists>c1 c2 c3. (\<S>\<bullet>\<C> \<turnstile> [c1] : ([] _> [t1]))
-                    \<and> (\<S>\<bullet>\<C> \<turnstile> [c2] : ([] _> [t2]))
-                    \<and> (\<S>\<bullet>\<C> \<turnstile> [c3] : ([] _> [t3]))
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [t1, t2, t3])"
+  shows "\<exists>c1 c2 c3. (s\<bullet>\<C> \<turnstile> [c1] : ([] _> [t1]))
+                    \<and> (s\<bullet>\<C> \<turnstile> [c2] : ([] _> [t2]))
+                    \<and> (s\<bullet>\<C> \<turnstile> [c3] : ([] _> [t3]))
                     \<and> cs = [c1, c2, c3]"
 proof -
   have l_cs:"length cs = 3"
@@ -2189,7 +2045,7 @@ proof -
     using assms e_type_const_conv_vs typing_map_typeof
     by fastforce
   thus ?thesis
-    using assms e_type_comp_conc2[of \<S> \<C> "[c1]" "[c2]" "[c3]" "[]" "[t1,t2,t3]"]
+    using assms e_type_comp_conc2[of s \<C> "[c1]" "[c2]" "[c3]" "[]" "[t1,t2,t3]"]
           e_type_const[of c1] e_type_const[of c2] e_type_const[of c3]
     unfolding const_list_def
     by fastforce
@@ -2197,14 +2053,14 @@ qed
 
 lemma const_of_typed_const_2:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t,t])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [t,t])"
   shows "\<exists>v1 v2. cs = [$C v1, $C v2]"
   using const_list_split_2[OF assms] const_list_def e_type_const_unwrap
   by  auto
 
 lemma progress_relop:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t, t])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [t, t])"
           "e = Relop t rop"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs@([$e])\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   using const_of_typed_const_2[OF assms(1,2)] assms(3) reduce_simple.intros(5) reduce.intros(1)
@@ -2212,7 +2068,7 @@ lemma progress_relop:
 
 lemma progress_binop:
   assumes "const_list cs"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> [t, t])"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> [t, t])"
           "e = Binop t fop"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs@([$e])\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   using const_of_typed_const_2[OF assms(1,2)] assms(3) reduce_simple.intros(2,3) reduce.intros(1)
@@ -2220,14 +2076,13 @@ lemma progress_binop:
 
 lemma progress_b_e:
   assumes "\<C> \<turnstile> b_es : (ts _> ts')"
-          "\<S>\<bullet>\<C> \<turnstile> cs : ([] _> ts)"
+          "s\<bullet>\<C> \<turnstile> cs : ([] _> ts)"
           "(\<And>lholed. \<not>(Lfilled 0 lholed [$Return] (cs@($*b_es))))"
           "\<And> i lholed. \<not>(Lfilled 0 lholed [$Br (i)] (cs@($*b_es)))"
           "const_list cs"
           "\<not> const_list ($* b_es)"
-          "i < length (s_inst \<S>)"
           "length (local \<C>) = length (vs)"
-          "Option.is_none (memory \<C>) = Option.is_none (inst.mem ((inst s)!i))"
+          "(memory \<C>) = (\<not>(Option.is_none (inst.mem i)))"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs@($*b_es)\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   using assms
 proof (induction b_es "(ts _> ts')" arbitrary: ts ts' cs rule: b_e_typing.induct)
@@ -2303,7 +2158,7 @@ next
     by fastforce
 next
   case (select \<C> t)
-  obtain v1 v2 v3 where cs_def:"\<S>\<bullet>\<C> \<turnstile> [$ C v3] : ([] _> [T_i32])"
+  obtain v1 v2 v3 where cs_def:"s\<bullet>\<C> \<turnstile> [$ C v3] : ([] _> [T_i32])"
                                "cs = [$C v1, $C v2, $ C v3]"
     using const_list_split_3[OF select(4,1)] select(4)
     unfolding const_list_def
@@ -2341,8 +2196,8 @@ next
     by fastforce
 next
   case (if_wasm tf tn tm \<C> es1 es2)
-  obtain c1s c2s where cs_def:"\<S>\<bullet>\<C> \<turnstile> c1s : ([] _> tn)"
-                              "\<S>\<bullet>\<C> \<turnstile> c2s : ([] _> [T_i32])"
+  obtain c1s c2s where cs_def:"s\<bullet>\<C> \<turnstile> c1s : ([] _> tn)"
+                              "s\<bullet>\<C> \<turnstile> c2s : ([] _> [T_i32])"
                               "const_list c1s"
                               "const_list c2s"
                               "cs = c1s @ c2s"
@@ -2373,8 +2228,8 @@ next
     by fastforce
 next
   case (br_if j \<C> ts)
-  obtain cs1 cs2 where cs_def:"\<S>\<bullet>\<C> \<turnstile> cs1 : ([] _> ts)"
-                              "\<S>\<bullet>\<C> \<turnstile> cs2 : ([] _> [T_i32])"
+  obtain cs1 cs2 where cs_def:"s\<bullet>\<C> \<turnstile> cs1 : ([] _> ts)"
+                              "s\<bullet>\<C> \<turnstile> cs2 : ([] _> [T_i32])"
                               "const_list cs1"
                               "const_list cs2"
                               "cs = cs1 @ cs2"
@@ -2400,13 +2255,13 @@ next
     by fastforce
 next
   case (br_table \<C> ts "is" i' t1s t2s)
-  obtain cs1 cs2 where cs_def:"\<S>\<bullet>\<C> \<turnstile> cs1 : ([]_> (t1s @ ts))"
-                              "\<S>\<bullet>\<C> \<turnstile> cs2 : ([] _> [T_i32])"
+  obtain cs1 cs2 where cs_def:"s\<bullet>\<C> \<turnstile> cs1 : ([]_> (t1s @ ts))"
+                              "s\<bullet>\<C> \<turnstile> cs2 : ([] _> [T_i32])"
                               "const_list cs1"
                               "const_list cs2"
                               "cs = cs1 @ cs2"
-    using e_type_const_list_cons[OF br_table(5), of \<S> \<C> "(t1s @ ts)" "[T_i32]"]
-          e_type_const_list[of _ \<S> \<C> "t1s @ ts" "(t1s @ ts) @ [T_i32]"]
+    using e_type_const_list_cons[OF br_table(5), of s \<C> "(t1s @ ts)" "[T_i32]"]
+          e_type_const_list[of _ s \<C> "t1s @ ts" "(t1s @ ts) @ [T_i32]"]
           br_table(2,5)
     unfolding const_list_def
     by fastforce
@@ -2442,13 +2297,13 @@ next
     by fastforce
 next
   case (call_indirect j \<C> t1s t2s)
-  obtain cs1 cs2 where cs_def:"\<S>\<bullet>\<C> \<turnstile> cs1 : ([]_> t1s)"
-                              "\<S>\<bullet>\<C> \<turnstile> cs2 : ([] _> [T_i32])"
+  obtain cs1 cs2 where cs_def:"s\<bullet>\<C> \<turnstile> cs1 : ([]_> t1s)"
+                              "s\<bullet>\<C> \<turnstile> cs2 : ([] _> [T_i32])"
                               "const_list cs1"
                               "const_list cs2"
                               "cs = cs1 @ cs2"
-    using e_type_const_list_cons[OF call_indirect(7), of \<S> \<C> t1s "[T_i32]"]
-          e_type_const_list[of _ \<S> \<C> t1s "t1s @ [T_i32]"]
+    using e_type_const_list_cons[OF call_indirect(7), of s \<C> t1s "[T_i32]"]
+          e_type_const_list[of _ s \<C> t1s "t1s @ [T_i32]"]
           call_indirect(4)
     by fastforce
   obtain c where c_def:"cs2 = [$C ConstInt32 c]"
@@ -2484,7 +2339,7 @@ next
   obtain v vj vj' where v_def:"v = vs ! j" "vj = (take j vs)" "vj' = (drop (j+1) vs)"
     by blast
   have j_def:"j < length vs"
-    using get_local(1,9)
+    using get_local(1,8)
     by simp
   hence vj_len:"length vj = j"
     using v_def(2)
@@ -2503,7 +2358,7 @@ next
     using const_of_const_list set_local(3,6) e_type_const_list
     by fastforce
   have j_def:"j < length vs"
-    using set_local(1,9)
+    using set_local(1,8)
     by simp
   hence vj_len:"length vj = j"
     using v_def(2)
@@ -2537,14 +2392,14 @@ next
     using reduce.intros(11)[of s i j v _ vs]
     by fastforce
 next
-  case (load \<C> n a tp_sx t off)
+  case (load \<C> a tp_sx t off)
   obtain c where c_def: "cs = [$C ConstInt32 c]"
     using const_of_i32 load(3,6) e_type_const_unwrap
     unfolding const_list_def
     by fastforce
   obtain j where mem_some:"smem_ind s i = Some j"
-    using load(1,10)
-    unfolding smem_ind_def
+    using load(1,9)
+    unfolding smem_ind_def Option.is_none_def
     by fastforce
   have "\<exists>a' s' vs' es'. \<lparr>s;vs;[$C ConstInt32 c, $Load t tp_sx a off]\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   proof (cases tp_sx)
@@ -2584,18 +2439,18 @@ next
     using c_def progress_L0
     by fastforce
 next
-  case (store \<C> n a tp t off)
-  obtain cs' v where cs_def:"\<S>\<bullet>\<C> \<turnstile> [cs'] : ([] _> [T_i32])"
-                            "\<S>\<bullet>\<C> \<turnstile> [$ C v] : ([] _> [t])"
+  case (store \<C> a tp t off)
+  obtain cs' v where cs_def:"s\<bullet>\<C> \<turnstile> [cs'] : ([] _> [T_i32])"
+                            "s\<bullet>\<C> \<turnstile> [$ C v] : ([] _> [t])"
                             "cs = [cs',$ C v]"
     using const_list_split_2[OF store(6,3)] e_type_const_unwrap
     unfolding const_list_def
     by fastforce
   have t_def:"typeof v = t"
-    using cs_def(2) b_e_type_value[OF unlift_b_e[of \<S> \<C> "[C v]" "([] _> [t])"]]
+    using cs_def(2) b_e_type_value[OF unlift_b_e[of s \<C> "[C v]" "([] _> [t])"]]
     by fastforce
   obtain j where mem_some:"smem_ind s i = Some j"
-    using store(1,10)
+    using store(1,9)
     unfolding smem_ind_def
     by fastforce
   obtain c where c_def:"cs' = $C ConstInt32 c"
@@ -2642,21 +2497,21 @@ next
     using c_def cs_def progress_L0
     by fastforce
 next
-  case (current_memory \<C> n)
+  case (current_memory \<C>)
   obtain j where mem_some:"smem_ind s i = Some j"
-    using current_memory(1,9)
+    using current_memory(1,8)
     unfolding smem_ind_def
     by fastforce
   thus ?case
     using progress_L0[OF reduce.intros(20)[OF mem_some] current_memory(5), of _ _ vs "[]"]
     by fastforce
 next
-  case (grow_memory \<C> n)
+  case (grow_memory \<C>)
   obtain c where c_def:"cs = [$C ConstInt32 c]"
     using const_of_i32 grow_memory(2,5)
     by fastforce
   obtain j where mem_some:"smem_ind s i = Some j"
-    using grow_memory(1,9)
+    using grow_memory(1,8)
     unfolding smem_ind_def
     by fastforce
   show ?case
@@ -2706,9 +2561,10 @@ next
         by simp
     qed
     thus ?thesis
-      using composition(2)[OF composition(5) _ _ composition(8) 1 composition(10,11,12)] progress_L0[of s vs "(cs @ ($* es))" i _ _ _ "[]" "$*[e]"]
+      using composition(8,10,11) composition(2)[OF composition(5) _ _ _ 1]
+            progress_L0[of s vs "(cs @ ($* es))" i _ _ _ "[]" "$*[e]"]
       unfolding const_list_def
-      by fastforce
+      by (metis append_assoc list_all_simps(2) map_append self_append_conv2)
   next
     case 2
     hence "const_list (cs@($* es))"
@@ -2716,7 +2572,7 @@ next
       unfolding const_list_def
       by simp
     moreover
-    have "\<S>\<bullet>\<C> \<turnstile> (cs@($* es)) : ([] _> t2s)"
+    have "s\<bullet>\<C> \<turnstile> (cs@($* es)) : ([] _> t2s)"
       using composition(5) e_typing_s_typing.intros(1)[OF composition(1)] e_type_comp_conc
       by fastforce
     ultimately
@@ -2726,12 +2582,12 @@ next
   qed
 next
   case (weakening \<C> es t1s t2s ts)
-  obtain cs1 cs2 where cs_def:"\<S>\<bullet>\<C> \<turnstile> cs1 : ([] _> ts)"
-                              "\<S>\<bullet>\<C> \<turnstile> cs2 : ([] _> t1s)"
+  obtain cs1 cs2 where cs_def:"s\<bullet>\<C> \<turnstile> cs1 : ([] _> ts)"
+                              "s\<bullet>\<C> \<turnstile> cs2 : ([] _> t1s)"
                               "cs = cs1 @ cs2"
                               "const_list cs1"
                               "const_list cs2"
-    using e_type_const_list_cons[OF weakening(6,3)] e_type_const_list[of _ \<S> \<C> "ts" "ts @ t1s"]
+    using e_type_const_list_cons[OF weakening(6,3)] e_type_const_list[of _ s \<C> "ts" "ts @ t1s"]
     by fastforce
   have "(\<And>lholed. \<not> Lfilled 0 lholed [$Return] (cs2 @ ($* es)))"
        "(\<And>i lholed. \<not> Lfilled 0 lholed [$Br i] (cs2 @ ($* es)))"
@@ -2773,49 +2629,48 @@ next
 qed
 
 lemma progress_e:
-  assumes "\<S>\<bullet>None \<tturnstile>_i vs;cs_es : ts'"
+  assumes "s\<bullet>None \<tturnstile>_i vs;cs_es : ts'"
           "\<And> k lholed. \<not>(Lfilled k lholed [$Return] cs_es)"
           "\<And> i k lholed. (Lfilled k lholed [$Br (i)] cs_es) \<Longrightarrow> i < k"
           "cs_es \<noteq> [Trap]"
           "\<not> const_list (cs_es)"
-          "store_typing s \<S>"
+          "store_typing s"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs_es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
 proof -
   fix \<C> cs es ts_c
   have prems1:
-      "\<S>\<bullet>\<C> \<turnstile> es : (ts_c _> ts') \<Longrightarrow>
-       \<S>\<bullet>\<C> \<turnstile> cs_es : ([] _> ts') \<Longrightarrow>
+      "s\<bullet>\<C> \<turnstile> es : (ts_c _> ts') \<Longrightarrow>
+       s\<bullet>\<C> \<turnstile> cs_es : ([] _> ts') \<Longrightarrow>
        cs_es = cs@es \<Longrightarrow>
        const_list cs \<Longrightarrow>
-       \<S>\<bullet>\<C> \<turnstile> cs : ([] _> ts_c) \<Longrightarrow>
+       s\<bullet>\<C> \<turnstile> cs : ([] _> ts_c) \<Longrightarrow>
        (\<And> k lholed. \<not>(Lfilled k lholed [$Return] cs_es)) \<Longrightarrow>
        (\<And> i k lholed. (Lfilled k lholed [$Br (i)] cs_es) \<Longrightarrow> i < k) \<Longrightarrow>
        cs_es \<noteq> [Trap] \<Longrightarrow>
        \<not> const_list (cs_es) \<Longrightarrow>
-       store_typing s \<S> \<Longrightarrow>
-       i < length (s_inst \<S>) \<Longrightarrow>
+       store_typing s \<Longrightarrow>
        length (local \<C>) = length (vs) \<Longrightarrow>
-       Option.is_none (memory \<C>) = Option.is_none (inst.mem ((inst s)!i))  \<Longrightarrow>
+       (memory \<C>) = (\<not> (Option.is_none (inst.mem i)))  \<Longrightarrow>
          \<exists>a s' vs' cs_es'. \<lparr>s;vs;cs_es\<rparr> \<leadsto>_i \<lparr>s';vs';cs_es'\<rparr>"
    and prems2:
-      "\<S>\<bullet>None \<tturnstile>_i vs;cs_es : ts' \<Longrightarrow>
+      "s\<bullet>None \<tturnstile>_i vs;cs_es : ts' \<Longrightarrow>
        (\<And> k lholed. \<not>(Lfilled k lholed [$Return] cs_es)) \<Longrightarrow>
        (\<And> i k lholed. (Lfilled k lholed [$Br (i)] cs_es) \<Longrightarrow> i < k) \<Longrightarrow>
        cs_es \<noteq> [Trap] \<Longrightarrow>
        \<not> const_list (cs_es) \<Longrightarrow>
-       store_typing s \<S> \<Longrightarrow>
+       store_typing s \<Longrightarrow>
          \<exists>a s' vs' cs_es'. \<lparr>s;vs;cs_es\<rparr> \<leadsto>_i \<lparr>s';vs';cs_es'\<rparr>"
   proof (induction arbitrary: vs ts_c ts' i cs_es cs rule: e_typing_s_typing.inducts)
-    case (1 \<C> b_es tf \<S>)
+    case (1 \<C> b_es tf s)
     hence "\<C> \<turnstile> b_es : (ts_c _> ts')"
-      using e_type_comp_conc1[of \<S> \<C> cs "($* b_es)" "[]" "ts'"] unlift_b_e
+      using e_type_comp_conc1[of s \<C> cs "($* b_es)" "[]" "ts'"] unlift_b_e
       by (metis e_type_const_conv_vs typing_map_typeof)
     then show ?case
-      using progress_b_e[OF _ 1(5) _ _ 1(4)] 1(3,4,9) list_all_append 1
+      using progress_b_e[OF _ 1(5) _ _ 1(4) _ 1(11,12)] 1(3,4,6,7,9) list_all_append
       unfolding const_list_def
       by fastforce
   next
-    case (2 \<S> \<C> es t1s t2s e t3s)
+    case (2 s \<C> es t1s t2s e t3s)
     show ?case
     proof (cases "const_list es")
       case True
@@ -2824,12 +2679,12 @@ proof -
         unfolding const_list_def
         by simp
       moreover
-      have "\<exists>ts''. (\<S>\<bullet>\<C> \<turnstile> (cs @ es) : ([] _> ts''))"
+      have "\<exists>ts''. (s\<bullet>\<C> \<turnstile> (cs @ es) : ([] _> ts''))"
         using 2(5,6)
         by (metis append.assoc e_type_comp_conc1)
       ultimately
       show ?thesis
-        using 2(4)[OF 2(5) _ _ _ 2(9,10,11,12,13,14,15), of "(cs@es)"] 2(6,16)
+        using 2(4)[OF 2(5) _ _ _ 2(9,10,11,12,13,14,15), of "(cs@es)"] 2(6,15)
         by fastforce
     next
       case False
@@ -2837,7 +2692,7 @@ proof -
         unfolding const_list_def
         by simp
       moreover
-      have "\<exists>ts''. (\<S>\<bullet>\<C> \<turnstile> (cs @ es) : ([] _> ts''))"
+      have "\<exists>ts''. (s\<bullet>\<C> \<turnstile> (cs @ es) : ([] _> ts''))"
         using 2(5,6)
         by (metis append.assoc e_type_comp_conc1)
       moreover
@@ -2914,18 +2769,18 @@ proof -
       next
         case False
         thus ?thesis
-          using 2(3)[OF _ _ 2(7,8) _ _ _ _  2(13,14,15)] preds 2(6,16)
+          using 2(3)[OF _ _ 2(7,8) _ _ _ _  2(13,14,15)] preds 2(6,15)
                 progress_L0[of s vs "(cs @ es)" _ _ _ _ "[]" "[e]"]
           unfolding const_list_def
           by (metis append.assoc append_Nil list.pred_inject(1))
       qed
     qed
   next
-    case (3 \<S> \<C> es t1s t2s ts)
+    case (3 s \<C> es t1s t2s ts)
     thus ?case
       by fastforce
   next
-    case (4 \<S> \<C>)
+    case (4 s \<C>)
     have cs_es_def:"Lfilled 0 (LBase cs []) [Trap] cs_es"
       using Lfilled.intros(1)[OF 4(3), of _ "[]" "[Trap]"] 4(2)
       by fastforce
@@ -2933,7 +2788,7 @@ proof -
       using reduce_simple.trap[OF 4(7) cs_es_def] reduce.intros(1)
       by blast
   next
-  case (5 \<S> ts j vls es n \<C>)
+  case (5 s ts j vls es n \<C>)
     consider (1) "(\<And>k lholed. \<not> Lfilled k lholed [$Return] es)"
                  "(\<And>k lholed i. (Lfilled k lholed [$Br i] es) \<Longrightarrow> i < k)"
                  "es \<noteq> [Trap]"
@@ -2957,9 +2812,9 @@ proof -
       then obtain k lholed where local_assms:"(Lfilled k lholed [$Return] es)"
         by blast
       then obtain lholed' vs' \<C>' where lholed'_def:"(Lfilled k lholed' (vs'@[$Return]) es)"
-                                                   "\<S>\<bullet>\<C>' \<turnstile> vs' : ([] _> ts)"
+                                                   "s\<bullet>\<C>' \<turnstile> vs' : ([] _> ts)"
                                                    "const_list vs'"
-        using progress_LN_return[OF local_assms, of \<S> _ ts ts] s_type_unfold[OF 5(1)]
+        using progress_LN_return[OF local_assms, of s _ ts ts] s_type_unfold[OF 5(1)]
         by fastforce
       hence temp1:"\<exists>a. \<lparr>[Local n j vls es]\<rparr> \<leadsto> \<lparr>vs'\<rparr>"
         using reduce_simple.return[OF lholed'_def(3)]
@@ -2995,21 +2850,21 @@ proof -
       then obtain k' lholed' i' where temp1:"Lfilled k' lholed' [$Br (k'+i')] es"
         using le_Suc_ex
         by blast
-      obtain \<C>' where c_def:"\<C>' = ((s_inst \<S>)!j)\<lparr>local := (local ((s_inst \<S>)!j)) @ (map typeof vls), return := Some ts\<rparr>"
-        by blast
-      hence  es_def:"\<S>\<bullet>\<C>' \<turnstile> es : ([] _> ts)" "j < length (s_inst \<S>)"
+      obtain \<C>' \<C>j where c_def:"s\<bullet>\<C>' \<turnstile> es : ([] _> ts)"
+                               "inst_typing s j \<C>j"
+                               "\<C>' = \<C>j\<lparr>local := (local \<C>j) @ (map typeof vls), return := Some ts\<rparr>"
         using 5(1) s_type_unfold
-        by fastforce+
+        by metis
       hence "length (label \<C>') = 0"
         using c_def store_local_label_empty 5(12)
         by fastforce
       thus ?thesis 
-        using progress_LN1[OF temp1 es_def(1)]
+        using progress_LN1[OF temp1 c_def(1)]
         by linarith
     qed
   next
-    case (6 \<S> cl tf \<C>)
-    obtain ts'' where ts''_def:"\<S>\<bullet>\<C> \<turnstile> cs : ([] _> ts'')" "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+    case (6 s cl tf \<C>)
+    obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> cs : ([] _> ts'')" "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
       using 6(2,3) e_type_comp_conc1
       by fastforce
     obtain ts_c t1s t2s where cl_def:"(ts'' = ts_c @ t1s)"
@@ -3017,8 +2872,8 @@ proof -
                                      "cl_type cl = (t1s _> t2s)"
       using e_type_callcl[OF ts''_def(2)]
       by fastforce
-    obtain vs1 vs2 where vs_def:"\<S>\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
-                                "\<S>\<bullet>\<C> \<turnstile> vs2 : (ts_c _> ts_c @ t1s)"
+    obtain vs1 vs2 where vs_def:"s\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
+                                "s\<bullet>\<C> \<turnstile> vs2 : (ts_c _> ts_c @ t1s)"
                                 "cs = vs1 @ vs2"
                                 "const_list vs1"
                                 "const_list vs2"
@@ -3074,7 +2929,7 @@ proof -
         by fastforce
     qed
   next
-    case (7 \<S> \<C> e0s ts t2s es n)
+    case (7 s \<C> e0s ts t2s es n)
     consider (1) "(\<And>k lholed. \<not> Lfilled k lholed [$Return] es)"
                  "(\<And>k lholed i. (Lfilled k lholed [$Br i] es) \<Longrightarrow> i < k)"
                  "es \<noteq> [Trap]"
@@ -3091,12 +2946,12 @@ proof -
       have temp1:"es = [] @ es" "const_list []"
         unfolding const_list_def
         by auto
-      have temp2:"\<S>\<bullet>\<C>\<lparr>label := [ts] @ label \<C>\<rparr> \<turnstile> [] : ([] _> [])"
+      have temp2:"s\<bullet>\<C>\<lparr>label := [ts] @ label \<C>\<rparr> \<turnstile> [] : ([] _> [])"
         using b_e_typing.empty e_typing_s_typing.intros(1)
         by fastforce
       have "\<exists>s' vs' a. \<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';vs';a\<rparr>"
-        using 7(5)[OF 7(2), of "[]" "[]", OF temp1 temp2 1(1) _ 1(3,4) 7(14,15)]
-              1(2) 7(16,17)
+        using 7(5)[OF 7(2), of "[]" "[]", OF temp1 temp2 1(1) _ 1(3,4) 7(14)]
+              1(2) 7(15,16)
         unfolding const_list_def
         by fastforce
       then obtain s' vs' a where red_def:"\<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';vs';a\<rparr>"
@@ -3139,7 +2994,7 @@ proof -
       then obtain k lholed where lholed_def:"(Lfilled k lholed [$Br (k+0)] es)"
         by fastforce
       then obtain lholed' vs' \<C>' where lholed'_def:"(Lfilled k lholed' (vs'@[$Br (k)]) es)"
-                                                   "\<S>\<bullet>\<C>' \<turnstile> vs' : ([] _> ts)"
+                                                   "s\<bullet>\<C>' \<turnstile> vs' : ([] _> ts)"
                                                    "const_list vs'"
         using progress_LN[OF lholed_def 7(2), of ts]
         by fastforce
@@ -3166,16 +3021,16 @@ proof -
         by simp
     qed
   next
-    case (8 i \<S> tvs vs \<C> rs es ts)
+    case (8 tvs vs \<S> i \<C>i \<C> rs es ts)
     have "length (local \<C>) = length vs"
-      using 8(2,3) store_local_label_empty[OF 8(1,11)]
+      using 8(1,3) store_local_label_empty[OF 8(2)]
       by fastforce
     moreover
-    have "Option.is_none (memory \<C>) = Option.is_none (inst.mem ((inst s)!i))"
-      using store_mem_exists[OF 8(1,11)] 8(3)
+    have "(memory \<C>) = (\<not> Option.is_none (inst.mem i))"
+      using store_mem_exists[OF 8(2)] 8(3)
       by simp
     ultimately show ?case
-      using 8(6)[OF 8(4) _ _ _ 8(7,8,9,10,11,1)]
+      using 8(6)[OF 8(4) _ _ _ 8(7,8,9,10,11)]
             e_typing_s_typing.intros(1)[OF b_e_typing.empty[of \<C>]]
       unfolding const_list_def
       by fastforce
@@ -3186,29 +3041,29 @@ proof -
 qed
 
 lemma progress_e1:
-  assumes "\<S>\<bullet>None \<tturnstile>_i vs;es : ts"
+  assumes "s\<bullet>None \<tturnstile>_i vs;es : ts"
   shows "\<not>(Lfilled k lholed [$Return] es)"
 proof -
   {
     assume "\<exists>k lholed. (Lfilled k lholed [$Return] es)"
     then obtain k lholed where local_assms:"(Lfilled k lholed [$Return] es)"
       by blast
-    obtain \<C> where c_def:"i < length (s_inst \<S>)"
-                   "\<C> = ((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i)) @ (map typeof vs), return := None\<rparr>"
-                   "(\<S>\<bullet>\<C> \<turnstile> es : ([] _> ts))"
+    obtain \<C> \<C>i where c_def:"inst_typing s i \<C>i"
+                   "\<C> = \<C>i\<lparr>local := (local \<C>i) @ (map typeof vs), return := None\<rparr>"
+                   "(s\<bullet>\<C> \<turnstile> es : ([] _> ts))"
       using assms s_type_unfold
-      by fastforce
+      by metis
     have "\<exists>rs. return \<C> = Some rs"
       using local_assms c_def(3)
     proof (induction "[$Return]" es arbitrary: \<C> ts rule: Lfilled.induct)
       case (L0 vs lholed es')
       thus ?case
-        using e_type_comp_conc2[OF L0(3)] unlift_b_e[of \<S> \<C> "[Return]"] b_e_type_return
+        using e_type_comp_conc2[OF L0(3)] unlift_b_e[of s \<C> "[Return]"] b_e_type_return
         by fastforce
     next
       case (LN vs lholed tls es' l es'' k lfilledk)
       thus ?case
-        using e_type_comp_conc2[OF LN(5)] e_type_label[of \<S> \<C> tls es' lfilledk]
+        using e_type_comp_conc2[OF LN(5)] e_type_label[of s \<C> tls es' lfilledk]
         by fastforce
     qed
     hence False
@@ -3220,24 +3075,24 @@ proof -
 qed
 
 lemma progress_e2:
-  assumes "\<S>\<bullet>None \<tturnstile>_i vs;es : ts"
-          "store_typing s \<S>"
+  assumes "s\<bullet>None \<tturnstile>_i vs;es : ts"
+          "store_typing s"
   shows "(Lfilled k lholed [$Br (j)] es) \<Longrightarrow> j < k"
 proof -
   {
     assume "(\<exists>i k lholed. (Lfilled k lholed [$Br (i)] es) \<and> i \<ge> k)"
     then obtain j k lholed where local_assms:"(Lfilled k lholed [$Br (k+j)] es)"
       by (metis le_iff_add)
-    obtain \<C> where c_def:"i < length (s_inst \<S>)"
-                   "\<C> = ((s_inst \<S>)!i)\<lparr>local := (local ((s_inst \<S>)!i)) @ (map typeof vs), return := None\<rparr>"
-                   "(\<S>\<bullet>\<C> \<turnstile> es : ([] _> ts))"
+    obtain \<C> \<C>i where c_def:"inst_typing s i \<C>i"
+                   "\<C> = \<C>i\<lparr>local := (local \<C>i) @ (map typeof vs), return := None\<rparr>"
+                   "(s\<bullet>\<C> \<turnstile> es : ([] _> ts))"
       using assms s_type_unfold
-      by fastforce
+      by metis
     have "j < length (label \<C>)"
       using progress_LN1[OF local_assms c_def(3)]
       by -
     hence False
-      using store_local_label_empty(1)[OF c_def(1) assms(2)] c_def(2)
+      using store_local_label_empty(1)[OF c_def(1)] c_def(2)
       by fastforce
   }
   thus "(\<And> j k lholed. (Lfilled k lholed [$Br (j)] es) \<Longrightarrow> j < k)"
@@ -3245,10 +3100,10 @@ proof -
 qed
 
 lemma progress_e3:
-  assumes "\<S>\<bullet>None \<tturnstile>_i vs;cs_es : ts'"
+  assumes "s\<bullet>None \<tturnstile>_i vs;cs_es : ts'"
           "cs_es \<noteq> [Trap]"
           "\<not> const_list (cs_es)"
-          "store_typing s \<S>"
+          "store_typing s"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs_es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   using assms progress_e progress_e1 progress_e2
   by fastforce
