@@ -1,4 +1,4 @@
-theory WasmBigStep imports "WebAssembly/Wasm" begin
+theory WasmBigStep imports "WebAssembly/Wasm_Base_Defs" begin
 
 datatype res_b =
   RValue "v list" 
