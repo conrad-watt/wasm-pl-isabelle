@@ -2,7 +2,12 @@ section {* WebAssembly Base Definitions *}
 
 theory Wasm_Base_Defs imports Wasm_Ast Wasm_Type_Abs begin
 
-instantiation i32 :: wasm_int begin instance .. end
+instantiation i32 :: wasm_int begin
+  lift_definition nat_of_int :: "i32 \<Rightarrow> nat" is "unat" .
+  lift_definition int_of_nat :: "nat \<Rightarrow> i32" is "of_nat" .
+instance ..
+
+end
 instantiation i64 :: wasm_int begin instance .. end
 instantiation f32 :: wasm_float begin instance .. end
 instantiation f64 :: wasm_float begin instance .. end
@@ -43,12 +48,15 @@ consts
   wasm_bool :: "bool \<Rightarrow> i32"
   int32_minus_one :: i32
 
+definition Ki64 :: "nat" where
+  "Ki64 = 65536"
+
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
-  "mem_size m = length (Rep_mem m)"
+  "mem_size m = length (Rep_mem m) div Ki64"
 
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem" where
-  "mem_grow m n = mem_append m (bytes_replicate (n * 64000) 0)"
+  "mem_grow m n = mem_append m (bytes_replicate (n * Ki64) 0)"
 
 definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> bytes option" where
   "load m n off l = (if (mem_size m \<ge> (n+off+l))

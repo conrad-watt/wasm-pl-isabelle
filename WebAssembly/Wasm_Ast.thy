@@ -1,6 +1,6 @@
 section {* WebAssembly Core AST *}
 
-theory Wasm_Ast imports Main "Native_Word.Uint8" begin
+theory Wasm_Ast imports Main "HOL-Word.Word" begin
 
 type_synonym \<comment> \<open>immediate\<close>
   i = nat
@@ -10,20 +10,23 @@ type_synonym \<comment> \<open>alignment exponent\<close>
   a = nat
 
 \<comment> \<open>primitive types\<close>
-typedecl i32
+typedef i32 = "UNIV :: (32 word) set" ..
 typedecl i64
 typedecl f32
 typedecl f64
 
+setup_lifting type_definition_i32
+declare Quotient_i32[transfer_rule]
+
 \<comment> \<open>memory\<close>
-type_synonym byte = uint8
+type_synonym byte = "8 word"
 
 typedef bytes = "UNIV :: (byte list) set" ..
 setup_lifting type_definition_bytes
 declare Quotient_bytes[transfer_rule]
 
-lift_definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" is "(\<lambda>a n as. takefill (Abs_uint8 a) n as)" .
-lift_definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" is "(\<lambda>n b. replicate n (Abs_uint8 b))" .
+lift_definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" is "(\<lambda>(a::8 word) n as. takefill a n as)" .
+lift_definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" is "(\<lambda>n (b::8 word). replicate n b)" .
 definition msbyte :: "bytes \<Rightarrow> byte" where
   "msbyte bs = last (Rep_bytes bs)"
 

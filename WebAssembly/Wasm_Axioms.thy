@@ -5,7 +5,7 @@ theory Wasm_Axioms imports Wasm begin
 (* these were originally axioms, but memory now has a concrete representation in the model *)
 lemma mem_grow_size:
   assumes "mem_grow m n = m'"
-  shows "(mem_size m + (64000 * n)) = mem_size m'"
+  shows "(mem_size m + (Ki64 * n)) = mem_size m'"
   using assms Abs_mem_inverse Abs_bytes_inverse
   unfolding mem_grow_def mem_size_def mem_append_def bytes_replicate_def
   by auto
