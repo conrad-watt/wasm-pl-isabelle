@@ -53,13 +53,13 @@ definition Ki64 :: "nat" where
 
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
-  "mem_size m = length (Rep_mem m) div Ki64"
+  "mem_size m = (mem_length m) div Ki64"
 
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem" where
   "mem_grow m n = mem_append m (bytes_replicate (n * Ki64) 0)"
 
 definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> bytes option" where
-  "load m n off l = (if (mem_size m \<ge> (n+off+l))
+  "load m n off l = (if (mem_length m \<ge> (n+off+l))
                        then Some (read_bytes m (n+off) l)
                        else None)"
 
@@ -72,7 +72,7 @@ definition load_packed :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> 
   "load_packed sx m n off lp l = map_option (sign_extend sx l) (load m n off lp)"
 
 definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
-  "store m n off bs l = (if (mem_size m \<ge> (n+off+l))
+  "store m n off bs l = (if (mem_length m \<ge> (n+off+l))
                           then Some (write_bytes m (n+off) (bytes_takefill 0 l bs))
                           else None)"
 

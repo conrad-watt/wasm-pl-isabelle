@@ -34,6 +34,9 @@ typedef mem = "UNIV :: (byte list) set" ..
 setup_lifting type_definition_mem
 declare Quotient_mem[transfer_rule]
 
+lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>m n. m!n)::byte list \<Rightarrow> nat \<Rightarrow> byte" .
+lift_definition mem_length :: "mem \<Rightarrow> nat" is "length" .
+
 lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. take l (drop n m))" .
 lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m n bs. (take n m) @ bs @ (drop (n + length bs) m))" .
 lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is append .
