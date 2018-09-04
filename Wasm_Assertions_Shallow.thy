@@ -160,17 +160,20 @@ definition valid_triple_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 
                                                                \<and> rvs = vcs'
                                                                \<and> reifies_s s' i h' st' fs
                                                                \<and> reifies_loc locs' st'
+                                                               \<and> snd (snd st') = lvar_st
                                        | RBreak n rvs \<Rightarrow> \<exists>h' vcs' st'.
                                                                n < length lasss
                                                                \<and> ass_sat (lasss!n) vcs' h' st'
                                                                \<and> rvs = vcs'
                                                                \<and> reifies_s s' i h' st' fs
                                                                \<and> reifies_loc locs' st'
+                                                               \<and> snd (snd st') = lvar_st
                                        | RReturn rvs \<Rightarrow> \<exists>h' vcs' st'.
                                                                ass_sat rass vcs' h' st'
                                                                \<and> rvs = vcs'
                                                                \<and> reifies_s s' i h' st' fs
-                                                               \<and> reifies_loc locs' st'))"
+                                                               \<and> reifies_loc locs' st'
+                                                               \<and> snd (snd st') = lvar_st))"
 
 definition valid_triples_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile>\<^sub>_ _" 60) where
   "(\<Gamma> \<TTurnstile>\<^sub>n specs) \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile>\<^sub>n {P}es{Q})"
