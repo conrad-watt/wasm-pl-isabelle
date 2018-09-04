@@ -143,8 +143,8 @@ definition valid_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rig
   "\<Gamma> \<TTurnstile> specs \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile> {P}es{Q})"
 
 (* TODO: frame? ? ? ?*)
-definition valid_triple_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_ \<Turnstile>\<^sub>_ {_}_{_}" 60) where
-  "(\<Gamma> \<Turnstile>\<^sub>k {P}es{Q}) \<equiv> let (fs,lasss,rass) = \<Gamma> in
+definition valid_triple_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_ \<Turnstile>'_ _ {_}_{_}" 60) where
+  "(\<Gamma> \<Turnstile>_k {P}es{Q}) \<equiv> let (fs,lasss,rass) = \<Gamma> in
                      \<forall>vcs h st s i locs labs ret lvar_st.
                                         ass_sat P vcs h st
                                       \<and> reifies_s s i h st fs
@@ -175,13 +175,13 @@ definition valid_triple_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 
                                                                \<and> reifies_loc locs' st'
                                                                \<and> snd (snd st') = lvar_st))"
 
-definition valid_triples_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile>\<^sub>_ _" 60) where
-  "(\<Gamma> \<TTurnstile>\<^sub>n specs) \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile>\<^sub>n {P}es{Q})"
+definition valid_triples_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile>'_ _ _" 60) where
+  "(\<Gamma> \<TTurnstile>_n specs) \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile>_n {P}es{Q})"
 
-definition cvalids :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<TTurnstile> _" 60) where
+definition valid_triples_assms :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<TTurnstile> _" 60) where
   "(\<Gamma>\<bullet>assms \<TTurnstile> specs) \<equiv> (\<Gamma> \<TTurnstile> assms) \<longrightarrow> (\<Gamma> \<TTurnstile> specs)"
 
-definition cvalids_n :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<TTurnstile>\<^sub>_ _" 60) where
-  "(\<Gamma>\<bullet>assms \<TTurnstile>\<^sub>n specs) \<equiv> (\<Gamma> \<TTurnstile>\<^sub>n assms) \<longrightarrow> (\<Gamma> \<TTurnstile>\<^sub>n specs)"
+definition valid_triples_assms_n :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<TTurnstile>'_ _ _" 60) where
+  "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs) \<equiv> (\<Gamma> \<TTurnstile>_n assms) \<longrightarrow> (\<Gamma> \<TTurnstile>_n specs)"
 
 end
