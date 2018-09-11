@@ -1,4 +1,4 @@
-theory Wasm_Big_Step imports "WebAssembly/Wasm_Base_Defs" begin
+theory Wasm_Big_Step imports "WebAssembly/Wasm_Properties" begin
 
 datatype res_b =
   RValue "v list" 
@@ -6,7 +6,7 @@ datatype res_b =
 | RReturn "v list"
 | RTrap
 
-inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times> nat \<times> inst), (s \<times> v list \<times> res_b)] \<Rightarrow> bool" ("_ \<Down>{_} _" 60) where
+inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times> nat option \<times> inst), (s \<times> v list \<times> res_b)] \<Rightarrow> bool" ("_ \<Down>{_} _" 60) where
   \<comment> \<open>\<open>constant values\<close>\<close>
   const:"(s,vs,[$C v]) \<Down>{\<Gamma>} (s,vs,RValue [v])"
   \<comment> \<open>\<open>unary ops\<close>\<close>
@@ -48,7 +48,7 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
 | br_table:"\<lbrakk>length ks > (nat_of_int c); const_list ves; (s,vs,ves@[$(Br (ks!(nat_of_int c)))]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>{\<Gamma>} (s',vs',res)"
 | br_table_length:"\<lbrakk>length ks \<le> (nat_of_int c); const_list ves; (s,vs,ves@[$(Br k)]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>{(ls,r,i)} (s',vs',RReturn vcs)"
+| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>{(ls,Some r,i)} (s',vs',RReturn vcs)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> (s,(vi @ [v] @ vs),[$(Get_local j)]) \<Down>{\<Gamma>} (s,(vi @ [v] @ vs),RValue [v])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -87,23 +87,23 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
 | callcl_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) f vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,vs,ves @ [Callcl cl]) \<Down>{(ls,r,i)} (s',vs,RValue vcs')"
 | callcl_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,vs,ves @ [Callcl cl]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
-| seq_value:"\<lbrakk>(s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue res''); (s'',vs'',($$* res'') @ es') \<Down>{\<Gamma>} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,es @ es') \<Down>{\<Gamma>} (s',vs',RValue res)"
+| const_value:"\<lbrakk>(s,vs,es) \<Down>{\<Gamma>} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,($$*ves)@es) \<Down>{\<Gamma>} (s',vs',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RValue res)"
-| local_value:"\<lbrakk>(s,lls,es) \<Down>{([],n,j)} (s',lls',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RValue res)"
+| local_value:"\<lbrakk>(s,lls,es) \<Down>{([],Some n,j)} (s',lls',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RValue res)"
+  \<comment> \<open>\<open>seq congruence\<close>\<close>
+| seq_value:"\<lbrakk>(s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue res''); (s'',vs'',($$* res'') @ es') \<Down>{\<Gamma>} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,es @ es') \<Down>{\<Gamma>} (s',vs',RValue res)"
+| seq_nonvalue:"\<lbrakk>const_list ves; (s,vs,es) \<Down>{\<Gamma>} (s',vs',res); \<nexists>rvs. res = RValue rvs\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>trap congruence\<close>\<close>
-| seq_trap:"\<lbrakk>const_list ves; (s,vs,es) \<Down>{\<Gamma>} (s',vs',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>{\<Gamma>} (s',vs',RTrap)"
 | label_trap:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RTrap)"
-| local_trap:"\<lbrakk>(s,lls,es) \<Down>{([],n,j)} (s',lls',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RTrap)"
+| local_trap:"\<lbrakk>(s,lls,es) \<Down>{([],Some n,j)} (s',lls',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
-| seq_break:"\<lbrakk>const_list ves; (s,vs,es) \<Down>{\<Gamma>} (s',vs',RBreak n bvs)\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>{\<Gamma>} (s',vs',RBreak n bvs)"
 | label_break_suc:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RBreak bn bvs)"
 | label_break_nil:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RBreak 0 bvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RValue bvs)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
-| seq_return:"\<lbrakk>const_list ves; (s,vs,es) \<Down>{\<Gamma>} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>{\<Gamma>} (s',vs',RReturn rvs)"
 | label_return:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RReturn rvs)"
-| local_return:"\<lbrakk>(s,lls,es) \<Down>{([],n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RValue rvs)"
+| local_return:"\<lbrakk>(s,lls,es) \<Down>{([],Some n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RValue rvs)"
 
-inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \<times> nat \<times> inst), (s \<times> v list \<times> res_b)] \<Rightarrow> bool" ("_ \<Down>_{_} _" 60) where
+inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \<times> nat option \<times> inst), (s \<times> v list \<times> res_b)] \<Rightarrow> bool" ("_ \<Down>_{_} _" 60) where
   \<comment> \<open>\<open>constant values\<close>\<close>
   const:"(s,vs,[$C v]) \<Down>k{\<Gamma>} (s,vs,RValue [v])"
   \<comment> \<open>\<open>unary ops\<close>\<close>
@@ -145,7 +145,7 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
 | br_table:"\<lbrakk>length js > (nat_of_int c); const_list ves; (s,vs,ves@[$(Br (js!(nat_of_int c)))]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table js j)]) \<Down>k{\<Gamma>} (s',vs',res)"
 | br_table_length:"\<lbrakk>length js \<le> (nat_of_int c); const_list ves; (s,vs,ves@[$(Br j)]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table js j)]) \<Down>k{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>k{(ls,r,i)} (s',vs',RReturn vcs)"
+| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>k{(ls,Some r,i)} (s',vs',RReturn vcs)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> (s,(vi @ [v] @ vs),[$(Get_local j)]) \<Down>k{\<Gamma>} (s,(vi @ [v] @ vs),RValue [v])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -175,39 +175,39 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
-| call:"\<lbrakk>const_list ves; (s,vs,ves@[Callcl (sfunc s i j)]) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$(Call j)]) \<Down>k{(ls,r,i)} (s',vs',res)"
+| call:"\<lbrakk>const_list ves; (s,vs,ves@[Callcl (sfunc s i j)]) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>stab s i (nat_of_int c) = Some cl; stypes s i j = tf; cl_type cl = tf; const_list ves; (s,vs,ves@[Callcl cl]) \<Down>{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k{(ls,r,i)} (s',vs',res)"
+| call_indirect_Some:"\<lbrakk>stab s i (nat_of_int c) = Some cl; stypes s i j = tf; cl_type cl = tf; const_list ves; (s,vs,ves@[Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k{(ls,r,i)} (s',vs',res)"
 | call_indirect_None:"\<lbrakk>(stab s i (nat_of_int c) = Some cl \<and> stypes s i j \<noteq> cl_type cl) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| callcl_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,vs,[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves @ [Callcl cl]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)"
+| callcl_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,vs,[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
 | callcl_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) f vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,vs,ves @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs,RValue vcs')"
 | callcl_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,vs,ves @ [Callcl cl]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
-| seq_value:"\<lbrakk>(s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue res''); (s'',vs'',($$* res'') @ es') \<Down>k{\<Gamma>} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,es @ es') \<Down>k{\<Gamma>} (s',vs',RValue res)"
+| const_value:"\<lbrakk>(s,vs,es) \<Down>k{\<Gamma>} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,($$*ves)@es) \<Down>k{\<Gamma>} (s',vs',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RValue res)"
-| local_value:"\<lbrakk>(s,lls,es) \<Down>k{([],n,j)} (s',lls',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RValue res)"
+| local_value:"\<lbrakk>(s,lls,es) \<Down>k{([],Some n,j)} (s',lls',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RValue res)"
+  \<comment> \<open>\<open>seq congruence\<close>\<close>
+| seq_value:"\<lbrakk>(s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue res''); (s'',vs'',($$* res'') @ es') \<Down>k{\<Gamma>} (s',vs',RValue res)\<rbrakk> \<Longrightarrow> (s,vs,es @ es') \<Down>k{\<Gamma>} (s',vs',RValue res)"
+| seq_nonvalue:"\<lbrakk>const_list ves; (s,vs,es) \<Down>k{\<Gamma>} (s',vs',res); \<nexists>rvs. res = RValue rvs\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>k{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>trap congruence\<close>\<close>
-| seq_trap:"\<lbrakk>const_list ves; (s,vs,es) \<Down>k{\<Gamma>} (s',vs',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>k{\<Gamma>} (s',vs',RTrap)"
 | label_trap:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RTrap)"
-| local_trap:"\<lbrakk>(s,lls,es) \<Down>k{([],n,j)} (s',lls',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RTrap)"
+| local_trap:"\<lbrakk>(s,lls,es) \<Down>k{([],Some n,j)} (s',lls',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
-| seq_break:"\<lbrakk>const_list ves; (s,vs,es) \<Down>k{\<Gamma>} (s',vs',RBreak n bvs)\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>k{\<Gamma>} (s',vs',RBreak n bvs)"
 | label_break_suc:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RBreak bn bvs)"
 | label_break_nil:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RBreak 0 bvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RValue bvs)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
-| seq_return:"\<lbrakk>const_list ves; (s,vs,es) \<Down>k{\<Gamma>} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,ves @ es @ es') \<Down>k{\<Gamma>} (s',vs',RReturn rvs)"
 | label_return:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RReturn rvs)"
-| local_return:"\<lbrakk>(s,lls,es) \<Down>k{([],n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RValue rvs)"
+| local_return:"\<lbrakk>(s,lls,es) \<Down>k{([],Some n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RValue rvs)"
 
 lemma reduce_to_n_mono:
   assumes "(c1 \<Down>k{\<Gamma>} c2)"
   shows"\<forall>k' \<ge> k. (c1 \<Down>k'{\<Gamma>} c2)"
   using assms
 proof (induction rule: reduce_to_n.induct)
-  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k ls r i s' vs' res)
-  show ?case
-    using reduce_to_n.callcl_native[OF callcl_native(1,2,3,4,5,6)] callcl_native(8)
+  case (call ves s vs i j k ls r s' vs' res)
+  thus ?case
+    using reduce_to_n.call
     by (metis Suc_le_D Suc_le_lessD less_Suc_eq_le)
 qed (fastforce intro: reduce_to_n.intros)+
 
@@ -216,12 +216,6 @@ lemma reduce_to_imp_reduce_to_n:
   shows"(\<exists>k. (c1 \<Down>k{\<Gamma>} c2))"
   using assms
 proof (induction rule: reduce_to.induct)
-  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs ls r i s' vs' res)
-  show ?case
-    using reduce_to_n.callcl_native[OF callcl_native(1,2,3,5,6,7), of s vs _ ls r i s' vs' res]
-    callcl_native(9)
-    by auto
-next
   case (seq_value s vs es \<Gamma> s'' vs'' res'' es' s' vs' res)
   thus ?case
     using reduce_to_n_mono reduce_to_n.seq_value
@@ -241,4 +235,223 @@ lemma reduce_to_iff_reduce_to_n:
   using reduce_to_imp_reduce_to_n reduce_to_n_imp_reduce_to
   by blast
 
+lemma reduce_to_consts:
+  assumes "((s,vs,($$*ves)) \<Down>{\<Gamma>} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RValue ves"
+  using assms
+proof (induction "(s,vs,($$*ves))""\<Gamma>" "(s',vs',res)" arbitrary: s vs ves s' vs' res rule: reduce_to.induct)
+  case (block ves n t1s t2s m es \<Gamma>)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by blast
+next
+  case (loop ves n t1s t2s m es \<Gamma>)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by blast
+next
+  case (if_false n ves tf e2s \<Gamma> e1s)
+  thus ?case
+    using consts_cons_last2(3) e_type_const_unwrap
+    by (metis b_e.distinct(325) e.inject(1))
+next
+  case (if_true n ves tf e1s \<Gamma> e2s)
+  thus ?case
+    using consts_cons_last2(3) e_type_const_unwrap
+    by (metis b_e.distinct(325) e.inject(1))
+next
+  case (br vcs n k ls r i)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by auto
+next
+  case (br_if_true n ves k \<Gamma>)
+  thus ?case
+    using consts_cons_last2(3) e_type_const_unwrap
+    by (metis b_e.distinct(403) e.inject(1))
+next
+  case (br_table ks c ves \<Gamma> k)
+  thus ?case
+    using consts_cons_last2(3) e_type_const_unwrap
+    by (metis b_e.distinct(439) e.inject(1))
+next
+  case (br_table_length ks c ves k \<Gamma>)
+  thus ?case
+    using consts_cons_last2(3) e_type_const_unwrap
+    by (metis b_e.distinct(439) e.inject(1))
+next
+  case (return r vcs ls i)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by auto
+next
+  case (call ves i j ls r)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by blast
+next
+  case (call_indirect_Some i c cl j tf ves ls r)
+  thus ?case
+    using consts_cons_last2(3) e_type_const_unwrap
+    by (metis b_e.distinct(535) e.inject(1))
+next
+  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs ls r i)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by blast
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m hs vcs' ls r i)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by auto
+next
+  case (const_value s vs es \<Gamma> s' vs' res ves)
+  thus ?case
+    by (metis consts_app_ex(2) inj_basic_econst map_append map_injective res_b.inject(1))
+next
+  case (callcl_host_None cl t1s t2s f ves vcs n m ls r i)
+  thus ?case
+    using consts_cons_last(2) e_type_const_unwrap
+    by auto
+next
+  case (seq_value s vs es \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_ex(1)
+    by blast
+next
+  case (seq_nonvalue ves s vs es \<Gamma> s' vs' es')
+  thus ?case
+    using consts_app_ex
+    by meson
+qed auto
+
+lemma call0: "((s,vs,($$*ves)@[$(Call j)]) \<Down>0{\<Gamma>} (s',vs',res)) \<Longrightarrow> False"
+proof (induction "(s,vs,($$*ves)@[$(Call j)])" "0::nat" \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
+  case (const_value s vs es \<Gamma> s' vs' res ves ves')
+  consider (1) "es = []" | (2) "\<exists>ves'. es = ($$* ves') @ [$Call j]"
+    using consts_cons_last consts_app_ex const_value(3)
+    by (metis append_butlast_last_id butlast_append butlast_snoc last_appendR last_snoc)
+  thus ?case
+    using const_value
+    apply (cases)
+    apply (metis append_Nil2 b_e.distinct(505) const_list_cons_last(2) e.inject(1) e_type_const_unwrap is_const_list)
+    apply blast
+    done
+next
+  case (seq_value s vs es \<Gamma> s'' vs'' res'' es' s' vs' res)
+  consider (1) "es' = []" | (2) "\<exists>ves'. es' = ($$* ves') @ [$Call j]"
+    using consts_cons_last consts_app_ex seq_value(5)
+    by (metis append_butlast_last_id butlast_append butlast_snoc last_appendR last_snoc)
+  thus ?case
+    using seq_value
+    apply (cases)
+    apply fastforce
+    apply (metis append_assoc map_append)
+    done
+next
+  case (seq_nonvalue ves s vs es \<Gamma> s' vs' res es' ves')
+  consider (1) "ves = ($$* ves') @ [$Call j] \<and> es = [] \<and> es' = []"
+         | (2) "(\<exists>ves'a ves''.
+                  ves = ($$* ves'a) \<and>
+                  es = ($$* ves'') @ [$Call j] \<and> es' = [] \<and>
+                  ves' = ves'a @ ves'')"
+         | (3) "(\<exists>ves'a ves'' ves'''.
+                  ves = ($$* ves'a) \<and>
+                  es = ($$* ves'') \<and>
+                  es' = ($$* ves''') @ [$Call j] \<and>
+                  ves' = ves'a @ ves'' @ ves''')"
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    by fastforce
+  thus ?case
+  proof (cases)
+    case 1
+    thus ?thesis
+      using seq_nonvalue(1) const_list_cons_last(2) e_type_const_unwrap
+      by auto
+  next
+    case 2
+    thus ?thesis
+      using seq_nonvalue(3)
+      by blast
+  next
+    case 3
+    thus ?thesis
+      using seq_nonvalue(2,4) reduce_to_consts reduce_to_n_imp_reduce_to
+      by blast
+  qed
+qed (fastforce intro: reduce_to_n.intros)+
+
+lemma calln_imp: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)) \<Longrightarrow> ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>k{(ls,r,i)} (s',vs',res))"
+proof (induction "(s,vs,($$*ves)@[$(Call j)])" "(Suc k)" "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es s' vs' res ves ves')
+  consider (1) "($$* ves) = ($$* ves') @ [$Call j] \<and> es = []"
+         | (2) "(\<exists>ves'a ves''.
+                  ($$* ves) = ($$* ves'a) \<and>
+                  es = ($$* ves'') @ [$Call j] \<and>
+                  ves' = ves'a @ ves'')"
+    using consts_app_snoc[OF const_value(3)]
+    by fastforce
+  thus ?case
+  proof (cases)
+    case 1
+    thus ?thesis
+      by (metis b_e.distinct(505) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
+  next
+    case 2
+    then obtain ves'a ves'' where ves''_def:"($$* ves) = ($$* ves'a)"
+                                            "es = ($$* ves'') @ [$Call j]"
+                                            "ves' = ves'a @ ves''"
+      by blast
+    thus ?thesis
+      using const_value(2)[OF ves''_def(2)] reduce_to.const_value
+      by (metis (no_types, lifting) append_assoc map_append reduce_to_n.const_value)
+  qed
+next
+  case (seq_value s vs es s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(5)] reduce_to_consts reduce_to_n_imp_reduce_to
+    apply (cases "es = ($$* ves) @ [$Call j] \<and> es' = []")
+    apply fastforce
+    apply blast
+    done
+next
+  case (seq_nonvalue ves s vs es s' vs' res es' ves')
+  consider (1) "ves = ($$* ves') @ [$Call j] \<and> es = [] \<and> es' = []"
+         | (2) "(\<exists>ves'a ves''.
+                  ves = ($$* ves'a) \<and>
+                  es = ($$* ves'') @ [$Call j] \<and> es' = [] \<and>
+                  ves' = ves'a @ ves'')"
+         | (3) "(\<exists>ves'a ves'' ves'''.
+                  ves = ($$* ves'a) \<and>
+                  es = ($$* ves'') \<and>
+                  es' = ($$* ves''') @ [$Call j] \<and>
+                  ves' = ves'a @ ves'' @ ves''')"
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    by fastforce
+  thus ?case
+  proof (cases)
+    case 1
+    thus ?thesis
+      using seq_nonvalue(1) const_list_cons_last(2) e_type_const_unwrap
+      by auto
+  next
+    case 2
+    then obtain ves'a ves'' where ves''_def:"ves = ($$* ves'a)"
+                                            "es = ($$* ves'') @ [$Call j]"
+                                            "ves' = ves'a @ ves''"
+      by blast
+    thus ?thesis
+      using seq_nonvalue(1,4) reduce_to_n.seq_nonvalue[OF _ seq_nonvalue(3)[OF ves''_def(2)]]
+      by auto
+  next
+    case 3
+    thus ?thesis
+      using seq_nonvalue(2,4) reduce_to_consts reduce_to_n_imp_reduce_to
+      by blast
+  qed
+qed (fastforce intro: reduce_to_n.intros)+
+
+lemma calln: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)) = ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  using calln_imp reduce_to_n.call
+  by (metis is_const_list)
 end

@@ -839,6 +839,116 @@ lemma const_list_cons_last:
   unfolding const_list_def
   by auto
 
+lemma consts_cons_last:
+  assumes "es@[e] = $$* ves"
+  shows "const_list es"
+        "is_const e"
+  using assms is_const_list const_list_cons_last
+  by blast+
+
+lemma consts_cons_last2:
+  assumes "es@[e,e'] = $$* ves"
+  shows "const_list es"
+        "is_const e"
+        "is_const e'"
+  apply (metis assms const_list_def is_const_list list_all_append)
+  apply (metis (full_types) assms const_list_def is_const_list list_all_append list_all_simps(1))+
+  done
+
+lemma consts_cons_last3:
+  assumes "es@[e,e',e''] = $$* ves"
+  shows "const_list es"
+        "is_const e"
+        "is_const e'"
+        "is_const e'"
+  apply (metis assms const_list_def is_const_list list_all_append)
+  apply (metis (full_types) assms const_list_def is_const_list list_all_append list_all_simps(1))+
+  done
+
+lemma consts_cons:
+  assumes "e#es = $$* ves"
+  shows "\<exists>ves. es = $$* ves"
+        "is_const e"
+  apply (metis assms map_eq_Cons_conv)
+  apply (metis assms const_list_def is_const_list list_all_simps(1))
+  done
+
+lemma consts_app_ex:
+  assumes "es@es' = $$* ves"
+  shows "\<exists>ves'. es = $$*ves'"
+        "\<exists>ves''. es' = $$*ves''"
+  using assms
+proof (induction es arbitrary: ves)
+  case Nil
+  fix ves
+  assume "[] @ es' = $$* ves"
+  thus "\<exists>ves'. [] = $$*ves'"
+       "\<exists>ves''. es' = $$*ves''"
+    by auto
+next
+  case (Cons a es)
+  fix ves
+  assume "(\<And>ves. es @ es' = $$* ves \<Longrightarrow> \<exists>ves'. es = $$* ves')"
+         "(\<And>ves. es @ es' = $$* ves \<Longrightarrow> \<exists>ves''. es' = $$* ves'')"
+         "(a # es) @ es' = $$* ves"
+  thus "\<exists>ves'. a # es = $$* ves'"
+       "\<exists>ves''. es' = $$* ves''"
+    using map_eq_Cons_D[of "(\<lambda>v. $C v)" ves a]
+    by (metis append_Cons list.simps(9),(metis append_Cons))
+qed
+
+lemma consts_app_snoc:
+  assumes "es @ es' = ($$* ves) @ [e]"
+  shows "(es = ($$* ves) @ [e] \<and> es' = []) \<or>
+           (\<exists>ves' ves''. es = ($$* ves') \<and> es' = ($$* ves'')@[e] \<and> ves = ves'@ves'')"
+proof (cases es' rule: rev_cases)
+  case Nil
+  thus ?thesis
+    using assms
+    by simp
+next
+  case (snoc ys y)
+  then obtain ves' ves'' where "es = ($$* ves') \<and> ys = ($$* ves'') \<and> y = e"
+    using assms
+    using consts_app_ex
+    by (metis append.assoc butlast_snoc snoc_eq_iff_butlast)
+  moreover
+  hence "ves = ves'@ves''"
+    using assms snoc map_injective[OF _ inj_basic_econst]
+    by auto
+  ultimately
+  show ?thesis
+    using snoc
+    by auto
+qed
+
+lemma consts_app_snoc3:
+  assumes "es @ es' @ es'' = ($$* ves) @ [e]"
+  shows "(es = ($$* ves) @ [e] \<and> es' = [] \<and> es'' = []) \<or> 
+         (\<exists>ves' ves''. es = ($$*ves') \<and> es' = ($$* ves'') @ [e] \<and> es'' = [] \<and> ves = ves'@ves'') \<or>
+           (\<exists>ves' ves'' ves'''. es = ($$* ves') \<and> es' = ($$* ves'') \<and> es'' = ($$* ves''')@[e] \<and> ves = ves'@ves''@ves''')"
+proof -
+  consider (1) "es @ es' = ($$* ves) @ [e]" "es'' = []"
+         | (2) "(\<exists>ves' ves''.
+                  es @ es' = ($$* ves') \<and>
+                  es'' = ($$* ves'') @ [e] \<and>
+                  ves = ves' @ ves'')"
+    using assms consts_app_snoc[of "es@es'" "es''" ves e]
+    by fastforce
+  thus ?thesis
+  proof cases
+    case 1
+    thus ?thesis
+      using consts_app_snoc[OF 1(1)]
+      by blast
+  next
+    case 2
+    thus ?thesis
+      using consts_app_ex[of es es']
+      by (metis (no_types, lifting) append.assoc inj_basic_econst map_append map_injective)
+  qed
+qed
+
 lemma e_type_const1:
   assumes "is_const e"
   shows "\<exists>t. (\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts@[t]))"
