@@ -67,8 +67,7 @@ definition reifies_loc :: "[v list, 'a var_st] \<Rightarrow> bool" where
 definition reifies_glob :: "[global list, nat list, 'a var_st] \<Rightarrow> bool" where
   "reifies_glob gs igs st \<equiv>
      let st_g = (fst st) in
-     \<forall>gn < length st_g.
-       gn < (length igs) \<and> igs!gn < (length gs) \<and> st_g!gn = (gs!(igs!gn))"
+     length st_g = (length igs) \<and> (\<forall>gn < length st_g. igs!gn < (length gs) \<and> st_g!gn = (gs!(igs!gn)))"
 
 (* function reification (with respect to a partial instance) *)
 definition reifies_func :: "[cl list, nat list, cl list] \<Rightarrow> bool" where
@@ -93,6 +92,12 @@ definition reifies_s :: "[s, inst, heap, 'a var_st, cl list] \<Rightarrow> bool"
   "reifies_s s i h st fs \<equiv> reifies_glob (globs s) (inst.globs i) st
                          \<and> reifies_func (funcs s) (inst.funcs i) fs
                          \<and> reifies_heap (mem s) (inst.mem i) h"
+
+definition var_st_agree :: "'a var_st \<Rightarrow> var \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "var_st_agree st1 var st2 \<equiv> case var of
+                                 Lc n \<Rightarrow> (var_st_get_local st1 n) = (var_st_get_local st2 n)
+                               | Gl n \<Rightarrow> (var_st_get_global st1 n) = (var_st_get_global st2 n)
+                               | Lv lvar \<Rightarrow> (var_st_get_lvar st1 lvar) = (var_st_get_lvar st2 lvar)"
 
 (* shallow embedding of assertions *)
 type_synonym 'a stack_ass = "(v \<Rightarrow> 'a var_st \<Rightarrow> bool) list"
@@ -142,7 +147,7 @@ definition ass_wf where
       \<and> snd (snd st) = lvar_st"
 
 definition res_wf where
-  "res_wf \<Gamma> res locs' s' hf vcsf Q \<equiv>
+  "res_wf lvar_st' \<Gamma> res locs' s' hf vcsf Q \<equiv>
     let (fs,lasss,rass) = \<Gamma> in
     (case res of
        RTrap \<Rightarrow> False
@@ -153,6 +158,7 @@ definition res_wf where
                              \<and> h' = heap_merge h'' hf
                              \<and> reifies_s s' i h' st' fs
                              \<and> reifies_loc locs' st'
+                             \<and> snd (snd st') = lvar_st'
      | RBreak n rvs \<Rightarrow> \<exists>h' h'' vcs' st'.
                              n < length lasss
                              \<and> ass_sat (lasss!n) vcs' h'' st'
@@ -161,20 +167,22 @@ definition res_wf where
                              \<and> h' = heap_merge h'' hf
                              \<and> reifies_s s' i h' st' fs
                              \<and> reifies_loc locs' st'
+                             \<and> snd (snd st') = lvar_st'
      | RReturn rvs \<Rightarrow> \<exists>h' h'' vcs' st'.
                              ass_sat (the rass) vcs' h'' st'
                              \<and> rvs = vcs'
                              \<and> heap_disj h'' hf
                              \<and> h' = heap_merge h'' hf
                              \<and> reifies_s s' i h' st' fs
-                             \<and> reifies_loc locs' st')"
+                             \<and> reifies_loc locs' st'
+                             \<and> snd (snd st') = lvar_st')"
 
 (* TODO: frame? ? ? ?*)
 definition valid_triple :: "'a triple_context \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_ \<Turnstile> {_}_{_}" 60) where
   "(\<Gamma> \<Turnstile> {P}es{Q}) \<equiv> \<forall>vcs h st s locs labs ret lvar_st hf vcsf s' locs' res.
                                       ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P \<and>
                                       ((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>{(labs,ret,i)} (s',locs', res))) \<longrightarrow>
-                                      res_wf \<Gamma> res locs' s' hf vcsf Q)"
+                                      res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q)"
 
 definition valid_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile> _" 60) where
   "\<Gamma> \<TTurnstile> specs \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile> {P}es{Q})"
@@ -184,7 +192,7 @@ definition valid_triple_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 
   "(\<Gamma> \<Turnstile>_k {P}es{Q}) \<equiv> \<forall>vcs h st s locs labs ret lvar_st hf vcsf s' locs' res.
                                       ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P \<and>
                                       ((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs,ret,i)} (s',locs', res))) \<longrightarrow>
-                                      res_wf \<Gamma> res locs' s' hf vcsf Q)"
+                                      res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q)"
 
 definition valid_triples_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile>'_ _ _" 60) where
   "(\<Gamma> \<TTurnstile>_n specs) \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile>_n {P}es{Q})"
@@ -211,9 +219,9 @@ lemma valid_triples_n_emp: "\<Gamma> \<TTurnstile>_n {}"
   by blast
 
 lemma res_wf_conseq:
-  assumes "res_wf \<Gamma> res locs' s' hf vcsf P"
+  assumes "res_wf l_st \<Gamma> res locs' s' hf vcsf P"
           "\<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t)"
-  shows "res_wf \<Gamma> res locs' s' hf vcsf P'"
+  shows "res_wf l_st \<Gamma> res locs' s' hf vcsf P'"
   using assms
   unfolding res_wf_def
   apply (cases res)

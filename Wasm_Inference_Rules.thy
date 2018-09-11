@@ -28,27 +28,165 @@ definition heap_ass_ind_on :: "'a heap_ass \<Rightarrow> var \<Rightarrow> bool"
                            | Lc n \<Rightarrow> heap_ass_ind_on_loc H n
                            | Lv n \<Rightarrow> True"
 
-fun modset_b_e :: "b_e \<Rightarrow> var set"
-and modsets_b_e :: "b_e list \<Rightarrow> var set" where
-  "modsets_b_e es = fold (\<lambda>e vs. (modset_b_e e) \<union> vs) es {}"
-| "modset_b_e (Set_local i) = {Lc i}"
-| "modset_b_e (Tee_local i) = {Lc i}"
-| "modset_b_e (Set_global i) = {Gl i}"
-| "modset_b_e (Block _ b_es) = modsets_b_e b_es"
-| "modset_b_e (Loop _ b_es) = modsets_b_e b_es"
-| "modset_b_e (If _ b_es1 b_es2) = modsets_b_e b_es1 \<union> modsets_b_e b_es2"
-| "modset_b_e _ = {}"
-
-fun modset :: "e \<Rightarrow> var set"
-and modsets:: "e list \<Rightarrow> var set" where
-  "modsets es = fold (\<lambda>e vs. (modset e) \<union> vs) es {}"
-| "modset ($ b_e) = modset_b_e b_e"
-| "modset (Label n les es) = modsets les \<union> modsets es"
-| "modset (Local n i lvs es) = modsets es"
-| "modset _ = {}"
-
 context encapsulated_module
 begin
+
+inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarrow> bool" where
+"\<lbrakk>(modifies fs es v) \<or> (modifies fs es' v)\<rbrakk> \<Longrightarrow> modifies fs (es@es') v"
+| "modifies fs [$Set_local j] (Lc j)"
+| "modifies fs [$Tee_local j] (Lc j)"
+| "modifies fs [$Set_global j] (Gl j)"
+| "\<lbrakk>(modifies fs [Label _ [] ($* b_es)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Block _ b_es] v"
+| "\<lbrakk>(modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [$Loop tf b_es] v"
+| "\<lbrakk>(modifies fs [Label _ [] ($* b_es1)] v) \<or> (modifies fs [Label _ [] ($* b_es2)] v)\<rbrakk> \<Longrightarrow> modifies fs [$If _ b_es1 b_es2] v"
+| "\<lbrakk>(modifies fs [Callcl (fs!j)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
+| "\<lbrakk>(modifies fs les v) \<or> (modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Label _ les es] v"
+| "\<lbrakk>(modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Local _ i lvs es] v"
+| "\<lbrakk>cl = Func_native i _ _ b_es; (modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
+
+lemma refl_var_st:
+  assumes "reifies_glob (globs s) (inst.globs i) var_st"
+          "reifies_loc vs var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_glob (globs s) (inst.globs i) var_st'"
+          "reifies_loc vs var_st'"
+          "snd (snd var_st') = lvar_st"
+  shows "var_st_agree var_st v var_st'"
+proof (cases v)
+  case (Gl x1)
+  thus ?thesis
+    using assms(1,4)
+    unfolding var_st_agree_def var_st_get_global_def reifies_glob_def
+    apply (cases var_st; cases var_st')
+    apply auto
+    done
+next
+  case (Lc x2)
+  thus ?thesis
+    using assms(2,5)
+    unfolding var_st_agree_def var_st_get_local_def reifies_loc_def
+    by simp
+next
+  case (Lv x3)
+  thus ?thesis
+    using assms(3,6)
+    unfolding var_st_agree_def var_st_get_lvar_def
+    by simp
+qed
+
+lemma modifies_var_st:
+  assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',res)"
+          "reifies_func (funcs s) (inst.funcs i) fs"
+          "reifies_glob (globs s) (inst.globs i) var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_loc vs var_st"
+          "\<not>(modifies fs es v)"
+          "reifies_glob (globs s') (inst.globs i) var_st'"
+          "reifies_loc vs' var_st'"
+          "snd (snd var_st') = lvar_st"
+  shows "var_st_agree var_st v var_st'"
+  using assms
+proof (induction "(s,vs,es)" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs es s' vs' res rule: reduce_to_n.induct)
+  case (block ves n t1s t2s m es k)
+  thus ?case sorry
+next
+  case (loop ves n t1s t2s m es k)
+  then show ?case sorry
+next
+  case (if_false n ves tf e2s k e1s)
+  then show ?case sorry
+next
+  case (if_true n ves tf e1s k e2s)
+  then show ?case sorry
+next
+  case (br_if_true n ves j k)
+  then show ?case sorry
+next
+  case (br_table js c ves k j)
+  then show ?case sorry
+next
+  case (br_table_length js c ves j k)
+  then show ?case sorry
+next
+  case (return r vcs k)
+  then show ?case sorry
+next
+  case (set_local vi j v vs v' k)
+  then show ?case sorry
+next
+  case (tee_local v i k)
+  then show ?case sorry
+next
+  case (set_global j v k)
+  then show ?case sorry
+next
+  case (store_Some t v j m n off mem' a k)
+  then show ?case sorry
+next
+  case (store_packed_Some t v j m n off tp mem' a k)
+  then show ?case sorry
+next
+  case (grow_memory j m n c mem' k)
+  then show ?case sorry
+next
+  case (call ves j k)
+  then show ?case sorry
+next
+  case (call_indirect_Some c cl j tf ves k)
+  then show ?case sorry
+next
+  case (callcl_native cl j t1s t2s ts es ves vcs n m zs k)
+  then show ?case sorry
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m hs vcs' k)
+  then show ?case sorry
+next
+  case (callcl_host_None cl t1s t2s f ves vcs n m k)
+  then show ?case sorry
+next
+  case (const_value es k res ves)
+  then show ?case sorry
+next
+  case (label_value es k n res les)
+  then show ?case sorry
+next
+  case (local_value lls es k n j lls' res)
+  then show ?case sorry
+next
+  case (seq_value es k s'' vs'' res'' es' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue ves es k es')
+  then show ?case sorry
+next
+  case (label_trap es k n les)
+  then show ?case sorry
+next
+  case (local_trap lls es k n j lls')
+  then show ?case sorry
+next
+  case (label_break_suc es k n bn bvs les)
+  then show ?case sorry
+next
+  case (label_break_nil es k n s'' vs'' bvs es' \<Gamma> les)
+  then show ?case sorry
+next
+  case (label_return es k n rvs les)
+  thus ?case sorry
+next
+  case (local_return lls es k n j lls' rvs)
+  thus ?case sorry
+qed (metis refl_var_st)+
+
+lemma Hf_equiv:
+  assumes "\<And>v. var_st_agree var_st v var_st' \<or> heap_ass_ind_on Hf v"
+          "snd (snd var_st) = lvar_st"
+          "snd (snd var_st') = lvar_st"
+  shows "Hf h var_st = Hf h var_st'"
+proof -
+  show ?thesis
+    sorry
+qed
 
 definition pred_option_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
   "pred_option_Some pred opt \<equiv> opt \<noteq> None \<and> pred_option pred opt"
@@ -87,16 +225,11 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Asm:"\<lbrakk>(P, [$Call k], Q) \<in> assms\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} [$Call k] {Q}"
 | Seq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; \<Gamma>\<bullet>assms \<turnstile> {Q} es' {R}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es@es' {R}"
 | Conseq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t) \<and> (ass_sat Q' vs h vs_t \<longrightarrow> ass_sat Q vs h vs_t)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
-| Frame:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; (\<forall>v \<in> modsets es. heap_ass_ind_on Hf v)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h (H \<^emph> Hf)} es {St' \<^sub>s|\<^sub>h (H' \<^emph> Hf)}"
-| Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; (\<forall>v \<in> modsets es. stack_ass_ind_on Stf v)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
+| Frame:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; (\<forall>v. modifies fs es v \<longrightarrow> heap_ass_ind_on Hf v)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h (H \<^emph> Hf)} es {St' \<^sub>s|\<^sub>h (H' \<^emph> Hf)}"
+| Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; (\<forall>v. modifies fs es v \<longrightarrow> stack_ass_ind_on Stf v)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
 | Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Callcl (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
 | ConjI:"\<forall>(P,es,Q) \<in> specs. (\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}) \<Longrightarrow> \<Gamma>\<bullet>assms \<tturnstile> specs"
 | ConjE:"\<lbrakk>\<Gamma>\<bullet>assms \<tturnstile> specs; (P,es,Q) \<in> specs\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
-
-lemma treeee: assumes "AA \<Longrightarrow> (BB = CC)"
-  shows "(AA \<and> BB) = (AA \<and> CC)"
-  using assms
-  by metis
 
 lemma valid_triple_n_call_equiv_callcl:
   assumes "j < length fs"
@@ -187,7 +320,7 @@ next
       then obtain nn :: "e list \<Rightarrow> nat" where
         "aa = [$Call (nn aa)] \<and> nn aa < length fs"
         using a3 by moura
-      then have "res_wf (fs, []::'a ass list, None::'a ass option) res locs' s' (ae, bc) vcsf b"
+      then have "res_wf lvar_st (fs, []::'a ass list, None::'a ass option) res locs' s' (ae, bc) vcsf b"
         using a2 a1 by (metis (no_types) append.assoc map_append)
     }
     thus ?case
