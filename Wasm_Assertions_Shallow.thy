@@ -59,6 +59,39 @@ definition heap_merge :: "heap \<Rightarrow> heap \<Rightarrow> heap" where
                        let (m2,s2) = h2 in
                        (m1 ++ m2, case_option s2 (\<lambda>s. Some s) s1)"
 
+lemma heap_disj_sym: "heap_disj h1 h2 = heap_disj h2 h1"
+  unfolding heap_disj_def map_disj_def option_disj_def
+  using disjnt_sym
+  by blast
+
+lemma heap_merge_disj_sym:
+  assumes "heap_disj h1 h2"
+  shows "heap_merge h1 h2 = heap_merge h2 h1"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
+  by (auto simp add: map_add_comm split: option.splits prod.splits)
+
+lemma heap_merge_assoc:
+  shows "heap_merge h1 (heap_merge h2 h3) = heap_merge (heap_merge h1 h2) h3"
+  unfolding heap_merge_def
+  by (auto split: option.splits prod.splits)
+
+lemma heap_disj_merge_sub:
+  assumes "heap_disj h1 (heap_merge h2 h3)"
+  shows "heap_disj h1 h2"
+        "heap_disj h1 h3"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def map_disj_def disjnt_def
+  by (auto split: option.splits prod.splits)
+
+lemma heap_disj_merge_assoc:
+  assumes "heap_disj h_H h_Hf"
+          "heap_disj (heap_merge h_H h_Hf) hf"
+  shows "heap_disj h_H (heap_merge h_Hf hf)"
+  using assms
+  unfolding heap_disj_def heap_merge_def map_disj_def disjnt_def
+  by (auto split: option.splits prod.splits)
+
 (* local variable reification *)
 definition reifies_loc :: "[v list, 'a var_st] \<Rightarrow> bool" where
   "reifies_loc locs st \<equiv> (fst (snd st)) = locs"
@@ -168,8 +201,9 @@ definition res_wf where
                              \<and> reifies_s s' i h' st' fs
                              \<and> reifies_loc locs' st'
                              \<and> snd (snd st') = lvar_st'
-     | RReturn rvs \<Rightarrow> \<exists>h' h'' vcs' st'.
-                             ass_sat (the rass) vcs' h'' st'
+     | RReturn rvs \<Rightarrow> \<exists>h' h'' vcs' st' the_rass.
+                             rass = Some the_rass
+                             \<and> ass_sat the_rass vcs' h'' st'
                              \<and> rvs = vcs'
                              \<and> heap_disj h'' hf
                              \<and> h' = heap_merge h'' hf
@@ -198,13 +232,69 @@ definition valid_triples_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow>
   "(\<Gamma> \<TTurnstile>_n specs) \<equiv> \<forall>(P,es,Q) \<in> specs. (\<Gamma> \<Turnstile>_n {P}es{Q})"
 
 definition valid_triples_assms :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<TTurnstile> _" 60) where
-  "(\<Gamma>\<bullet>assms \<TTurnstile> specs) \<equiv> (\<Gamma> \<TTurnstile> assms) \<longrightarrow> (\<Gamma> \<TTurnstile> specs)"
+  "(\<Gamma>\<bullet>assms \<TTurnstile> specs) \<equiv> ((fst \<Gamma>,[],None) \<TTurnstile> assms) \<longrightarrow> (\<Gamma> \<TTurnstile> specs)"
 
 definition valid_triples_assms_n :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<TTurnstile>'_ _ _" 60) where
-  "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs) \<equiv> (\<Gamma> \<TTurnstile>_n assms) \<longrightarrow> (\<Gamma> \<TTurnstile>_n specs)"
+  "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs) \<equiv> ((fst \<Gamma>,[],None) \<TTurnstile>_n assms) \<longrightarrow> (\<Gamma> \<TTurnstile>_n specs)"
 
 lemmas valid_triple_defs = valid_triple_def valid_triples_def valid_triples_assms_def
                            valid_triple_n_def valid_triples_n_def valid_triples_assms_n_def
+
+lemma extend_context_res_wf:
+  assumes "res_wf lvar_st' (fs,[],None) res locs' s' hf vcsf Q"
+  shows "res_wf lvar_st' (fs,ls,rs) res locs' s' hf vcsf Q"
+  using assms
+  unfolding res_wf_def
+  by (auto split: res_b.splits)
+
+lemma extend_context_res_wf_value_trap:
+  assumes "res_wf lvar_st' (fs,ls,rs) res locs' s' hf vcsf Q"
+          "\<exists>rvs. res = RValue rvs \<or> res = RTrap"
+  shows "res_wf lvar_st' (fs,ls',rs') res locs' s' hf vcsf Q"
+  using assms
+  unfolding res_wf_def
+  by (auto split: res_b.splits)
+
+lemma ex_lab:"\<exists>l. lab = ass_stack_len l"
+  using ass_stack_len.simps(1)
+  by (metis Ex_list_of_length)
+
+lemma ex_labs:"\<exists>ls. labs = map ass_stack_len ls"
+  using ex_lab
+  by (simp add: ex_lab ex_map_conv)
+
+lemma ex_ret:"\<exists>rs. ret = map_option ass_stack_len rs"
+  using ex_lab
+  by (metis not_Some_eq option.simps(8) option.simps(9))
+
+lemma extend_context_call:
+  assumes "(fs,ls,rs) \<Turnstile>_n {P} [$Call j] {Q}"
+  shows "(fs,ls',rs') \<Turnstile>_n {P} [$Call j] {Q}"
+proof -
+  {
+    fix vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"ass_wf lvar_st ret (fs, ls', rs') labs locs s hf st h vcs P"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Call j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    obtain ret' labs' where "ass_wf lvar_st ret' (fs, ls, rs) labs' locs s hf st h vcs P"
+      using local_assms(1) 
+      unfolding ass_wf_def reifies_s_def reifies_lab_def reifies_ret_def
+      by fastforce
+    moreover
+    have "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Call j]) \<Down>n{(labs', ret', i)} (s', locs', res)"
+      by (metis append_assoc calln_context local_assms(2) map_append)
+    ultimately
+    have "res_wf lvar_st (fs, ls, rs) res locs' s' hf vcsf Q"
+      using assms local_assms(2)
+      unfolding valid_triple_n_def
+      by fastforce
+    hence "res_wf lvar_st (fs, ls', rs') res locs' s' hf vcsf Q"
+      using extend_context_res_wf_value_trap call_value_trap local_assms(2)
+      by (metis (no_types, lifting) append_assoc map_append)
+  }
+  thus ?thesis
+    unfolding valid_triple_n_def
+    by blast
+qed
 
 lemma reifies_func_ind:
   assumes "reifies_func (funcs s) (inst.funcs i) fs"

@@ -48,7 +48,7 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
 | br_table:"\<lbrakk>length ks > (nat_of_int c); const_list ves; (s,vs,ves@[$(Br (ks!(nat_of_int c)))]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>{\<Gamma>} (s',vs',res)"
 | br_table_length:"\<lbrakk>length ks \<le> (nat_of_int c); const_list ves; (s,vs,ves@[$(Br k)]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>{(ls,Some r,i)} (s',vs',RReturn vcs)"
+| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>{(ls,Some r,i)} (s,vs,RReturn vcs)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> (s,(vi @ [v] @ vs),[$(Get_local j)]) \<Down>{\<Gamma>} (s,(vi @ [v] @ vs),RValue [v])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -145,7 +145,7 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
 | br_table:"\<lbrakk>length js > (nat_of_int c); const_list ves; (s,vs,ves@[$(Br (js!(nat_of_int c)))]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table js j)]) \<Down>k{\<Gamma>} (s',vs',res)"
 | br_table_length:"\<lbrakk>length js \<le> (nat_of_int c); const_list ves; (s,vs,ves@[$(Br j)]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 c), $(Br_table js j)]) \<Down>k{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>k{(ls,Some r,i)} (s',vs',RReturn vcs)"
+| return:"\<lbrakk>length vs = r\<rbrakk>  \<Longrightarrow> (s,vs,($$*vcs) @ [$Return]) \<Down>k{(ls,Some r,i)} (s,vs,RReturn vcs)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> (s,(vi @ [v] @ vs),[$(Get_local j)]) \<Down>k{\<Gamma>} (s,(vi @ [v] @ vs),RValue [v])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -234,6 +234,14 @@ lemma reduce_to_n_imp_reduce_to:
   using assms
   apply (induction rule: reduce_to_n.induct)
                       apply (fastforce intro: reduce_to.intros)+
+  done
+
+lemma reduce_to_n_emp:
+  assumes "(s,vs,[]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "res = RValue []"
+  using assms
+  apply (induction "(s,vs,[]::e list)" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
+                  apply auto
   done
 
 lemma reduce_to_iff_reduce_to_n:
@@ -460,4 +468,152 @@ qed (fastforce intro: reduce_to_n.intros)+
 lemma calln: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)) = ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>k{(ls,r,i)} (s',vs',res))"
   using calln_imp reduce_to_n.call
   by (metis is_const_list)
+
+lemma local_context:
+  assumes "((s,vs,[Local n i vls es]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "((s,vs,[Local n i vls es]) \<Down>k{\<Gamma>'} (s',vs',res))"
+  using assms
+proof (induction "(s,vs,[Local n i vls es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
+  case (const_value es k \<Gamma> res ves)
+  thus ?case
+    using append_eq_Cons_conv
+    by fastforce
+next
+  case (local_value k lls' res \<Gamma>)
+  thus ?case
+    using reduce_to_n.local_value
+    by blast
+next
+  case (seq_value s vs es' k \<Gamma> s'' vs'' res'' es'' s' vs' res)
+  consider (1) "es' = [Local n i vls es]" "es'' = []" | (2) "es' = []" "es'' = [Local n i vls es]"
+    using seq_value(5)
+    unfolding append_eq_Cons_conv
+    by fastforce
+  thus ?case
+    apply (cases)
+    apply (metis append_Nil2 reduce_to_consts reduce_to_n_imp_reduce_to seq_value.hyps(2) seq_value.hyps(3))
+    apply (metis Nil_is_map_conv reduce_to_consts reduce_to_n_imp_reduce_to res_b.inject(1) seq_value.hyps(1) seq_value.hyps(4) seq_value.hyps(5))
+    done
+next
+  case (seq_nonvalue ves s vs es' k \<Gamma> s' vs' res es'')
+  consider (1) "es' = [Local n i vls es]" "es'' = []" | (2) "es' = []" "es'' = [Local n i vls es]"
+    using seq_nonvalue(5) consts_app_snoc3[of ves es' es'' "[]" "Local n i vls es"]
+    apply simp
+    apply (metis append_self_conv2 const_list_cons_last(2) e.distinct(7) e_type_const_unwrap seq_nonvalue.hyps(1))
+    done
+  thus ?case
+    apply (cases)
+    apply (simp add: seq_nonvalue.hyps(3))
+    apply (metis reduce_to_n_emp seq_nonvalue.hyps(2) seq_nonvalue.hyps(4))
+    done
+next
+  case (local_trap k lls' \<Gamma>)
+  thus ?case
+    using reduce_to_n.local_trap
+    by blast
+next
+  case (local_return k lls' rvs \<Gamma>)
+  thus ?case
+    using reduce_to_n.local_return
+    by blast
+qed auto
+
+lemma callcl_context:
+  assumes "((s,vs,($$*ves)@[(Callcl cl)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "((s,vs,($$*ves)@[(Callcl cl)]) \<Down>k{\<Gamma>'} (s',vs',res))"
+  using assms
+proof (induction "(s,vs,($$*ves)@[(Callcl cl)])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
+  case (callcl_native cl j t1s t2s ts es ves' vcs n m zs s vs k ls r i s' vs' res)
+  show ?case
+    using local_context[OF callcl_native(7), of \<Gamma>'] reduce_to_n.callcl_native[OF callcl_native(1,2,3,4,5,6)]
+    apply (cases \<Gamma>')
+    apply (auto simp add: callcl_native.hyps(9))
+    done
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k ls r i)
+  show ?case
+    using reduce_to_n.callcl_host_Some[OF callcl_host_Some(1,2,3,4,5,6)]
+    apply (cases \<Gamma>')
+    apply (auto simp add: callcl_host_Some.hyps(7))
+    done
+next
+  case (callcl_host_None cl t1s t2s f ves vcs n m s vs k ls r i)
+  thus ?case
+    using reduce_to_n.callcl_host_None[OF callcl_host_None(1,2,3,4,5)]
+    apply (cases \<Gamma>')
+    apply (auto simp add: callcl_host_None.hyps(6))
+    done
+next
+  case (const_value s vs es k \<Gamma> s' vs' res ves ves')
+  thus ?case
+    using consts_app_snoc[OF const_value(3)]
+    by (metis (no_types, lifting) const_list_cons_last(2) e.distinct(3) e_type_const_unwrap is_const_list reduce_to_n.const_value)
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(5)]
+    by (metis (no_types, lifting) append_self_conv reduce_to_consts reduce_to_n_imp_reduce_to res_b.inject(1))
+next
+  case (seq_nonvalue ves s vs es k \<Gamma> s' vs' res es' ves')
+  thus ?case
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    apply simp
+    apply (metis reduce_to_consts reduce_to_n.seq_nonvalue reduce_to_n_emp reduce_to_n_imp_reduce_to)
+    done
+qed auto
+
+lemma calln_context: "((s,vs,($$*ves)@[$(Call j)]) \<Down>k{(ls,r,i)} (s',vs',res)) = ((s,vs,($$*ves)@[$(Call j)]) \<Down>k{(ls',r',i)} (s',vs',res))"
+  apply (cases k)
+  apply(metis call0)
+  apply (metis callcl_context calln)
+  done
+
+lemma local_value_trap:
+  assumes "((s,vs,[Local n i vls es]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "\<exists>vrs. res = RValue vrs \<or> res = RTrap"
+  using assms
+proof (induction "(s,vs,[Local n i vls es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
+  case (seq_nonvalue ves s vs es k \<Gamma> s' vs' res es')
+  thus ?case
+    using consts_app_snoc3[of ves es es' "[]"]
+    apply simp
+    apply (metis reduce_to_n_emp)
+    done
+qed auto
+
+lemma callcl_value_trap:
+  assumes "((s,vs,($$*ves)@[(Callcl cl)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "\<exists>vrs. res = RValue vrs \<or> res = RTrap"
+  using assms
+proof (induction "(s,vs,($$*ves)@[(Callcl cl)])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
+  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k ls r i s' vs' res)
+  thus ?case
+    using local_value_trap
+    by blast
+next
+  case (seq_nonvalue ves s vs es k \<Gamma> s' vs' res es' ves')
+  thus ?case
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    apply simp
+    apply (metis reduce_to_consts reduce_to_n_emp reduce_to_n_imp_reduce_to)
+    done
+qed auto
+
+lemma call_value_trap:
+  assumes "((s,vs,($$*ves)@[$(Call j)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "\<exists>vrs. res = RValue vrs \<or> res = RTrap"
+proof (cases k)
+  case 0
+  thus ?thesis
+    using call0 assms
+    by metis
+next
+  case (Suc k')
+  thus ?thesis
+    using assms calln callcl_value_trap
+    apply (cases \<Gamma>)
+    apply simp
+    done
+qed
+
 end
