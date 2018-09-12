@@ -3,6 +3,26 @@ theory Wasm_Inference_Rules imports Wasm_Assertions_Shallow begin
 definition var_st_differ_on :: "'a var_st \<Rightarrow> var set \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "var_st_differ_on v_st vars v_st' \<equiv> (\<forall>var. var \<notin> vars \<longrightarrow> var_st_agree v_st var v_st')"
 
+lemma var_st_eq_intro1:
+  assumes "reifies_glob (s.globs s) (inst.globs i) var_st"
+          "reifies_loc vs var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_glob (s.globs s) (inst.globs i) var_st'"
+          "reifies_loc vs var_st'"
+          "snd (snd var_st') = lvar_st"
+  shows "var_st = var_st'"
+  using assms
+proof -
+  have f1: "length (fst var_st') = length (inst.globs i)"
+    by (meson assms(4) reifies_glob_def)
+  have f2: "length (fst var_st) = length (inst.globs i)"
+    by (meson assms(1) reifies_glob_def)
+  then have "\<And>n. \<not> n < length (inst.globs i) \<or> fst var_st' ! n = fst var_st ! n"
+    using f1 by (metis assms(1,4) reifies_glob_def)
+  then show ?thesis
+    using f2 f1 by (metis (no_types) assms(2,3,5,6) nth_equalityI prod.collapse reifies_loc_def)
+qed
+
 lemma var_st_differ_on_refl: "var_st_differ_on v_st vars v_st"
   unfolding var_st_differ_on_def var_st_agree_def
   by (auto split: var.splits)
@@ -23,11 +43,13 @@ inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarr
 | "modifies fs [$Set_global j] (Gl j)"
 | "\<lbrakk>(modifies fs [Label _ [] ($* b_es)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Block _ b_es] v"
 | "\<lbrakk>(modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [$Loop tf b_es] v"
-| "\<lbrakk>(modifies fs [Label _ [] ($* b_es1)] v) \<or> (modifies fs [Label _ [] ($* b_es2)] v)\<rbrakk> \<Longrightarrow> modifies fs [$If _ b_es1 b_es2] v"
+| "\<lbrakk>(modifies fs [$Block _ b_es1] v) \<or> (modifies fs [$Block _ b_es2] v)\<rbrakk> \<Longrightarrow> modifies fs [$If _ b_es1 b_es2] v"
 | "\<lbrakk>(modifies fs [Callcl (fs!j)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
 | "\<lbrakk>(modifies fs les v) \<or> (modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Label _ les es] v"
 | "\<lbrakk>(modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Local _ i lvs es] v"
 | "\<lbrakk>cl = Func_native i _ _ b_es; (modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
+| "\<lbrakk>cl = Func_host _ _\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
+
 
 
 definition modset where "modset cls es = {v. modifies cls es v}"
@@ -103,6 +125,59 @@ lemma modset_consts_app:
   using modset_arb_app modset_arb_app1 modset_consts
   by blast
 
+lemma modset_label:
+  assumes "v \<in> modset fs [Label n les es]"
+  shows "v \<in> modset fs les \<or> v \<in> modset fs es"
+  using assms
+  apply (induction fs "[Label n les es]" v rule: modset_induct)
+   apply (auto dest: modset_emp)
+  done
+
+lemma modset_label_inner:
+  "(v \<in> modset fs [Label n les (($$*ves)@es)]) = (v \<in> modset fs [Label n les es])"
+  using modset_label modset_consts_app modset_intros(9)
+  by blast
+
+lemma modset_block1:
+  assumes "v \<in> modset fs [$Block tf b_es]"
+  shows "v \<in> modset fs [Label n [] ($*b_es)]"
+  using assms
+  apply (induction fs "[$Block tf b_es]" v rule: modset_induct)
+   apply (auto dest: modset_label simp add: modset_intros(9))
+  done
+
+lemma modset_block:
+  "v \<in> modset fs [$Block tf b_es] = (v \<in> modset fs [Label n [] ($*b_es)])"
+  using modset_block1 modset_intros(5)
+  by blast
+
+lemma modset_loop1:
+  assumes "v \<in> modset fs [$Loop tf b_es]"
+  shows "v \<in> modset fs ($*b_es)"
+  using assms
+  apply (induction fs "[$Loop tf b_es]" v rule: modset_induct)
+   apply (auto dest: modset_emp)
+  done
+
+lemma modset_loop:
+  "v \<in> modset fs [$Loop tf b_es] = (v \<in> modset fs ($*b_es))"
+  using modset_loop1 modset_intros(6)
+  by blast
+
+lemma modset_if1:
+  assumes "v \<in> modset fs [$If tf b_es1 b_es2]"
+  shows "v \<in> modset fs [$Block tf1 b_es1] \<or> (v \<in> modset fs [$Block tf2 b_es2])"
+  using assms
+  apply (induction fs "[$If tf b_es1 b_es2]" v rule: modset_induct)
+  apply (metis modset_emp)
+  apply (metis modset_block) 
+  done
+
+lemma modset_if:
+  "v \<in> modset fs [$If tf b_es1 b_es2] = (v \<in> modset fs [$Block tf1 b_es1] \<or> v \<in> modset fs [$Block tf2 b_es2])"
+  using modset_if1 modset_intros(7)
+  by blast
+
 lemma modifies_var_st:
   assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',res)"
           "reifies_func (funcs s) (inst.funcs i) fs"
@@ -115,64 +190,36 @@ lemma modifies_var_st:
   shows "var_st_differ_on var_st (modset fs es) var_st'"
   using assms
 proof (induction "(s,vs,es)" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs es s' vs' res rule: reduce_to_n.induct)
-case (const s vs v k)
-then show ?case sorry
-next
-  case (unop s vs v t op k)
-  then show ?case sorry
-next
-  case (binop_Some op v1 v2 v s vs t k)
-  then show ?case sorry
-next
-case (binop_None op v1 v2 s vs t k)
-  then show ?case sorry
-next
-case (testop s vs v t op k)
-  then show ?case sorry
-next
-case (relop s vs v1 v2 t op k)
-  then show ?case sorry
-next
-case (convert_Some t1 v t2 sx v' s vs k)
-  then show ?case sorry
-next
-case (convert_None t1 v t2 sx s vs k)
-  then show ?case sorry
-next
-  case (reinterpret t1 v s vs t2 k)
-then show ?case sorry
-next
-  case (unreachable s vs k)
-  then show ?case sorry
-next
-case (nop s vs k)
-  then show ?case sorry
-next
-  case (drop s vs v k)
-  then show ?case sorry
-next
-  case (select_false n s vs v1 v2 k)
-  then show ?case sorry
-next
-  case (select_true n s vs v1 v2 k)
-  then show ?case sorry
-next
   case (block ves n t1s t2s m s vs es k s' vs' res)
-  then show ?case sorry
+  hence "var_st_differ_on var_st (modset fs [Label m [] (ves @ ($* es))]) var_st'"
+    by blast
+  hence "var_st_differ_on var_st (modset fs [$Block (t1s _> t2s) es]) var_st'"
+    using modset_block modset_label_inner
+    by (metis block(1) e_type_const_conv_vs var_st_differ_on_def)
+  thus ?case
+    by (metis modset_arb_app var_st_differ_on_def)
 next
-case (loop ves n t1s t2s m s vs es k s' vs' res)
-  then show ?case sorry
+  case (loop ves n t1s t2s m s vs es k s' vs' res)
+  hence "var_st_differ_on var_st (modset fs [Label n [$Loop (t1s _> t2s) es] (ves @ ($* es))]) var_st'"
+    by blast
+  hence "var_st_differ_on var_st (modset fs [$Loop (t1s _> t2s) es]) var_st'"
+    using modset_loop modset_label_inner
+    by (metis e_type_const_conv_vs loop(1) modset_label var_st_differ_on_def)
+  thus ?case
+    by (metis modset_arb_app var_st_differ_on_def)
 next
   case (if_false n ves s vs tf e2s k s' vs' res e1s)
-  then show ?case sorry
+  hence "var_st_differ_on var_st (modset fs (ves @ [$Block tf e2s])) var_st'"
+    by blast
+  hence "var_st_differ_on var_st (modset fs ([$If tf e1s e2s])) var_st'"
+    using modset_if
+    unfolding var_st_differ_on_def
+    apply auto
+  thus ?case
+    using modset_if
+    sorry
 next
   case (if_true n ves s vs tf e1s k s' vs' res e2s)
-  then show ?case sorry
-next
-  case (br vcs n j s vs k)
-  then show ?case sorry
-next
-  case (br_if_false n s vs j k)
   then show ?case sorry
 next
   case (br_if_true n ves s vs j k s' vs' res)
@@ -184,19 +231,10 @@ next
   case (br_table_length js c ves s vs j k s' vs' res)
   then show ?case sorry
 next
-  case (return vs r s vcs k)
-then show ?case sorry
-next
-  case (get_local vi j s v vs k)
-  then show ?case sorry
-next
   case (set_local vi j s v vs v' k)
   then show ?case sorry
 next
   case (tee_local v s vs i k s' vs' res)
-  then show ?case sorry
-next
-  case (get_global s vs j k)
   then show ?case sorry
 next
   case (set_global s j v s' vs k)
@@ -205,43 +243,22 @@ next
   case (load_Some s j m n off t bs vs a k)
   then show ?case sorry
 next
-  case (load_None s j m n off t vs a k)
-  then show ?case sorry
-next
   case (load_packed_Some s j m sx n off tp t bs vs a k)
   then show ?case sorry
 next
-  case (load_packed_None s j m sx n off tp t vs a k)
-then show ?case sorry
-next
   case (store_Some t v s j m n off mem' vs a k)
-  then show ?case sorry
-next
-  case (store_None t v s j m n off vs a k)
   then show ?case sorry
 next
   case (store_packed_Some t v s j m n off tp mem' vs a k)
 then show ?case sorry
 next
-  case (store_packed_None t v s j m n off tp vs a k)
-  then show ?case sorry
-next
-  case (current_memory s j m n vs k)
-  then show ?case sorry
-next
   case (grow_memory s j m n c mem' vs k)
-  then show ?case sorry
-next
-  case (grow_memory_fail s j m n vs c k)
   then show ?case sorry
 next
   case (call ves s vs j k s' vs' res)
   then show ?case sorry
 next
   case (call_indirect_Some s c cl j tf ves vs k s' vs' res)
-  then show ?case sorry
-next
-  case (call_indirect_None s c cl j vs k)
   then show ?case sorry
 next
   case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k s' vs' res)
@@ -285,7 +302,7 @@ next
 next
   case (local_return s lls es k n j s' lls' rvs vs)
   then show ?case sorry
-qed
+qed (metis var_st_eq_intro1 var_st_differ_on_refl)+
 
 
 
