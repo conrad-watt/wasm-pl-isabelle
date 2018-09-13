@@ -3,6 +3,13 @@ theory Wasm_Inference_Rules imports Wasm_Assertions_Shallow begin
 definition var_st_differ_on :: "'a var_st \<Rightarrow> var set \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "var_st_differ_on v_st vars v_st' \<equiv> (\<forall>var. var \<notin> vars \<longrightarrow> var_st_agree v_st var v_st')"
 
+lemma var_st_ex:
+  assumes "(\<forall>gn<length (inst.globs i). inst.globs i ! gn < length (s.globs s))"
+  shows "\<exists>var_st. reifies_glob (s.globs s) (inst.globs i) var_st \<and> reifies_loc vs var_st \<and> snd (snd var_st) = lvar_st"
+  using assms
+  unfolding reifies_glob_def reifies_loc_def
+  by simp (metis (full_types) length_map nth_map)
+
 lemma var_st_eq_intro1:
   assumes "reifies_glob (s.globs s) (inst.globs i) var_st"
           "reifies_loc vs var_st"
@@ -23,9 +30,53 @@ proof -
     using f2 f1 by (metis (no_types) assms(2,3,5,6) nth_equalityI prod.collapse reifies_loc_def)
 qed
 
+lemma var_st_eq_intro2:
+  assumes "reifies_glob (s.globs s) (inst.globs i) var_st"
+          "reifies_loc vs var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_glob (s.globs (s\<lparr>s.mem := mem'\<rparr>)) (inst.globs i) var_st'"
+          "reifies_loc vs var_st'"
+          "snd (snd var_st') = lvar_st"
+  shows "var_st = var_st'"
+  using assms
+proof -
+  have f1: "length (fst var_st') = length (inst.globs i)"
+    by (meson assms(4) reifies_glob_def)
+  have f2: "length (fst var_st) = length (inst.globs i)"
+    by (meson assms(1) reifies_glob_def)
+  then have "\<And>n. \<not> n < length (inst.globs i) \<or> fst var_st' ! n = fst var_st ! n"
+    using f1 assms(1,4)
+    unfolding reifies_glob_def
+    by auto
+  then show ?thesis
+    using f2 f1 by (metis (no_types) assms(2,3,5,6) nth_equalityI prod.collapse reifies_loc_def)
+qed
+
 lemma var_st_differ_on_refl: "var_st_differ_on v_st vars v_st"
   unfolding var_st_differ_on_def var_st_agree_def
   by (auto split: var.splits)
+
+lemma var_st_differ_on_subset:
+  assumes "var_st_differ_on v_st vars v_st'"
+          "vars \<subseteq> vars'"
+  shows "var_st_differ_on v_st vars' v_st'"
+  unfolding var_st_differ_on_def
+  by (metis assms(1) assms(2) contra_subsetD var_st_differ_on_def)
+
+lemma var_st_differ_on_emp:
+  assumes "var_st_differ_on v_st {} v_st'"
+  shows "v_st = v_st'"
+  using assms
+  unfolding var_st_differ_on_def var_st_agree_def var_st_get_global_def var_st_get_local_def
+            var_st_get_lvar_def
+  apply (cases v_st)
+  apply (cases v_st')
+  apply (simp split: var.splits if_splits)
+  apply safe
+    apply (metis less_irrefl neqE nth_equalityI)
+  apply (metis less_irrefl neqE nth_equalityI)
+  apply auto
+  done
 
 definition stack_ass_ind_on :: "'a stack_ass \<Rightarrow> var set \<Rightarrow> bool" where
   "stack_ass_ind_on St vars \<equiv> \<forall>vs v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> stack_ass_sat St vs v_st = stack_ass_sat St vs v_st'"
@@ -39,16 +90,20 @@ begin
 inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarrow> bool" where
 "\<lbrakk>(modifies fs [e] v) \<or> (modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs (e#es) v"
 | "modifies fs [$Set_local j] (Lc j)"
-| "modifies fs [$Tee_local j] (Lc j)"
+| "\<lbrakk>modifies fs [$Set_local j] v\<rbrakk> \<Longrightarrow> modifies fs [$Tee_local j] v"
 | "modifies fs [$Set_global j] (Gl j)"
+| "\<lbrakk>j \<ge> length (inst.globs i)\<rbrakk> \<Longrightarrow> modifies fs [$Set_global j] (Gl j)"
 | "\<lbrakk>(modifies fs [Label _ [] ($* b_es)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Block _ b_es] v"
 | "\<lbrakk>(modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [$Loop tf b_es] v"
 | "\<lbrakk>(modifies fs [$Block _ b_es1] v) \<or> (modifies fs [$Block _ b_es2] v)\<rbrakk> \<Longrightarrow> modifies fs [$If _ b_es1 b_es2] v"
 | "\<lbrakk>(modifies fs [Callcl (fs!j)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
+| "\<lbrakk>j \<ge> length fs\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
 | "\<lbrakk>(modifies fs les v) \<or> (modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Label _ les es] v"
 | "\<lbrakk>(modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Local _ i lvs es] v"
-| "\<lbrakk>cl = Func_native i _ _ b_es; (modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
+| "\<lbrakk>j \<noteq> i\<rbrakk> \<Longrightarrow> modifies fs [Local _ j lvs es] v"
+| "\<lbrakk>cl = Func_native j _ _ b_es; (modifies fs [Local _ j _ [$Block _ b_es]] v)\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
 | "\<lbrakk>cl = Func_host _ _\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
+| "modifies fs [$Call_indirect k] v"
 
 
 
@@ -125,6 +180,22 @@ lemma modset_consts_app:
   using modset_arb_app modset_arb_app1 modset_consts
   by blast
 
+lemma modset_consts_app_equiv:
+  "(modset fs (($$*vs)@es)) = (modset fs es)"
+  using modset_arb_app modset_arb_app1 modset_consts
+  by blast
+
+lemma modset_call:
+  assumes "j \<ge> length fs"
+  shows "modset fs [$Call j] = UNIV"
+  using assms modset_intros(10)
+  by blast
+
+lemma modset_call_indirect:
+  shows "modset fs [$Call_indirect j] = UNIV"
+  using modset_intros(16)
+  by blast
+
 lemma modset_label:
   assumes "v \<in> modset fs [Label n les es]"
   shows "v \<in> modset fs les \<or> v \<in> modset fs es"
@@ -135,7 +206,7 @@ lemma modset_label:
 
 lemma modset_label_inner:
   "(v \<in> modset fs [Label n les (($$*ves)@es)]) = (v \<in> modset fs [Label n les es])"
-  using modset_label modset_consts_app modset_intros(9)
+  using modset_label modset_consts_app modset_intros(11)
   by blast
 
 lemma modset_block1:
@@ -143,12 +214,12 @@ lemma modset_block1:
   shows "v \<in> modset fs [Label n [] ($*b_es)]"
   using assms
   apply (induction fs "[$Block tf b_es]" v rule: modset_induct)
-   apply (auto dest: modset_label simp add: modset_intros(9))
+   apply (auto dest: modset_label simp add: modset_intros(11))
   done
 
 lemma modset_block:
   "v \<in> modset fs [$Block tf b_es] = (v \<in> modset fs [Label n [] ($*b_es)])"
-  using modset_block1 modset_intros(5)
+  using modset_block1 modset_intros(6)
   by blast
 
 lemma modset_loop1:
@@ -161,7 +232,20 @@ lemma modset_loop1:
 
 lemma modset_loop:
   "v \<in> modset fs [$Loop tf b_es] = (v \<in> modset fs ($*b_es))"
-  using modset_loop1 modset_intros(6)
+  using modset_loop1 modset_intros(7)
+  by blast
+
+lemma modset_tee_local1:
+  assumes "v \<in> modset fs [$Tee_local j]"
+  shows "v \<in> modset fs [$Set_local j]"
+  using assms
+  apply (induction fs "[$Tee_local j]" v rule: modset_induct)
+   apply (auto dest: modset_emp)
+  done
+
+lemma modset_tee_local:
+  "v \<in> modset fs [$Tee_local j] = (v \<in> modset fs [$Set_local j])"
+  using modset_tee_local1 modset_intros(3)
   by blast
 
 lemma modset_if1:
@@ -175,8 +259,135 @@ lemma modset_if1:
 
 lemma modset_if:
   "v \<in> modset fs [$If tf b_es1 b_es2] = (v \<in> modset fs [$Block tf1 b_es1] \<or> v \<in> modset fs [$Block tf2 b_es2])"
-  using modset_if1 modset_intros(7)
+  using modset_if1 modset_intros(8)
   by blast
+
+lemma modset_if_1:
+  "modset fs [$Block tf1 b_es1] \<subseteq> modset fs [$If tf b_es1 b_es2]"
+  using modset_if1 modset_intros(8)
+  by blast
+
+lemma modset_if_2:
+  "modset fs [$Block tf2 b_es2] \<subseteq> modset fs [$If tf b_es1 b_es2]"
+  using modset_if1 modset_intros(8)
+  by blast
+
+lemma modset_implies:
+  assumes "\<And>x. x \<in> modset fs es \<Longrightarrow> x \<in> modset fs es'"
+  shows "modset fs es \<subseteq> modset fs es'"
+  using assms
+  by auto
+
+lemma modset_call1:
+  assumes "reifies_func (s.funcs s) (inst.funcs i) fs"
+          "x \<in> modset fs ([Callcl (sfunc s i j)])"
+  shows "x \<in> modset fs ([$Call j])"
+  using reifies_func_ind[OF assms(1)] modset_call assms(2) modset_intros(9)
+  apply (cases "j < length fs")
+   apply auto
+  done
+
+lemma modset_br1:  "x \<in> modset fs ([$Br j]) \<Longrightarrow> False"
+  apply (induction "[$Br j]" x rule: modset_induct)
+  apply (auto dest: modset_emp)
+  done
+
+lemma modset_br: "modset fs ([$Br j]) = {}"
+  using modset_br1
+  by auto
+
+lemma modset_local:
+  assumes "v \<in> modset fs [Local m i vls es]"
+  shows "v \<in> modset fs es"
+  using assms
+  apply (induction fs "[Local m i vls es]" v rule: modset_induct)
+  apply (auto dest: modset_emp)
+  done
+
+lemma modset_callcl_native1:
+  assumes "v \<in> modset fs [Callcl cl]"
+          "cl = Func_native j tf ts b_es"
+  shows "v \<in> modset fs [Local m j vls [$Block tf' b_es]]"
+  using assms
+proof (induction fs "[Callcl cl]" v arbitrary: rule: modset_induct)
+  case (14 j' vc vd b_es' fs ve vf vg v)
+  hence j'_def:"j = j'"
+               "b_es = b_es'"
+    by auto
+  thus ?case
+  proof (cases "j = i")
+    case True
+    thus ?thesis
+      using modset_local j'_def 14(2)
+      by (metis encapsulated_module.modset_block modset_intros(12))
+  next
+    case False
+      thus ?thesis
+        using modset_intros(13)
+        by blast
+  qed
+qed (auto dest: modset_emp)
+
+lemma modset_callcl_native:
+  assumes "cl = Func_native j tf ts b_es"    
+  shows "modset fs [Local m j vls [$Block tf' b_es]] = modset fs [Callcl cl]"
+  using assms modset_callcl_native1 modset_intros(14)
+  by blast
+
+lemma var_st_differ_on_subset_const_list_helper:
+  assumes "var_st_differ_on var_st (modset fs (ves @ es)) var_st'"
+          "const_list ves"
+          "modset fs es \<subseteq> modset fs es'"
+  shows "var_st_differ_on var_st (modset fs (ves @ es')) var_st'"
+  using assms(1,2) e_type_const_conv_vs var_st_differ_on_subset[OF _ assms(3)]
+        modset_consts_app_equiv
+  by metis
+
+lemma var_st_differ_on_arb_app3:
+  assumes "var_st_differ_on var_st (modset fs es) var_st'"
+  shows "var_st_differ_on var_st (modset fs (es' @ es @ es'')) var_st'"
+  by (meson assms modset_arb_app var_st_differ_on_def)
+
+lemma var_st_differ_on_trans:
+  assumes "var_st_differ_on var_st (modset fs es) var_st''"
+          "var_st_differ_on var_st'' (modset fs es) var_st'"
+  shows "var_st_differ_on var_st (modset fs es) var_st'"
+  using assms
+  unfolding var_st_differ_on_def var_st_agree_def
+  by (simp split: var.splits) metis
+
+lemma var_st_differ_on_app:
+  assumes "var_st_differ_on var_st (modset fs es) var_st''"
+          "var_st_differ_on var_st'' (modset fs es') var_st'"
+  shows "var_st_differ_on var_st (modset fs (es@es')) var_st'"
+  using assms
+  unfolding var_st_differ_on_def var_st_agree_def
+  by (simp split: var.splits) (metis modset_arb_app)
+
+lemma var_st_eq_local_differ:
+  assumes "var_st_differ_on var_st_l vset var_st_l'"
+          "reifies_glob (s.globs s) (inst.globs i) var_st"
+          "reifies_loc vs var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_glob (s.globs s') (inst.globs i) var_st'"
+          "reifies_loc vs var_st'"
+          "snd (snd var_st') = lvar_st"
+          "reifies_glob (s.globs s) (inst.globs i) var_st_l"
+          "reifies_loc lvs var_st_l"
+          "snd (snd var_st_l) = lvar_st"
+          "reifies_glob (s.globs s') (inst.globs i) var_st_l'"
+          "reifies_loc lvs' var_st_l'"
+          "snd (snd var_st_l') = lvar_st"
+  shows "var_st_differ_on var_st vset var_st'"
+  using assms
+  unfolding var_st_differ_on_def reifies_loc_def reifies_glob_def var_st_agree_def var_st_get_global_def
+            var_st_get_lvar_def var_st_get_local_def
+  apply (cases var_st)
+  apply (cases var_st')
+  apply (cases var_st_l)
+  apply (cases var_st_l')
+  apply (auto split: var.splits if_splits)
+  done
 
 lemma modifies_var_st:
   assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',res)"
@@ -189,7 +400,7 @@ lemma modifies_var_st:
           "snd (snd var_st') = lvar_st"
   shows "var_st_differ_on var_st (modset fs es) var_st'"
   using assms
-proof (induction "(s,vs,es)" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs es s' vs' res rule: reduce_to_n.induct)
+proof (induction "(s,vs,es)" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs es s' vs' res var_st var_st' ls r rule: reduce_to_n.induct)
   case (block ves n t1s t2s m s vs es k s' vs' res)
   hence "var_st_differ_on var_st (modset fs [Label m [] (ves @ ($* es))]) var_st'"
     by blast
@@ -211,97 +422,316 @@ next
   case (if_false n ves s vs tf e2s k s' vs' res e1s)
   hence "var_st_differ_on var_st (modset fs (ves @ [$Block tf e2s])) var_st'"
     by blast
+  hence "var_st_differ_on var_st (modset fs ([$Block tf e2s])) var_st'"
+    using modset_consts_app_equiv
+    by (metis e_type_const_conv_vs if_false(2))
   hence "var_st_differ_on var_st (modset fs ([$If tf e1s e2s])) var_st'"
-    using modset_if
-    unfolding var_st_differ_on_def
-    apply auto
+    using var_st_differ_on_subset[OF _ modset_if_2] 
+    by fastforce
   thus ?case
-    using modset_if
-    sorry
+    by (metis modset_arb_app modset_intros(1) var_st_differ_on_def)
 next
   case (if_true n ves s vs tf e1s k s' vs' res e2s)
-  then show ?case sorry
+  hence "var_st_differ_on var_st (modset fs (ves @ [$Block tf e1s])) var_st'"
+    by blast
+  hence "var_st_differ_on var_st (modset fs ([$Block tf e1s])) var_st'"
+    using modset_consts_app_equiv
+    by (metis e_type_const_conv_vs if_true(2))
+  hence "var_st_differ_on var_st (modset fs ([$If tf e1s e2s])) var_st'"
+    using var_st_differ_on_subset[OF _ modset_if_1] 
+    by fastforce
+  thus ?case
+    by (metis modset_arb_app modset_intros(1) var_st_differ_on_def)
 next
   case (br_if_true n ves s vs j k s' vs' res)
-  then show ?case sorry
+  hence "var_st_differ_on var_st (modset fs (ves @ [$Br j])) var_st'"
+    by simp
+  hence "var_st_differ_on var_st {} var_st'"
+    using modset_br var_st_differ_on_emp modset_consts_app_equiv e_type_const_conv_vs[OF br_if_true(2)]
+    by auto
+  thus ?case
+    by (simp add: var_st_differ_on_def)
 next
   case (br_table js c ves s vs k s' vs' res j)
-  then show ?case sorry
+  hence "var_st_differ_on var_st (modset fs (ves @ [$Br (js !  Wasm_Base_Defs.nat_of_int c)])) var_st'"
+    by simp
+  hence "var_st_differ_on var_st {} var_st'"
+    using modset_br var_st_differ_on_emp modset_consts_app_equiv e_type_const_conv_vs[OF br_table(2)]
+    by auto
+  thus ?case
+    by (simp add: var_st_differ_on_def)
 next
   case (br_table_length js c ves s vs j k s' vs' res)
-  then show ?case sorry
+  hence "var_st_differ_on var_st (modset fs (ves @ [$Br j])) var_st'"
+    by simp
+  hence "var_st_differ_on var_st {} var_st'"
+    using modset_br var_st_differ_on_emp modset_consts_app_equiv e_type_const_conv_vs[OF br_table_length(2)]
+    by auto
+  thus ?case
+    by (simp add: var_st_differ_on_def)
 next
   case (set_local vi j s v vs v' k)
   then show ?case sorry
 next
   case (tee_local v s vs i k s' vs' res)
-  then show ?case sorry
+  obtain v_c where v_c_def:"v = $C v_c"
+    using e_type_const_unwrap[OF tee_local(1)]
+    by blast
+  hence "var_st_differ_on var_st (modset fs [v, v, $Set_local i]) var_st'"
+    using tee_local
+    by blast
+  hence "var_st_differ_on var_st (modset fs ([$Set_local i])) var_st'"
+    using modset_consts_app_equiv[of _ "[v_c, v_c]" "[$Set_local i]"] v_c_def
+    by simp
+  thus ?case
+    by (meson modset_intros(1,3) var_st_differ_on_def)
 next
   case (set_global s j v s' vs k)
   then show ?case sorry
 next
-  case (load_Some s j m n off t bs vs a k)
-  then show ?case sorry
-next
-  case (load_packed_Some s j m sx n off tp t bs vs a k)
-  then show ?case sorry
-next
   case (store_Some t v s j m n off mem' vs a k)
-  then show ?case sorry
+  thus ?case
+    by (metis var_st_eq_intro2 var_st_differ_on_refl)
 next
   case (store_packed_Some t v s j m n off tp mem' vs a k)
-then show ?case sorry
+  thus ?case
+    by (metis var_st_eq_intro2 var_st_differ_on_refl)
 next
   case (grow_memory s j m n c mem' vs k)
-  then show ?case sorry
+  thus ?case
+    by (metis var_st_eq_intro2 var_st_differ_on_refl)
 next
   case (call ves s vs j k s' vs' res)
-  then show ?case sorry
+  thus ?case
+    using modset_call1
+    by (metis modset_implies var_st_differ_on_subset_const_list_helper)
 next
-  case (call_indirect_Some s c cl j tf ves vs k s' vs' res)
-  then show ?case sorry
+  case (call_indirect_Some s c cl j tf ves vs k ls r s' vs' res)
+  show ?case
+    by (meson modset_arb_app modset_intros(1,16) var_st_differ_on_def)
 next
-  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k s' vs' res)
-  then show ?case sorry
+  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k ls r s' vs' res)
+  hence "var_st_differ_on var_st (modset fs [Local m j (vcs @ zs) [$Block ([] _> t2s) es]]) var_st'"
+    by blast
+  hence "var_st_differ_on var_st (modset fs ([Callcl cl])) var_st'"
+    using modset_callcl_native[OF callcl_native(1)]
+    by simp
+  thus ?case
+    using callcl_native(2)
+    by (simp add: modset_consts_app_equiv)
 next
   case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k)
-  then show ?case sorry
-next
-  case (callcl_host_None cl t1s t2s f ves vcs n m s vs k)
-  then show ?case sorry
+  thus ?case
+    by (simp add: modset_consts_app_equiv modset_intros(15) var_st_differ_on_def)
 next
   case (const_value s vs es k s' vs' res ves)
-  then show ?case sorry
+  thus ?case
+    by (simp add: modset_consts_app_equiv)
 next
-  case (label_value s vs es k n s' vs' res les)
-  then show ?case sorry
+  case (label_value s vs es k n ls r s' vs' res les)
+  hence "var_st_differ_on var_st (modset fs es) var_st'"
+    by simp
+  thus ?case
+    by (meson modset_intros(11) var_st_differ_on_def)
 next
   case (local_value s lls es k n j s' lls' res vs)
-  then show ?case sorry
+  show ?case
+  proof (cases "j = i")
+    case True
+    have 1:"\<forall>gn<length (inst.globs i).
+         inst.globs i ! gn
+         < length (s.globs s)"
+      using local_value(4)
+      unfolding reifies_glob_def
+      by metis
+    hence 2:"\<forall>gn<length (inst.globs i).
+         inst.globs i ! gn
+         < length (s.globs s')"
+      using reduce_to_length_globs[OF local_value(1)]
+      by simp
+    obtain var_st_l where var_st_l_def:"reifies_glob (s.globs s) (inst.globs i) var_st_l"
+                                                "reifies_loc lls var_st_l"
+                                                "snd (snd var_st_l) = lvar_st"
+      using var_st_ex 1
+      by blast
+    obtain var_st_l' where var_st_l'_def:"reifies_glob (s.globs s') (inst.globs i) var_st_l'"
+                                            "reifies_loc lls' var_st_l'"
+                                            "snd (snd var_st_l') = lvar_st"
+      using var_st_ex 2
+      by blast
+    have "var_st_differ_on var_st_l (modset fs es) var_st_l'"
+      using local_value(2)[OF True local_value(3) var_st_l_def var_st_l'_def]
+      by -
+    hence "var_st_differ_on var_st (modset fs es) var_st'"
+      using var_st_eq_local_differ[OF _ local_value(4,5,6,7,8,9) var_st_l_def var_st_l'_def]
+      by blast
+    thus ?thesis
+      by (metis True modset_intros(12) var_st_differ_on_def)
+  next
+    case False
+    thus ?thesis
+      by (simp add: modset_intros(13) var_st_differ_on_def)
+  qed
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
-then show ?case sorry
+  have 1:"reifies_func (s.funcs s'') (inst.funcs i) fs"
+    using reduce_to_funcs[OF seq_value(1)] seq_value(5)
+    by simp
+  have "\<forall>gn<length (inst.globs i).
+       inst.globs i ! gn
+       < length (s.globs s)"
+    using seq_value(6)
+    unfolding reifies_glob_def
+    by metis
+  hence "\<forall>gn<length (inst.globs i).
+       inst.globs i ! gn
+       < length (s.globs s'')"
+    using reduce_to_length_globs[OF seq_value(1)]
+    by simp
+  then obtain var_st'' where var_st''_def:"reifies_glob (s.globs s'') (inst.globs i) var_st''"
+                                          "reifies_loc vs'' var_st''"
+                                          "snd (snd var_st'') =
+                                          lvar_st"
+    using var_st_ex
+    by blast
+  have "var_st_differ_on var_st (modset fs es) var_st''"
+    using seq_value(2)[OF _ _ _ _ var_st''_def] seq_value.prems(1,2,3,4)
+    by blast
+  moreover
+  have "var_st_differ_on var_st'' (modset fs es') var_st'"
+    using seq_value(4)[OF 1 var_st''_def]
+    by (simp add: modset_consts_app_equiv seq_value.prems(5,6,7))
+  ultimately
+  show ?case
+    using var_st_differ_on_app
+    by blast
 next
   case (seq_nonvalue ves s vs es k s' vs' res es')
-  then show ?case sorry
+  thus ?case
+    by (simp add: var_st_differ_on_arb_app3)
 next
   case (label_trap s vs es k n s' vs' les)
-  then show ?case sorry
+  thus ?case
+    by (metis modset_intros(11) var_st_differ_on_def)
 next
   case (local_trap s lls es k n j s' lls' vs)
-  then show ?case sorry
+  show ?case
+  proof (cases "j = i")
+    case True
+    have 1:"\<forall>gn<length (inst.globs i).
+         inst.globs i ! gn
+         < length (s.globs s)"
+      using local_trap(4)
+      unfolding reifies_glob_def
+      by metis
+    hence 2:"\<forall>gn<length (inst.globs i).
+         inst.globs i ! gn
+         < length (s.globs s')"
+      using reduce_to_length_globs[OF local_trap(1)]
+      by simp
+    obtain var_st_l where var_st_l_def:"reifies_glob (s.globs s) (inst.globs i) var_st_l"
+                                                "reifies_loc lls var_st_l"
+                                                "snd (snd var_st_l) = lvar_st"
+      using var_st_ex 1
+      by blast
+    obtain var_st_l' where var_st_l'_def:"reifies_glob (s.globs s') (inst.globs i) var_st_l'"
+                                            "reifies_loc lls' var_st_l'"
+                                            "snd (snd var_st_l') = lvar_st"
+      using var_st_ex 2
+      by blast
+    have "var_st_differ_on var_st_l (modset fs es) var_st_l'"
+      using local_trap(2)[OF True local_trap(3) var_st_l_def var_st_l'_def]
+      by -
+    hence "var_st_differ_on var_st (modset fs es) var_st'"
+      using var_st_eq_local_differ[OF _ local_trap(4,5,6,7,8,9) var_st_l_def var_st_l'_def]
+      by blast
+    thus ?thesis
+      by (metis True modset_intros(12) var_st_differ_on_def)
+  next
+    case False
+    thus ?thesis
+      by (simp add: modset_intros(13) var_st_differ_on_def)
+  qed
 next
   case (label_break_suc s vs es k n s' vs' bn bvs les)
-  then show ?case sorry
+  thus ?case
+    by (metis modset_intros(11) var_st_differ_on_def)
 next
-  case (label_break_nil s vs es k n s'' vs'' bvs es' \<Gamma> s' vs' res les)
-  then show ?case sorry
+  case (label_break_nil s vs es k n ls r s'' vs'' bvs les s' vs' res)
+  have 1:"reifies_func (s.funcs s'') (inst.funcs i) fs"
+    using reduce_to_funcs[OF label_break_nil(1)] label_break_nil(5)
+    by simp
+  have "\<forall>gn<length (inst.globs i).
+       inst.globs i ! gn
+       < length (s.globs s)"
+    using label_break_nil(6)
+    unfolding reifies_glob_def
+    by metis
+  hence "\<forall>gn<length (inst.globs i).
+       inst.globs i ! gn
+       < length (s.globs s'')"
+    using reduce_to_length_globs[OF label_break_nil(1)]
+    by simp
+  then obtain var_st'' where var_st''_def:"reifies_glob (s.globs s'') (inst.globs i) var_st''"
+                                          "reifies_loc vs'' var_st''"
+                                          "snd (snd var_st'') =
+                                          lvar_st"
+    using var_st_ex
+    by blast
+  have "var_st_differ_on var_st (modset fs es) var_st''"
+    using label_break_nil(2)[OF _ _ _ _ var_st''_def] label_break_nil.prems(1,2,3,4)
+    by blast
+  moreover
+  have "var_st_differ_on var_st'' (modset fs les) var_st'"
+    using label_break_nil(4)[OF 1 var_st''_def]
+    by (simp add: modset_consts_app_equiv label_break_nil.prems(5,6,7))
+  ultimately
+  show ?case
+    using var_st_differ_on_app
+    by (metis modset_arb_app1 modset_intros(11) var_st_differ_on_def)
 next
   case (label_return s vs es k n s' vs' rvs les)
-  then show ?case sorry
+  thus ?case
+    by (metis modset_intros(11) var_st_differ_on_def)
 next
   case (local_return s lls es k n j s' lls' rvs vs)
-  then show ?case sorry
+  show ?case
+  proof (cases "j = i")
+    case True
+    have 1:"\<forall>gn<length (inst.globs i).
+         inst.globs i ! gn
+         < length (s.globs s)"
+      using local_return(4)
+      unfolding reifies_glob_def
+      by metis
+    hence 2:"\<forall>gn<length (inst.globs i).
+         inst.globs i ! gn
+         < length (s.globs s')"
+      using reduce_to_length_globs[OF local_return(1)]
+      by simp
+    obtain var_st_l where var_st_l_def:"reifies_glob (s.globs s) (inst.globs i) var_st_l"
+                                                "reifies_loc lls var_st_l"
+                                                "snd (snd var_st_l) = lvar_st"
+      using var_st_ex 1
+      by blast
+    obtain var_st_l' where var_st_l'_def:"reifies_glob (s.globs s') (inst.globs i) var_st_l'"
+                                            "reifies_loc lls' var_st_l'"
+                                            "snd (snd var_st_l') = lvar_st"
+      using var_st_ex 2
+      by blast
+    have "var_st_differ_on var_st_l (modset fs es) var_st_l'"
+      using local_return(2)[OF True local_return(3) var_st_l_def var_st_l'_def]
+      by -
+    hence "var_st_differ_on var_st (modset fs es) var_st'"
+      using var_st_eq_local_differ[OF _ local_return(4,5,6,7,8,9) var_st_l_def var_st_l'_def]
+      by blast
+    thus ?thesis
+      by (metis True modset_intros(12) var_st_differ_on_def)
+  next
+    case False
+    thus ?thesis
+      by (simp add: modset_intros(13) var_st_differ_on_def)
+  qed
 qed (metis var_st_eq_intro1 var_st_differ_on_refl)+
 
 

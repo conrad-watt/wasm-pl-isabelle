@@ -36,7 +36,7 @@ proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.
           e_type_const_list[OF is_const_list[OF callcl_host_Some(2)] ts''_def(1)]
     by fastforce
   thus ?case
-    using host_apply_preserve_store[OF _ callcl_host_Some(6)] callcl_host_Some(2)
+    using host_apply_preserve_store[OF callcl_host_Some(6)] callcl_host_Some(2)
     by (metis append_Nil e_typing_imp_list_types_agree)
 next
   case (set_global s i j v s' vs)

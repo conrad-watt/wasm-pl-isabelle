@@ -98,7 +98,7 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
 | local_trap:"\<lbrakk>(s,lls,es) \<Down>{([],Some n,j)} (s',lls',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
 | label_break_suc:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RBreak bn bvs)"
-| label_break_nil:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s'',vs'',RBreak 0 bvs); (s'',vs'',($$* bvs) @ les) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',res)"
+| label_break_nil:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s'',vs'',RBreak 0 bvs); (s'',vs'',($$* bvs) @ les) \<Down>{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',res)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RReturn rvs)"
 | local_return:"\<lbrakk>(s,lls,es) \<Down>{([],Some n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RValue rvs)"
@@ -195,7 +195,7 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
 | local_trap:"\<lbrakk>(s,lls,es) \<Down>k{([],Some n,j)} (s',lls',RTrap)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
 | label_break_suc:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RBreak bn bvs)"
-| label_break_nil:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s'',vs'',RBreak 0 bvs); (s'',vs'',($$* bvs) @ les) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+| label_break_nil:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s'',vs'',RBreak 0 bvs); (s'',vs'',($$* bvs) @ les) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RReturn rvs)"
 | local_return:"\<lbrakk>(s,lls,es) \<Down>k{([],Some n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RValue rvs)"
@@ -221,7 +221,7 @@ proof (induction rule: reduce_to.induct)
     using reduce_to_n_mono reduce_to_n.seq_value
     by (meson le_cases)
 next
-  case (label_break_nil s vs es n ls r i s'' vs'' bvs les \<Gamma> s' vs' res)
+  case (label_break_nil s vs es n ls r i s'' vs'' bvs les s' vs' res)
   thus ?case
     using reduce_to_n_mono reduce_to_n.label_break_nil
     by (meson le_cases)
@@ -567,6 +567,38 @@ lemma calln_context: "((s,vs,($$*ves)@[$(Call j)]) \<Down>k{(ls,r,i)} (s',vs',re
   apply(metis call0)
   apply (metis callcl_context calln)
   done
+
+lemma reduce_to_length_globs:
+  assumes "(s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "length (s.globs s) = length (s.globs s')"
+  using assms
+proof (induction "(s,vs,es)" "k" "\<Gamma>" "(s',vs',res)" arbitrary: s s' es res vs vs' rule: reduce_to_n.induct)
+  case (set_global s i j v s' vs k ls r)
+  thus ?case
+    by (metis length_list_update s.ext_inject s.surjective s.update_convs(4) supdate_glob_def supdate_glob_s_def)
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k ls r i)
+  show ?case
+    using host_apply_preserve_store[OF callcl_host_Some(6)] list_all2_lengthD
+    unfolding store_extension.simps
+    by force
+qed auto
+
+lemma reduce_to_funcs:
+  assumes "(s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "(s.funcs s) = (s.funcs s')"
+  using assms
+proof (induction "(s,vs,es)" "k" "\<Gamma>" "(s',vs',res)" arbitrary: s s' es res vs vs' rule: reduce_to_n.induct)
+  case (set_global s i j v s' vs k ls r)
+  thus ?case
+    by (metis s.ext_inject s.surjective s.update_convs(4) supdate_glob_def supdate_glob_s_def)
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k ls r i)
+  show ?case
+    using host_apply_preserve_store[OF callcl_host_Some(6)] list_all2_lengthD
+    unfolding store_extension.simps
+    by force
+qed auto
 
 lemma local_value_trap:
   assumes "((s,vs,[Local n i vls es]) \<Down>k{\<Gamma>} (s',vs',res))"
