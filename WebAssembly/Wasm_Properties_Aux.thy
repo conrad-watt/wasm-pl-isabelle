@@ -965,6 +965,33 @@ proof -
   qed
 qed
 
+lemma consts_app:
+  assumes "es @ es' = ($$* ves) @ es''"
+  shows "(\<exists>ves' ves''. es = ($$* ves') \<and> es' = ($$* ves'')@es'' \<and> ves = ves'@ves'') \<or>
+           (\<exists>es_1 es_2. es = ($$* ves)@es_1 \<and> es' = es_2 \<and> es'' = es_1@es_2)"
+proof -
+  obtain us where us_def:"(es = ($$* ves) @ us \<and> us @ es' = es'') \<or> (es @ us = ($$* ves) \<and> es' = us @ es'')"
+    using append_eq_append_conv2[of es es' "($$* ves)" es''] assms
+    by blast
+  show ?thesis
+  proof -
+    obtain vvs :: "e list \<Rightarrow> v list" where
+      f2: "\<forall>es esa vs. es @ esa \<noteq> $$* vs \<or> es = $$* vvs es"
+      by (metis consts_app_ex(1))
+    obtain vvsa :: "e list \<Rightarrow> v list" where
+      f3: "\<forall>x1. (\<exists>v3. x1 = $$* v3) = (x1 = $$* vvsa x1)"
+      by moura
+    moreover
+    { assume "ves \<noteq> vvs es @ vvsa us"
+      then have "$$* ves \<noteq> $$* vvs es @ vvsa us"
+        using inj_basic_econst map_injective by blast
+      then have "es @ us \<noteq> $$* ves \<or> es' \<noteq> us @ es''"
+        using f3 f2 by (metis (no_types) consts_app_ex(2) map_append) }
+    ultimately show ?thesis
+      using f2 us_def by (metis (no_types) consts_app_ex(2))
+  qed
+qed
+
 lemma e_type_const1:
   assumes "is_const e"
   shows "\<exists>t. (\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts@[t]))"
