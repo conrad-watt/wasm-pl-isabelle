@@ -92,7 +92,7 @@ inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarr
 | "modifies fs [$Set_local j] (Lc j)"
 | "\<lbrakk>modifies fs [$Set_local j] v\<rbrakk> \<Longrightarrow> modifies fs [$Tee_local j] v"
 | "modifies fs [$Set_global j] (Gl j)"
-| "\<lbrakk>j \<ge> length (inst.globs i)\<rbrakk> \<Longrightarrow> modifies fs [$Set_global j] (Gl j)"
+| "\<lbrakk>j \<ge> length (inst.globs i)\<rbrakk> \<Longrightarrow> modifies fs [$Set_global j] v"
 | "\<lbrakk>(modifies fs [Label _ [] ($* b_es)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Block _ b_es] v"
 | "\<lbrakk>(modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [$Loop tf b_es] v"
 | "\<lbrakk>(modifies fs [$Block _ b_es1] v) \<or> (modifies fs [$Block _ b_es2] v)\<rbrakk> \<Longrightarrow> modifies fs [$If _ b_es1 b_es2] v"
@@ -304,6 +304,33 @@ lemma modset_local:
   apply (auto dest: modset_emp)
   done
 
+lemma modset_set_local1:
+  assumes "v \<in> modset fs [$Set_local j]"
+  shows "v = Lc j"
+  using assms
+  apply (induction fs "[$Set_local j]" v rule: modset_induct)
+  apply (auto dest: modset_emp)
+  done
+
+lemma modset_set_local: "modset fs [$Set_local j] = {Lc j}"
+  using modset_set_local1 modset_def modifies.intros(2)
+  by fastforce
+
+lemma modset_set_global1:
+  assumes "v \<in> modset fs [$Set_global j]"
+          "j < length (inst.globs i)"
+  shows "v = Gl j"
+  using assms
+  apply (induction fs "[$Set_global j]" v rule: modset_induct)
+  apply (auto dest: modset_emp)
+  done
+
+lemma modset_set_global:
+  assumes "j \<ge> length (inst.globs i)"
+  shows "modset fs [$Set_global j] = UNIV"
+  using modset_def modifies.intros(5) assms
+  by fastforce
+
 lemma modset_callcl_native1:
   assumes "v \<in> modset fs [Callcl cl]"
           "cl = Func_native j tf ts b_es"
@@ -319,7 +346,7 @@ proof (induction fs "[Callcl cl]" v arbitrary: rule: modset_induct)
     case True
     thus ?thesis
       using modset_local j'_def 14(2)
-      by (metis encapsulated_module.modset_block modset_intros(12))
+      by (metis modset_block modset_intros(12))
   next
     case False
       thus ?thesis
@@ -386,7 +413,58 @@ lemma var_st_eq_local_differ:
   apply (cases var_st')
   apply (cases var_st_l)
   apply (cases var_st_l')
-  apply (auto split: var.splits if_splits)
+  apply (auto simp add: split: var.splits if_splits)
+  done
+
+lemma var_st_eq_set_local_differ:
+  assumes "reifies_glob (s.globs s) (inst.globs i) var_st"
+          "reifies_loc (vi @ [v] @ vs) var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_glob (s.globs s) (inst.globs i) var_st'"
+          "reifies_loc (vi @ [v'] @ vs) var_st'"
+          "snd (snd var_st') = lvar_st"
+  shows "var_st_differ_on var_st {Lc (length vi)} var_st'"
+  using assms
+  unfolding var_st_differ_on_def reifies_loc_def reifies_glob_def var_st_agree_def var_st_get_global_def
+            var_st_get_lvar_def var_st_get_local_def
+  apply (cases var_st)
+  apply (cases var_st')
+  apply (fastforce dest: set_local_access split: var.splits if_splits)
+  done
+
+lemma set_local_differ:
+  assumes "x1 < length (inst.globs i)"
+          "j < length (inst.globs i)"
+          "x1 \<noteq> j"
+          "(inst.globs i ! j) < length (s.globs s)"
+          "(inst.globs i ! x1) < length (s.globs s)"
+  shows "s.globs s ! (inst.globs i ! x1) =
+          s.globs
+            (s\<lparr>s.globs := s.globs s
+                    [(inst.globs i ! j) :=
+     (s.globs s ! (inst.globs i ! j))\<lparr>g_val := v\<rparr>]\<rparr>) !
+           (inst.globs i ! x1)"
+  using assms encapsulated_inst_globs
+  by auto
+
+lemma var_st_set_global_differ:
+  assumes "supdate_glob s i j v = s'"
+          "j < length (inst.globs i)"
+          "reifies_func (s.funcs s) (inst.funcs i) fs"
+          "reifies_glob (s.globs s) (inst.globs i) var_st"
+          "reifies_loc vs var_st"
+          "snd (snd var_st) = lvar_st"
+          "reifies_glob (s.globs s') (inst.globs i) var_st'"
+          "reifies_loc vs var_st'"
+          "snd (snd var_st') = lvar_st"
+  shows "var_st_differ_on var_st {Gl j} var_st'"
+  using assms
+  unfolding var_st_differ_on_def reifies_loc_def reifies_glob_def var_st_agree_def var_st_get_global_def
+            var_st_get_lvar_def var_st_get_local_def supdate_glob_def sglob_ind_def supdate_glob_s_def
+  apply (cases var_st)
+  apply (cases var_st')
+  apply (simp split: var.splits if_splits)
+  apply (metis encapsulated_inst_globs nth_list_update_neq s.ext_inject s.surjective s.update_convs(4))
   done
 
 lemma modifies_var_st:
@@ -471,7 +549,9 @@ next
     by (simp add: var_st_differ_on_def)
 next
   case (set_local vi j s v vs v' k)
-  then show ?case sorry
+  thus ?case
+    using var_st_eq_set_local_differ modset_set_local
+    by (metis modset_intros(1) var_st_differ_on_def)
 next
   case (tee_local v s vs i k s' vs' res)
   obtain v_c where v_c_def:"v = $C v_c"
@@ -487,7 +567,17 @@ next
     by (meson modset_intros(1,3) var_st_differ_on_def)
 next
   case (set_global s j v s' vs k)
-  then show ?case sorry
+  show ?case
+  proof (cases "j < length (inst.globs i)")
+    case True
+    show ?thesis
+      using var_st_set_global_differ[OF set_global(1) True set_global(2,3,4,5,6,7,8)] modset_set_global1
+      by (metis modset_intros(1,4) singletonD var_st_differ_on_def)
+  next
+    case False
+    thus ?thesis
+      by (meson modset_intros(1) modset_intros(5) not_le_imp_less var_st_differ_on_def)
+  qed
 next
   case (store_Some t v s j m n off mem' vs a k)
   thus ?case
@@ -582,7 +672,7 @@ next
        < length (s.globs s)"
     using seq_value(6)
     unfolding reifies_glob_def
-    by metis
+    by metis         
   hence "\<forall>gn<length (inst.globs i).
        inst.globs i ! gn
        < length (s.globs s'')"
@@ -733,8 +823,6 @@ next
       by (simp add: modset_intros(13) var_st_differ_on_def)
   qed
 qed (metis var_st_eq_intro1 var_st_differ_on_refl)+
-
-
 
 definition pred_option_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option \<Rightarrow> bool" where
   "pred_option_Some pred opt \<equiv> opt \<noteq> None \<and> pred_option pred opt"
@@ -1186,7 +1274,21 @@ next
     by blast
 next
   case (Seq \<Gamma> assms P es Q es' R)
-  then show ?case sorry
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ es @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
+
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf R"
+      sorry
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
 next
   case (Conseq \<Gamma> assms P' es Q' P Q)
   thus ?case
@@ -1317,7 +1419,7 @@ next
 next
 case (ConjE \<Gamma> assms specs P es Q)
   thus ?case
-    by (metis encapsulated_module.valid_triple_defs(5,6) singletonD)
+    by (metis valid_triple_defs(5,6) singletonD)
 qed
 
 end

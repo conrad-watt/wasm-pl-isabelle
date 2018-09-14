@@ -166,7 +166,9 @@ definition reifies_ret :: "nat option \<Rightarrow> 'a triple_context \<Rightarr
   "reifies_ret rn \<Gamma> \<equiv> rn = Option.map_option ass_stack_len (snd (snd \<Gamma>))"
 
 locale encapsulated_module =
-fixes i :: inst
+  fixes i :: inst
+  assumes encapsulated_inst_globs:"\<And> j k. \<lbrakk>j \<noteq> k; (j < length (inst.globs i)); (k < length (inst.globs i))\<rbrakk>
+                                    \<Longrightarrow> (inst.globs i)!j \<noteq> (inst.globs i)!k"
 begin
 
 definition ass_wf where

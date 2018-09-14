@@ -100,6 +100,22 @@ next
     by fastforce
 qed
 
+lemma set_local_access: 
+  assumes "j < Suc (length vi + length vs)"
+          "j \<noteq> length vi"
+  shows "(vi @ [v] @ vs) ! j = (vi @ [v'] @ vs) ! j"
+proof -
+  consider (1) "j < length vi" | (2) "j \<ge> length (vi @ [v])" "j \<ge> length (vi @ [v'])"
+    using assms(2)
+    by fastforce
+  thus ?thesis
+    using assms(1)
+    apply (cases)
+    apply (simp add: nth_append)
+    apply (simp add: nth_append)
+    done
+qed
+
 lemma lfilled_collapse1:
   assumes "Lfilled n lholed (vs@es) LI"
           "const_list vs"
