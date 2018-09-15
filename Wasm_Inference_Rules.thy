@@ -1255,7 +1255,7 @@ case (Size_mem \<Gamma> assms lv_l lv')
   then show ?case sorry
 next
   case (Function cl tn tm tls es fs St' H' assms H St ls r)
-  then show ?case sorry
+  thus ?case sorry
 next
   case (Asm P k Q assms \<Gamma>)
   {
@@ -1313,11 +1313,30 @@ next
           apply auto
           done
       qed
-      then obtain st'' h'' vcs'' where "ass_wf lvar_st ret \<Gamma> labs locs'' s'' hf st'' h'' vcs'' Q"
-        using res'_def(3) encapsulated_module_axioms local_assms(3)
+      then obtain vcs' where vcs'_def:"rvs = vcsf @ vcs'"
+         "\<exists>h' h'' st'.
+          ass_sat Q vcs' h'' st' \<and>
+          heap_disj h'' hf \<and>
+          h' = heap_merge h'' hf \<and>
+          reifies_s s'' i h' st'
+           fs \<and>
+          reifies_loc locs'' st' \<and>
+          snd (snd st') = lvar_st"
+        using res'_def(3) local_assms(1)
+        unfolding res_wf_def
+        by fastforce
+      then obtain st'' h'' where st''_def:"ass_wf lvar_st ret \<Gamma> labs locs'' s'' hf st'' h'' vcs' Q"
+        using res'_def(3) encapsulated_module_axioms local_assms(1,3)
         unfolding res_wf_def ass_wf_def
         by fastforce
+      have "\<Gamma> \<Turnstile>_n {Q} es' {R}"
+        using Seq(4) local_assms(1,2)
+        unfolding valid_triples_assms_n_def valid_triples_n_def
+        by simp
       thus ?thesis
+        using st''_def res'_def(2) local_assms(1)
+        unfolding valid_triple_n_def
+        by (metis append_assoc map_append vcs'_def(1))
     next
       case 2
       have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
