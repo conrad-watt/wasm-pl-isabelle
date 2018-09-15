@@ -672,8 +672,8 @@ qed
 lemma reduce_to_apps:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "($$*ves') @ [e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
   consider (1) "es = es@es'" | (2) "\<exists>ves. es = $$* ves"
     using consts_app_snoc[of es es' ves' e] assms(2)
@@ -695,32 +695,32 @@ qed
 lemma reduce_to_app0:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[]"]
   by auto
 
 lemma reduce_to_app1:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[$C v, e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[v]"]
   by fastforce
 
 lemma reduce_to_app2:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[$C v, $C v', e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[v,v']"]
   by fastforce
 
 lemma reduce_to_app3:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[$C v, $C v', $C v'', e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[v,v',v'']"]
   by fastforce
 
@@ -728,8 +728,8 @@ lemma reduce_to_apps_const_list:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "const_list ves'"
           "(ves') @ [e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
   consider (1) "es = es@es'" | (2) "\<exists>ves. es = $$* ves"
     using consts_app_snoc[of es es' _ e]  e_type_const_conv_vs[OF assms(2)]
@@ -752,8 +752,8 @@ lemma reduce_to_apps_const_list_v:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "const_list ves'"
           "(ves') @ [$C v, e] = es@es'"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
   obtain ves where "($$* ves) = (ves') @ [$C v]"
   proof -
@@ -790,23 +790,23 @@ lemma reduce_to_app_disj:
            ($$*ves') @ [e] = es@es' \<or>
            (const_list ves'' \<and> (ves'') @ [e] = es@es') \<or>
            (const_list ves''' \<and> (ves''') @ [$C v''', e] = es@es')"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms
   apply safe
-  using reduce_to_app0 apply blast
-  using reduce_to_app1 apply blast
-  using reduce_to_app2 apply blast
-  using reduce_to_app3 apply blast
-  using reduce_to_apps apply blast
-  using reduce_to_apps_const_list apply blast
-  using reduce_to_apps_const_list_v apply blast
+  using reduce_to_app0 apply (blast+)[2]
+  using reduce_to_app1 apply (blast+)[2]
+  using reduce_to_app2 apply (blast+)[2]
+  using reduce_to_app3 apply (blast+)[2]
+  using reduce_to_apps apply (blast+)[2]
+  using reduce_to_apps_const_list apply (blast+)[2]
+  using reduce_to_apps_const_list_v apply (blast+)[2]
   done
 
 lemma reduce_to_app:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "\<exists>s'' vs'' res'. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',res'))
-                         \<and> (\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res)))"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms assms
 proof (induction "(s,vs,es@es')" "k" "\<Gamma>" "(s',vs',res)" arbitrary: s vs es es' s' vs' res rule: reduce_to_n.induct)
   case (emp s vs k \<Gamma>)
@@ -851,42 +851,23 @@ next
                                           "es' = es_2"
                                           "es'' = es_1 @ es_2"
       by blast
-    obtain s'' vs'' res' where s''_def:"((s, vs, es_1) \<Down>k{\<Gamma>} (s'', vs'', res'))"
-                               "(\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'', vs'', ($$* rvs) @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue res)))"
+    obtain s'' vs'' res' where s''_def:"((s, vs, es_1) \<Down>k{\<Gamma>} (s'', vs'', RValue res'))"
+                               "(s'', vs'', ($$* res') @ es_2) \<Down>k{\<Gamma>} (s', vs', RValue res)"
       using const_value(1) const_value(2)[OF es_1_def(3)] es_1_def(3)
       by blast
+    hence "((s'', vs'', ($$* res') @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue res))"
+      using s''_def
+      by blast
+    hence "((s'', vs'', ($$* ves) @ ($$* res') @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue (ves@res)))"
+      by (simp add: reduce_to_n.const_value)
+    moreover
+    have "(s, vs, es) \<Down>k{\<Gamma>} (s'', vs'', RValue (ves@res'))"
+      using s''_def(1) es_1_def(1)
+      by (simp add: reduce_to_n.const_value)
+    ultimately
     show ?thesis
-    proof (cases res')
-      case (RValue x1)
-      hence "((s'', vs'', ($$* x1) @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue res))"
-        using s''_def
-        by blast
-      hence "((s'', vs'', ($$* ves) @ ($$* x1) @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue (ves@res)))"
-        by (simp add: reduce_to_n.const_value)
-      moreover
-      have "(s, vs, es) \<Down>k{\<Gamma>} (s'', vs'', RValue (ves@x1))"
-        using s''_def(1) es_1_def(1) RValue
-        by (simp add: reduce_to_n.const_value)
-      ultimately
-      show ?thesis
-        using es_1_def(2)
-        by fastforce
-    next
-      case (RBreak x21 x22)
-      thus ?thesis
-        using es_1_def(1) seq_nonvalue[OF _ s''_def(1), of "$$*ves" "[]"] is_const_list
-        by auto
-    next
-      case (RReturn x3)
-      thus ?thesis
-        using es_1_def(1) seq_nonvalue[OF _ s''_def(1), of "$$*ves" "[]"] is_const_list
-        by auto
-    next
-      case RTrap
-      thus ?thesis
-        using es_1_def(1) seq_nonvalue[OF _ s''_def(1), of "$$*ves" "[]"] is_const_list
-        by auto
-    qed
+      using es_1_def(2)
+      by fastforce
   qed
 next
   case (seq_value s vs es'' k \<Gamma> s'' vs'' res'' es''' s' vs' res es es')
@@ -907,37 +888,17 @@ next
     then obtain us where us_def:"es'' @ us = es"
                                 "es''' = us @ es'"
       by blast
-    obtain s''a vs''a res' where res'_def:
-         "(s'', vs'', ($$* res'') @ us) \<Down>k{\<Gamma>} (s''a, vs''a, res')"
-               "(\<forall>rvs. res' = RValue rvs \<longrightarrow>
-                ((s''a, vs''a, ($$* rvs) @ es') \<Down>k{\<Gamma>} (s', vs',res)))"
+    consider (1) "\<exists>s''a vs''a rvs. (((s'', vs'', ($$* res'') @ us) \<Down>k{\<Gamma>} (s''a, vs''a,  RValue rvs)) \<and>
+           ((s''a, vs''a, ($$* rvs) @ es') \<Down>k{\<Gamma>} (s', vs', res)))"
+      | (2) "((s'', vs'', ($$* res'') @ us) \<Down>k{\<Gamma>} (s', vs', res)) \<and> (\<nexists>rvs. res = RValue rvs)"
       using seq_value(4)[of "($$* res'') @ us" "es'"] seq_value.hyps(3) us_def(2)
       by auto
-    have us_to:"(s, vs, es'' @ us) \<Down>k{\<Gamma>} (s''a, vs''a, res')"
-      using reduce_to_n.seq_value[OF seq_value(1) res'_def(1)]
-      by -
-    show ?thesis
-    proof (cases res')
-      case (RValue x1)
-      thus ?thesis
-        using res'_def(2) us_def(1) us_to
-        by blast
-    next
-      case (RBreak x21 x22)
-      thus ?thesis
-        using us_def(1) us_to
-        by blast
-    next
-      case (RReturn x3)
-      thus ?thesis
-        using us_def(1) us_to
-        by blast
-    next
-      case RTrap
-      thus ?thesis
-        using us_def(1) us_to
-        by blast
-    qed
+    thus ?thesis
+      using reduce_to_n.seq_value seq_value.hyps(1) us_def(1)
+      apply cases
+       apply blast
+      apply blast
+      done
   qed
 next
   case (seq_nonvalue ves s vs es k \<Gamma> s' vs' res es' es'' es''')
@@ -948,7 +909,7 @@ next
   proof cases
     case 1
     thus ?thesis
-      by (metis consts_app_ex(1) e_type_const_conv_vs reduce_to_n_consts1 res_b.inject(1) seq_nonvalue.hyps(1) seq_nonvalue.prems)
+      by (metis consts_app_ex(1) e_type_const_conv_vs reduce_to_n_consts1 seq_nonvalue.hyps(1) seq_nonvalue.prems)
   next
     case 2
     then obtain us where us_def:"ves @ us = es''"
@@ -962,39 +923,34 @@ next
       case 11
       then obtain usa where usa_def:"es = us @ usa" "usa @ es' = es'''"
         by blast
-      obtain s'' vs'' res' where res'_def:"(s, vs, us) \<Down>k{\<Gamma>} (s'', vs'', res')"
-       "(\<forall>rvs. res' = RValue rvs \<longrightarrow> ((s'', vs'', ($$* rvs) @ usa) \<Down>k{\<Gamma>} (s', vs', res)))"
+      consider (1) "\<exists>s'' vs'' rvs. (((s, vs, us) \<Down>k{\<Gamma>} (s'', vs'', RValue rvs)) \<and> ((s'', vs'', ($$* rvs) @ usa) \<Down>k{\<Gamma>} (s', vs', res)))"
+        | (2) "(((s, vs, us) \<Down>k{\<Gamma>} (s', vs', res)) \<and> (\<nexists>rvs. res = RValue rvs))"
         using seq_nonvalue(3)[OF usa_def(1)] usa_def(1) seq_nonvalue(2)
         by blast
-      show ?thesis
-      proof (cases res')
-        case (RValue x1)
+      thus ?thesis
+      proof cases
+        case 1
+        then obtain s'' vs'' rvs where s''_def:"(s, vs, us) \<Down>k{\<Gamma>} (s'', vs'', RValue rvs)"
+                                               "(s'', vs'', ($$* rvs) @ usa) \<Down>k{\<Gamma>} (s', vs', res)"
+          by blast
         obtain vcs where vcs_def:"ves = $$* vcs"
           using e_type_const_conv_vs seq_nonvalue.hyps(1)
           by blast
-        hence "(s, vs, es'') \<Down>k{\<Gamma>} (s'', vs'', RValue (vcs@x1))"
-          using res'_def(1) us_def(1) RValue reduce_to_n.const_value
+        hence "(s, vs, es'') \<Down>k{\<Gamma>} (s'', vs'', RValue (vcs@rvs))"
+          using s''_def us_def(1) reduce_to_n.const_value
           by blast
         moreover
-        have "((s'', vs'', ($$* vcs@x1) @ es''') \<Down>k{\<Gamma>} (s', vs', res))"
-          using res'_def(2) RValue seq_nonvalue(4) reduce_to_n.seq_nonvalue[OF seq_nonvalue(1)] RValue usa_def(2)
+        have "((s'', vs'', ($$* vcs@rvs) @ es''') \<Down>k{\<Gamma>} (s', vs', res))"
+          using s''_def seq_nonvalue(4) reduce_to_n.seq_nonvalue[OF seq_nonvalue(1)] usa_def(2)
                 vcs_def
           by (metis append.assoc map_append)
         ultimately
         show ?thesis
           by fastforce
       next
-        case (RBreak x21 x22)
+        case 2
         thus ?thesis
-          by (metis append.right_neutral reduce_to_n.seq_nonvalue res'_def(1) res_b.distinct(1) seq_nonvalue.hyps(1) us_def(1))
-      next
-        case (RReturn x3)
-        thus ?thesis
-          by (metis append.right_neutral reduce_to_n.seq_nonvalue res'_def(1) res_b.distinct(3) seq_nonvalue.hyps(1) us_def(1))
-      next
-        case RTrap
-        thus ?thesis
-          by (metis res'_def(1) append.right_neutral reduce_to_n.seq_nonvalue res_b.distinct(5) seq_nonvalue.hyps(1) us_def(1))
+          by (metis append.right_neutral reduce_to_n.seq_nonvalue seq_nonvalue.hyps(1) us_def(1))
       qed
     next
       case 22

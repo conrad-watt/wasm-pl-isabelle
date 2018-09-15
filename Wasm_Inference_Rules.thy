@@ -1280,9 +1280,68 @@ next
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
                        "(s, locs, ($$* vcsf) @ ($$* vcs) @ es @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
-
-    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf R"
-      sorry
+    consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs, ret, i)} (s',locs',res)))"
+      | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
+      using reduce_to_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]
+            local_assms(4)
+      by fastforce
+    consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs, ret, i)} (s',locs',res)))"
+      | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
+      using reduce_to_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]
+            local_assms(4)
+      by fastforce
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf R"
+    proof (cases)
+      case 1
+      then obtain s'' locs'' res' rvs where res'_def:
+         "(s, locs, ($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret,i)} (s'', locs'', res')"
+         "(s'', locs'', ($$* rvs) @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
+         "res' = RValue rvs"
+        by blast
+      have "res_wf lvar_st \<Gamma> res' locs'' s'' hf vcsf Q"
+      proof -
+        have "\<Gamma> \<TTurnstile>_n {(P, es, Q)}"
+          using Seq(3) local_assms(1,2)
+          unfolding valid_triples_assms_n_def
+          by simp
+        thus ?thesis
+          using local_assms(1,3) res'_def(1)
+          unfolding valid_triple_defs
+          apply (cases h)
+          apply (cases st)
+          apply (cases hf)
+          apply auto
+          done
+      qed
+      then obtain st'' h'' vcs'' where "ass_wf lvar_st ret \<Gamma> labs locs'' s'' hf st'' h'' vcs'' Q"
+        using res'_def(3) encapsulated_module_axioms local_assms(3)
+        unfolding res_wf_def ass_wf_def
+        by fastforce
+      thus ?thesis
+    next
+      case 2
+      have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+      proof -
+        have "\<Gamma> \<TTurnstile>_n {(P, es, Q)}"
+          using Seq(3) local_assms(1,2)
+          unfolding valid_triples_assms_n_def
+          by simp
+        thus ?thesis
+          using local_assms(1,3) 2
+          unfolding valid_triple_defs
+          apply (cases h)
+          apply (cases st)
+          apply (cases hf)
+          apply auto
+          done
+      qed
+      thus ?thesis
+        using 2
+        unfolding res_wf_def
+        apply (cases res)
+           apply auto
+        done
+    qed
   }
   thus ?case
     unfolding valid_triple_defs
