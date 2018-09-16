@@ -84,6 +84,12 @@ definition stack_ass_ind_on :: "'a stack_ass \<Rightarrow> var set \<Rightarrow>
 definition heap_ass_ind_on :: "'a heap_ass \<Rightarrow> var set \<Rightarrow> bool" where
   "heap_ass_ind_on H vars \<equiv> \<forall>h v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> H h v_st = H h v_st'"
 
+definition stack_ass_ind_on_locals :: "'a stack_ass \<Rightarrow> bool" where
+  "stack_ass_ind_on_locals St \<equiv> stack_ass_ind_on St {lc. \<exists>n. lc = Lc n}"
+
+definition heap_ass_ind_on_locals :: "'a heap_ass \<Rightarrow> bool" where
+  "heap_ass_ind_on_locals H \<equiv> heap_ass_ind_on H {lc. \<exists>n. lc = Lc n}"
+
 context encapsulated_module
 begin
 
@@ -866,17 +872,23 @@ definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rig
   "is_lvar_len lv h v_st \<equiv> let (h_raw,l_opt) = h in
                             h_raw = Map.empty \<and> pred_option_Some (\<lambda>l. var_st_get_lvar v_st lv = Some (V_n l)) l_opt"
 
-definition is_lvar_lvar32_len :: "lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "is_lvar_lvar32_len lv lv32 h v_st \<equiv> let (h_raw,l_opt) = h in
-                                        h_raw = Map.empty 
-                                      \<and> pred_option_Some (\<lambda>l. var_st_get_lvar v_st lv = Some (V_n l) \<and> var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 (int_of_nat l)))) l_opt"
+definition is_i32_of_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_i32_of_lvar lv v v_st \<equiv> \<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> v = (ConstInt32 (int_of_nat vnat))"
 
 inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile> _" 60)
       and inf_triple :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> {_}_{_}" 60) where
   "\<Gamma>\<bullet>assms \<turnstile> {P} es {Q} \<equiv> \<Gamma>\<bullet>assms \<tturnstile> {(P,es,Q)}"
-| Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_lvar32 lv'] \<^sub>s|\<^sub>h is_lvar_lvar32_len lv_l lv'}"
+| Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
 (*| Grow_mem:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {[is_lvar32 lv'] \<^sub>s|\<^sub>h H}" *)
-| Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es; (fs,[],Some (St' \<^sub>s|\<^sub>h H'))\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h (\<lambda>h v_st. H h v_st \<and> (args_ass St (length tn) v_st) \<and> (zeros_ass (length tn) tls v_st))} [$Block ([] _> tm) es] {St' \<^sub>s|\<^sub>h H'}\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} [Callcl cl] {St' \<^sub>s|\<^sub>h H'}"
+| Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
+             length St = length tn;
+             length St' = length tm;
+             stack_ass_ind_on_locals St;
+             stack_ass_ind_on_locals St';
+             heap_ass_ind_on_locals H;
+             heap_ass_ind_on_locals H';
+             (fs,[],Some (St' \<^sub>s|\<^sub>h H'))\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h (\<lambda>h v_st. H h v_st \<and> (args_ass St (length tn) v_st) \<and> (zeros_ass (length tn) tls v_st))} [$Block ([] _> tm) es] {St' \<^sub>s|\<^sub>h H'}\<rbrakk>
+             \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} [Callcl cl] {St' \<^sub>s|\<^sub>h H'}"
 | Asm:"\<lbrakk>(P, [$Call k], Q) \<in> assms\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} [$Call k] {Q}"
 | Seq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; \<Gamma>\<bullet>assms \<turnstile> {Q} es' {R}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es@es' {R}"
 | Conseq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t) \<and> (ass_sat Q' vs h vs_t \<longrightarrow> ass_sat Q vs h vs_t)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
@@ -1246,17 +1258,216 @@ proof -
     by auto
 qed
 
+lemma ass_sat_ind_on_locals:
+  assumes "ass_sat (St \<^sub>s|\<^sub>h H) ves h (gs, locs, lvs)"
+          "stack_ass_ind_on_locals St"
+          "heap_ass_ind_on_locals H"
+  shows "ass_sat (St \<^sub>s|\<^sub>h H) ves h (gs, locs', lvs)"
+proof -
+  have "stack_ass_sat St ves (gs, locs', lvs)"
+    using assms(1,2)
+    unfolding ass_sat.simps stack_ass_ind_on_locals_def stack_ass_ind_on_def
+              var_st_differ_on_def var_st_agree_def var_st_get_global_def
+              var_st_get_local_def var_st_get_lvar_def
+    by (fastforce split: var.splits if_splits)
+  moreover
+  have  "H h (gs, locs', lvs)"
+  proof -
+    {
+    assume a1: "\<forall>a b aa ab ba ac ad bb. (\<forall>var. (\<forall>x1. (x1 < length aa \<longrightarrow> (x1 < length ac \<longrightarrow> var = Gl x1 \<longrightarrow> aa ! x1 = ac ! x1) \<and> (var = Gl x1 \<longrightarrow> x1 < length ac)) \<and> (var = Gl x1 \<longrightarrow> x1 < length aa \<or> \<not> x1 < length ac)) \<and> (\<forall>x3. var = Lv x3 \<longrightarrow> ba x3 = bb x3)) \<longrightarrow> H (a, b) (aa, ab, ba) = H (a, b) (ac, ad, bb)"
+      assume a2: "H h (gs, locs, lvs)"
+      have "\<And>p gs vs f vsa. \<not> H p (gs, vs, f) \<or> H p (gs, vsa, f)"
+        using a1 by fastforce
+    }
+    note a = this
+    show ?thesis
+      using assms(1,3)
+      unfolding ass_sat.simps heap_ass_ind_on_locals_def heap_ass_ind_on_def
+                var_st_differ_on_def var_st_agree_def var_st_get_global_def
+                var_st_get_local_def var_st_get_lvar_def
+      apply (simp split: var.splits if_splits)
+      apply (insert a)
+      apply blast
+      done
+  qed
+  ultimately
+  show ?thesis
+    by simp
+qed
+
+lemma stack_ass_to_heap_ass:
+  assumes "stack_ass_sat St ves (gs, (ves@n_zeros tls), lvs)"
+  shows "(args_ass St (length St) (gs, (ves@n_zeros tls), lvs)) \<and> (zeros_ass (length St) tls (gs, (ves@n_zeros tls), lvs))"
+  using assms
+  unfolding stack_ass_sat_def args_ass_def zeros_ass_def n_zeros_def list_all2_conv_all_nth
+            pred_option_Some_def pred_option_def var_st_get_local_def
+  apply (simp split: if_splits)
+  apply (metis add_diff_cancel_right' not_add_less2 nth_append nth_map)
+  done
+
+lemma ass_sat_local:
+  assumes "ass_sat (St \<^sub>s|\<^sub>h H) ves h (gs, locs, lvs)"
+          "stack_ass_ind_on_locals St"
+          "heap_ass_ind_on_locals H"
+        shows "(ass_sat ([] \<^sub>s|\<^sub>h (\<lambda>h vl_st. H h vl_st \<and> (args_ass St (length St) vl_st) \<and> (zeros_ass (length St) tls vl_st))) [] h (gs, (ves@n_zeros tls), lvs))"
+proof -
+  have 1:"stack_ass_sat St ves (gs, ves @ n_zeros tls, lvs)"
+         "H h (gs, ves @ n_zeros tls, lvs)"
+    using ass_sat_ind_on_locals[OF assms, of "ves @ n_zeros tls"]
+    by simp_all
+  show ?thesis
+    using stack_ass_to_heap_ass[OF 1(1)] 1(2)
+    by (simp add: stack_ass_sat_def)
+qed
+
 lemma
   assumes "\<Gamma>\<bullet>assms \<tturnstile> specs"
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
   using assms
 proof(induction arbitrary: n rule:inf_triples.induct)
-case (Size_mem \<Gamma> assms lv_l lv')
-  then show ?case sorry
+  case (Size_mem \<Gamma> assms lv_l)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h is_lvar_len lv_l)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Current_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l)" sorry
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
 next
-  case (Function cl tn tm tls es fs St' H' assms H St ls r)
-  thus ?case sorry
-next
+  case (Function cl tn tm tls es St St' H H' fs assms ls r)
+  {
+    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (St \<^sub>s|\<^sub>h H)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [Callcl cl]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+
+    obtain \<Gamma>l where \<Gamma>l_def:"\<Gamma>l = (fs, []::'a ass list, Some (St' \<^sub>s|\<^sub>h  H'))"
+      by blast
+    obtain gs where st_is:"st = (gs, locs, lvar_st)"
+      using local_assms(3)
+      unfolding ass_wf_def reifies_loc_def
+      by (metis prod.collapse)
+    hence "ass_sat ([] \<^sub>s|\<^sub>h (\<lambda>h vl_st. H h vl_st \<and> args_ass St (length St) vl_st \<and> zeros_ass (length St) tls vl_st)) [] h (gs, vcs @ n_zeros tls, lvar_st)"
+      using ass_sat_local[OF _ Function(4,6)] local_assms(3)
+      unfolding ass_wf_def
+      by fastforce
+    hence 3:"ass_wf lvar_st (Some (length tm)) (fs, [], Some (St' \<^sub>s|\<^sub>h  H')) [] (vcs @ n_zeros tls) s hf (gs, vcs @ n_zeros tls, lvar_st) h [] ([] \<^sub>s|\<^sub>h (\<lambda>h vl_st. H h vl_st \<and> args_ass St (length tn) vl_st \<and> zeros_ass (length tn) tls vl_st))"
+      using \<Gamma>l_def local_assms(1,3) Function(2,3) st_is
+      unfolding ass_wf_def reifies_loc_def reifies_lab_def reifies_ret_def reifies_s_def reifies_glob_def
+      by simp
+    moreover
+    have "length vcs = length tn"
+      using Function(2) local_assms(3) list_all2_lengthD
+      unfolding ass_wf_def
+      by (fastforce simp add: stack_ass_sat_def)
+    hence 1:"(s, locs, ($$* vcsf) @ [Local (length tm) i (vcs @ n_zeros tls) [$Block ([] _> tm) es]]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using callcl_native_imp_local[OF _ Function(1)] local_assms(4)
+      by blast
+    obtain lvs' lres lrvs where lres_def:
+      "(s, vcs @ n_zeros tls, [$Block ([] _> tm) es]) \<Down>n{([], Some (length tm), i)} (s', lvs', lres)"
+      "locs = locs'"
+      "((lres = RTrap \<and> res = RTrap) \<or>
+       ((lres = RValue lrvs \<or> lres = RReturn lrvs) \<and> res = RValue (vcsf @ lrvs)))"
+      using local_imp_body[OF 1]         
+      by blast
+    have 2:"(fs, [], Some (St' \<^sub>s|\<^sub>h H')) \<Turnstile>_n {([] \<^sub>s|\<^sub>h
+                             (\<lambda>h v_st.
+                                 H h v_st \<and>
+                                 args_ass St (length tn) v_st \<and>
+                                 zeros_ass (length tn) tls v_st))}
+                             [$Block ([] _> tm) es] {(St' \<^sub>s|\<^sub>h H')}"
+      using local_assms(2) Function(9)
+      unfolding valid_triples_assms_n_def
+      by (auto simp add: valid_triples_n_def)
+    have 4:"res_wf lvar_st (fs, [], Some (St' \<^sub>s|\<^sub>h H')) lres lvs' s' hf [] (St' \<^sub>s|\<^sub>h H')"
+      using res_wf_valid_triple_n_intro[OF 2 3, of "[]"] lres_def(1)
+      by simp
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (St' \<^sub>s|\<^sub>h H')"
+    proof (cases lres)
+      case (RValue x1)
+      obtain h' h'' gl' where h'_is:
+          "ass_sat (St' \<^sub>s|\<^sub>h H') lrvs h'' (gl', lvs', lvar_st)"
+          "heap_disj h'' hf"
+          "h' = heap_merge h'' hf"
+          "reifies_s s' i h' (gl', lvs', lvar_st) fs"
+          "reifies_loc lvs' (gl', lvs', lvar_st)"
+        using 4 lres_def(3)
+        unfolding res_wf_def reifies_loc_def
+        by fastforce
+      have "ass_sat (St' \<^sub>s|\<^sub>h H') lrvs h'' (gl', locs', lvar_st)"
+        using h'_is(1) ass_sat_ind_on_locals Function(5,7) lres_def(2)
+        by blast
+      moreover
+      have "reifies_s s' i h' (gl', locs', lvar_st) fs"
+        using h'_is(4)
+        unfolding reifies_s_def reifies_glob_def
+        by auto
+      moreover
+      have "reifies_loc locs' (gl', locs', lvar_st)"
+        unfolding reifies_loc_def
+        by simp
+      ultimately
+      show ?thesis
+        using lres_def(3) h'_is(2,3) RValue local_assms(1)
+        unfolding res_wf_def
+        apply simp
+        apply (metis prod.collapse)
+        done
+    next
+      case (RBreak x21 x22)
+      thus ?thesis
+        using lres_def(3) Function(4,6)
+        by blast
+    next
+      case (RReturn x3)
+      obtain h' h'' gl' where h'_is:
+          "ass_sat (St' \<^sub>s|\<^sub>h H') lrvs h'' (gl', lvs', lvar_st)"
+          "heap_disj h'' hf"
+          "h' = heap_merge h'' hf"
+          "reifies_s s' i h' (gl', lvs', lvar_st) fs"
+          "reifies_loc lvs' (gl', lvs', lvar_st)"
+        using 4 lres_def(3)
+        unfolding res_wf_def reifies_loc_def
+        by fastforce
+      have "ass_sat (St' \<^sub>s|\<^sub>h H') lrvs h'' (gl', locs', lvar_st)"
+        using h'_is(1) ass_sat_ind_on_locals Function(5,7) lres_def(2)
+        by blast
+      moreover
+      have "reifies_s s' i h' (gl', locs', lvar_st) fs"
+        using h'_is(4)
+        unfolding reifies_s_def reifies_glob_def
+        by auto
+      moreover
+      have "reifies_loc locs' (gl', locs', lvar_st)"
+        unfolding reifies_loc_def
+        by simp
+      ultimately
+      show ?thesis
+        using lres_def(3) h'_is(2,3) RReturn local_assms(1)
+        unfolding res_wf_def
+        apply simp
+        apply (metis prod.collapse)
+        done
+    next
+      case RTrap
+      thus ?thesis
+        using 4
+        unfolding res_wf_def
+        by simp
+    qed
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply auto
+    done
+  next
   case (Asm P k Q assms \<Gamma>)
   {
     assume "((fst \<Gamma>,[],None) \<TTurnstile>_n assms)"

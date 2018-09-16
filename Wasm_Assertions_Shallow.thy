@@ -269,6 +269,15 @@ lemma ex_ret:"\<exists>rs. ret = map_option ass_stack_len rs"
   using ex_lab
   by (metis not_Some_eq option.simps(8) option.simps(9))
 
+lemma res_wf_valid_triple_n_intro:
+  assumes "\<Gamma> \<Turnstile>_k {P}es{Q}"
+          "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
+          "((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs,ret,i)} (s',locs', res))"
+  shows "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+  using assms
+  unfolding valid_triple_n_def
+  by blast
+
 lemma extend_context_call:
   assumes "(fs,ls,rs) \<Turnstile>_n {P} [$Call j] {Q}"
   shows "(fs,ls',rs') \<Turnstile>_n {P} [$Call j] {Q}"

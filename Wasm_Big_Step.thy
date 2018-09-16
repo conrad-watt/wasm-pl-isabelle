@@ -343,6 +343,12 @@ next
     by meson
 qed auto
 
+lemma reduce_to_n_consts:
+  assumes "((s,vs,($$*ves)) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RValue ves"
+  using assms reduce_to_consts reduce_to_n_imp_reduce_to
+  by blast
+
 lemma call0: "((s,vs,($$*ves)@[$(Call j)]) \<Down>0{\<Gamma>} (s',vs',res)) \<Longrightarrow> False"
 proof (induction "(s,vs,($$*ves)@[$(Call j)])" "0::nat" \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
   case (const_value s vs es \<Gamma> s' vs' res ves ves')
@@ -472,6 +478,362 @@ qed (fastforce intro: reduce_to_n.intros)+
 lemma calln: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)) = ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>k{(ls,r,i)} (s',vs',res))"
   using calln_imp reduce_to_n.call
   by (metis is_const_list)
+
+lemma callcl_native_imp_local_length:
+  assumes "(s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
+          "cl = Func_native j (t1s _> t2s) ts es"
+  shows "length vcs \<ge> length t1s"
+  using assms
+proof (induction "(s,vs,($$* vcs) @ [Callcl cl])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k s' vs' res)
+  thus ?case
+    using inj_basic_econst
+    by simp
+next
+  case (const_value s vs es k s' vs' res ves)
+  thus ?case
+    using consts_app_snoc[OF const_value(3)] consts_cons_last[of _ _ ves] is_const_def
+    by fastforce
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(5)]
+    apply safe
+    apply blast
+    apply (metis reduce_to_consts reduce_to_n_imp_reduce_to res_b.inject(1))
+    done
+next
+  case (seq_nonvalue ves s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    apply safe
+    apply (meson reduce_to_n_emp)
+    apply (simp add: trans_le_add2)
+    apply (metis reduce_to_consts reduce_to_n_imp_reduce_to)
+    done
+qed auto
+
+lemma callcl_native_imp_local1:
+  assumes "(s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
+          "cl = Func_native j (t1s _> t2s) ts es"
+          "length vcs = n"
+          "length t1s = n"
+          "length t2s = m"
+          "(n_zeros ts = zs)"
+  shows "(s,vs,[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  using assms
+proof (induction "(s,vs,($$* vcs) @ [Callcl cl])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (callcl_native cl' j t1s t2s ts es ves' vcs n m zs s vs k s' vs' res)
+  thus ?case
+    using inj_basic_econst
+    by auto
+next
+  case (const_value s vs es k s' vs' res ves)
+  consider (1) "($$* ves) = ($$* vcs) @ [Callcl cl]" "es = []"
+         | (2) "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es = ($$* ves'') @ [Callcl cl] \<and> vcs = ves' @ ves'')"
+    using consts_app_snoc[OF const_value(3)] inj_basic_econst
+    by auto
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using consts_cons_last[OF 1(1)[symmetric]] is_const_def
+      by simp
+  next
+    case 2
+    then obtain ves' ves'' where ves'_def:"($$* ves) = $$* ves'"
+                                           "es = ($$* ves'') @ [Callcl cl]"
+                                           "vcs = ves' @ ves''"
+      by blast
+    show ?thesis
+    proof (cases "length ves'' \<ge> length t1s")
+      case True
+      hence "ves'' = vcs"
+        using ves'_def const_value(5,6)
+        by auto
+      thus ?thesis
+        using const_value(2)[OF ves'_def(2) const_value(4) _ const_value(6,7,8)] const_value(5)
+              ves'_def inj_basic_econst
+        by simp
+    next
+      case False
+      thus ?thesis
+        using callcl_native_imp_local_length const_value(1,4) ves'_def(2)
+        by fastforce
+    qed
+  qed
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(5)]
+    apply simp
+    apply (metis reduce_to_n_consts res_b.inject(1) self_append_conv)
+    done
+next
+  case (seq_nonvalue ves s vs es k s' vs' res es')
+  consider (1) "ves = ($$* vcs) @ [Callcl cl] \<and> es = [] \<and> es' = []"
+         | (2) "(\<exists>ves' ves''.
+                  (ves = $$* ves') \<and>
+                  es = ($$* ves'') @ [Callcl cl] \<and>
+                  es' = [] \<and> vcs = ves' @ ves'')"
+         | (3) "(\<exists>ves' ves'' ves'''.
+                    ves = ($$* ves') \<and>
+                    es = ($$* ves'') \<and>
+                    es' = ($$* ves''') @ [Callcl cl] \<and>
+                    vcs = ves' @ ves'' @ ves''')"
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    by blast
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using reduce_to_n_emp seq_nonvalue.hyps(2,4)
+      by blast
+  next
+    case 2
+    then obtain ves' ves'' where ves'_def:"ves = $$* ves'"
+                                           "es = ($$* ves'') @ [Callcl cl]"
+                                           "vcs = ves' @ ves''"
+      by blast
+    show ?thesis
+    proof (cases "length ves'' \<ge> length t1s")
+      case True
+      hence "ves'' = vcs"
+        using ves'_def seq_nonvalue(7,8)
+        by auto
+      thus ?thesis
+        using seq_nonvalue ves'_def inj_basic_econst
+        by simp
+    next
+      case False
+      thus ?thesis
+        using callcl_native_imp_local_length seq_nonvalue ves'_def(2)
+        by blast
+    qed
+  next
+    case 3
+    then obtain ves'' where "es = $$* ves''"
+      by blast
+    thus ?thesis
+      using reduce_to_n_consts[of s vs ves''] seq_nonvalue(2,4)
+      by blast
+  qed
+qed auto
+
+lemma reduce_to_local_nonvalue:
+  assumes "(s,vs,($$* vfs)@[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res)"
+          "\<nexists>rvs. res = RValue rvs"
+  shows "(s,vs,[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res)"
+  using assms
+proof (induction "(s,vs,($$* vfs)@[Local m j vcs es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vfs rule: reduce_to_n.induct)
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(5)]
+    apply simp
+    apply (metis append_Nil2 reduce_to_n_consts res_b.inject(1))
+    done
+next
+  case (seq_nonvalue ves s vs es k \<Gamma> s' vs' res es')
+  thus ?case
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    apply simp
+    apply (metis reduce_to_n_consts reduce_to_n_emp)
+    done
+next
+  case (local_trap s lls es k n j s' lls' vs \<Gamma>)
+  thus ?case
+    using reduce_to_n.local_trap
+    by auto
+qed auto
+
+lemma local_imp_body:
+  assumes "(s,vs,($$*vfs)@[Local m j lvs les]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  shows "\<exists>lvs' lres. ((s,lvs,les) \<Down>k{([],Some m,j)} (s',lvs',lres)) \<and> vs = vs' \<and>
+         ((lres = RTrap \<and> res = RTrap) \<or> (\<exists>rvs. ((lres = RValue rvs \<or> lres = RReturn rvs) \<and> res = RValue (vfs@rvs))))"
+  using assms
+proof (induction "(s,vs,($$*vfs)@[Local m j lvs les])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res les vfs rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves)
+  thus ?case
+    using consts_app_snoc[OF const_value(3)]
+    apply simp
+    apply safe
+    apply (metis consts_cons_last(2) e.simps(12) e_type_const_unwrap)
+    apply (metis (no_types, lifting) append.assoc inj_basic_econst map_injective)
+    done
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  consider (1) "es = ($$* vfs) @ [Local m j lvs les]" "es' = []"
+         | (2) "(\<exists>ves' ves''. es = ($$* ves') \<and> es' = ($$* ves'') @ [Local m j lvs les] \<and> vfs = ves' @ ves'')"
+    using consts_app_snoc[OF seq_value(5)]
+    by blast
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      by (metis append.right_neutral reduce_to_n_consts seq_value.hyps(2,3))
+  next
+    case 2
+    then obtain ves' ves'' where
+     "es = $$* ves'"
+     "es' = ($$* ves'') @ [Local m j lvs les] \<and> vfs = ves' @ ves''"
+      by blast
+    thus ?thesis
+      using seq_value(1,3,4,5)
+      by (metis (no_types, lifting) reduce_to_n_consts res_b.inject(1))
+  qed
+next
+  case (seq_nonvalue ves s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    apply simp
+    apply (metis reduce_to_consts reduce_to_n_emp reduce_to_n_imp_reduce_to)
+    done
+qed auto
+
+lemma callcl_native_imp_local:
+  assumes "(s,vs,($$* vfs) @ ($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
+          "cl = Func_native j (t1s _> t2s) ts es"
+          "length vcs = n"
+          "length t1s = n"
+          "length t2s = m"
+          "(n_zeros ts = zs)"
+  shows "(s,vs,($$* vfs)@[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  using assms
+proof (induction "(s,vs,($$* vfs) @ ($$* vcs) @ [Callcl cl])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vfs rule: reduce_to_n.induct)
+  case (callcl_native cl j t1s t2s ts es ves vcs' n m zs s vs k s' vs' res)
+   thus ?case
+   proof -
+     {
+       assume a1: "($$* vcs') = ($$* vfs) @ ($$* vcs) \<and> j = j \<and> t1s = t1s \<and> t2s = t2s \<and> ts = ts \<and> es = es"
+       assume "ves = ($$* vfs) @ ($$* vcs)"
+       assume a2: "length vcs = n"
+       assume a3: "length vcs' = n"
+       assume a4: "(s, vs, [Local m j (vcs' @ zs) [$Block ([] _> t2s) es]]) \<Down>k{(ls, r, i)} (s', vs', res)"
+       have "($$* vfs) = []"
+         using a3 a2 a1 by (metis (no_types) append_eq_append_conv length_map self_append_conv2)
+       then have "(s, vs, ($$* vfs) @ [Local m j (vcs @ zs) [$Block ([] _> t2s) es]]) \<Down>k{(ls, r, i)} (s', vs', res)"
+         using a4 a1 by (metis (no_types) reduce_to_n_consts reduce_to_n_consts1 res_b.inject(1) self_append_conv2)
+     }
+     thus ?thesis
+       using callcl_native
+       by auto
+   qed
+next
+  case (const_value s vs es' k s' vs' res ves vcs)
+  consider (1) "($$* ves) = ($$*vfs @ vcs) @ [Callcl cl]" "es' = []"
+         | (2) "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es' = ($$* ves'') @ [Callcl cl] \<and> vfs @ vcs = ves' @ ves'')"
+    using consts_app_snoc[of "$$*ves" es' "vfs@vcs" "Callcl cl"] inj_basic_econst const_value(3)
+    by auto
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using consts_cons_last[OF 1(1)[symmetric]] is_const_def
+      by simp
+  next
+    case 2
+    then obtain ves' ves'' where ves'_def:"($$* ves) = $$* ves'"
+                                           "es' = ($$* ves'') @ [Callcl cl]"
+                                           "vfs @ vcs = ves' @ ves''"
+      by blast
+    thus ?thesis
+    proof (cases "length ves'' \<ge> length t1s")
+      case True
+      then obtain ves_l ves_l' where ves_l_def:"ves'' = ves_l @ ves_l'"
+                                     "length ves_l' = length t1s"
+        by (metis (full_types) append_take_drop_id diff_diff_cancel length_drop)
+      hence 0:"ves_l' = vcs"
+        using ves'_def const_value(5)
+        by (metis append.assoc append_eq_append_conv const_value.prems(3))
+      hence 1:"(s, vs, ($$* ves_l) @ [Local m j (vcs @ zs) [$Block ([] _> t2s) es]]) \<Down>k{(ls, r,i)} (s', vs', RValue res)"
+        using const_value(2)[OF _ const_value(4) _ const_value(6,7,8), of ves_l ves_l'] ves_l_def
+        by (simp add: const_value.prems(3) ves'_def(2))
+      thus ?thesis
+        using reduce_to_n.const_value[OF 1] ves_l_def ves'_def 0 inj_basic_econst
+        by simp
+    next
+      case False
+      thus ?thesis
+        using callcl_native_imp_local_length const_value(1,4) ves'_def(2)
+        by fastforce
+    qed
+  qed
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[of es es' "vfs@vcs" "Callcl cl"]
+    apply simp
+    apply (metis reduce_to_n_consts res_b.inject(1) self_append_conv)
+    done
+next
+  case (seq_nonvalue ves s vs es'' k s' vs' res es')
+  consider (1) "ves = ($$* vfs @ vcs) @ [Callcl cl] \<and> es'' = [] \<and> es' = []"
+         | (2) "(\<exists>ves' ves''.
+                  ves = ($$* ves') \<and>
+                  es'' = ($$* ves'') @ [Callcl cl] \<and>
+                  es' = [] \<and> vfs @ vcs = ves' @ ves'')"
+         | (3) "(\<exists>ves' ves'' ves'''.
+                    ves = ($$* ves') \<and>
+                    es'' = ($$* ves'') \<and>
+                    es' = ($$* ves''') @ [Callcl cl] \<and>
+                    vfs @ vcs = ves' @ ves'' @ ves''')"
+    using consts_app_snoc3[of ves es'' es' "vfs@vcs" "Callcl cl"] seq_nonvalue(5)
+    by fastforce
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using reduce_to_n_emp seq_nonvalue.hyps(2,4)
+      by blast
+  next
+    case 2
+    then obtain ves' ves'' where ves'_def:"ves = $$* ves'"
+                                           "es'' = ($$* ves'') @ [Callcl cl]"
+                                           "es' = []"
+                                           "vfs @ vcs = ves' @ ves''"
+      by blast
+    show ?thesis
+    proof (cases "length ves'' \<ge> length t1s")
+      case True
+      then obtain ves_l ves_l' where ves_l_def:"ves'' = ves_l @ ves_l'"
+                                     "length ves_l' = length t1s"
+        by (metis (full_types) append_take_drop_id diff_diff_cancel length_drop)
+      hence 0:"ves_l' = vcs"
+        using ves'_def
+        by (metis append.assoc append_eq_append_conv seq_nonvalue.prems(2,3)) 
+      hence 1:"(s, vs, [Local m j (vcs @ zs) [$Block ([] _> t2s) es]]) \<Down>k{(ls, r,i)} (s', vs', res)"
+        using seq_nonvalue(3)[OF _ seq_nonvalue(6)_ seq_nonvalue(8,9,10)]
+              reduce_to_local_nonvalue[OF _ seq_nonvalue(4)]
+              seq_nonvalue.prems(2) ves'_def(2) ves_l_def(1)
+        by fastforce
+      show ?thesis
+        using reduce_to_n.seq_nonvalue[OF _ 1 seq_nonvalue(4), of "$$*vfs" "[]"] 0 ves'_def
+        by (simp add: is_const_list)
+    next
+      case False
+      thus ?thesis
+        using callcl_native_imp_local_length seq_nonvalue ves'_def(2)
+        by fastforce
+    qed
+  next
+    case 3
+    then obtain ves'' where "es'' = $$* ves''"
+      by blast
+    thus ?thesis
+      using reduce_to_n_consts[of s vs ves''] seq_nonvalue(2,4)
+      by blast
+  qed
+qed auto
+
+lemma callcl_native_equiv_local:
+  assumes "cl = Func_native j (t1s _> t2s) ts es"
+          "length vcs = n"
+          "length t1s = n"
+          "length t2s = m"
+          "(n_zeros ts = zs)"
+  shows "((s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)) = ((s,vs,[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  using callcl_native_imp_local1[OF _ assms] reduce_to_n.callcl_native[OF assms(1) _ assms(2,3,4,5)]
+  by blast
 
 lemma local_context:
   assumes "((s,vs,[Local n i vls es]) \<Down>k{\<Gamma>} (s',vs',res))"
