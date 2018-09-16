@@ -1332,7 +1332,39 @@ proof(induction arbitrary: n rule:inf_triples.induct)
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h is_lvar_len lv_l)::('a ass))"
                        "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Current_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
-    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l)" sorry
+    obtain n j m where s_is:"s = s'"
+                       "locs = locs'"
+                       "res =  RValue ((vcsf@vcs) @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)])"
+                       "smem_ind s i = Some j"
+                       "s.mem s ! j = m \<and> mem_size m = n"
+      using reduce_to_n_current_memory local_assms(4)
+      by (metis append_assoc map_append)
+    have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h is_lvar_len lv_l) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have 1:"vcs = []"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def)
+    have "snd h = Some n"
+      using ass_is(1,3) s_is(4,5)
+      by (auto simp add: stack_ass_sat_def is_lvar_len_def pred_option_Some_def reifies_s_def
+                         reifies_heap_def reifies_heap_length_def heap_merge_def smem_ind_def
+               split: prod.splits if_splits)
+    hence "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l) [ConstInt32 (Wasm_Base_Defs.int_of_nat n)] h st"
+      using ass_is(1)
+      by (auto simp add: stack_ass_sat_def is_lvar_len_def is_i32_of_lvar_def pred_option_Some_def)
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l)"
+      using ass_is s_is local_assms(1) 1
+      unfolding res_wf_def
+      apply simp
+      by (metis prod.collapse)
   }
   thus ?case
     unfolding valid_triple_defs

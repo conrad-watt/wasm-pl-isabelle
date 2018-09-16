@@ -405,6 +405,44 @@ next
   qed
 qed (fastforce intro: reduce_to_n.intros)+
 
+lemma reduce_to_n_current_memory:
+  assumes "((s,vs,($$*ves)@[$Current_memory]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  shows "\<exists>n j m. s = s' \<and> vs = vs' \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)]) \<and> smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> mem_size m = n"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$Current_memory])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves)
+  consider (1) "es = []" | (2) "\<exists>ves'. es = ($$* ves') @ [$Current_memory]"
+    using consts_app_snoc[OF const_value(3)]
+    by fastforce
+  thus ?case
+  proof (cases)
+    case 1
+    thus ?thesis
+      by (metis append.right_neutral b_e.distinct(703) const_value.hyps(3) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
+  next
+    case 2
+    thus ?thesis
+      using const_value
+      by (metis (no_types, lifting) append.assoc append1_eq_conv inj_basic_econst map_append map_injective res_b.inject(1))
+  qed
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(5)]
+    apply simp
+    apply (metis (no_types, lifting) append_Nil2 reduce_to_n_consts res_b.inject(1))
+    done
+next
+  case (seq_nonvalue ves s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc3[OF seq_nonvalue(5)]
+    apply simp
+    apply (metis reduce_to_n_consts reduce_to_n_emp)
+    done
+qed auto
+
+
+
 lemma calln_imp: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)) \<Longrightarrow> ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>k{(ls,r,i)} (s',vs',res))"
 proof (induction "(s,vs,($$*ves)@[$(Call j)])" "(Suc k)" "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es s' vs' res ves ves')
