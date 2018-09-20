@@ -1533,7 +1533,46 @@ theorem
   using assms
 proof(induction arbitrary: n rule:inf_triples.induct)
   case (Unop \<Gamma> assms lv t op)
-  then show ?case sorry
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Unop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v where vcs_is:"vcs = [v]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0)
+      done
+    hence 0:"ass_sat ([is_lvar_unop lv op] \<^sub>s|\<^sub>h emp) [app_unop op v] h st"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def is_lvar_unop_def list_all2_conv_all_nth is_lvar_def
+                    var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Unop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_unop lv op] \<^sub>s|\<^sub>h emp)"
+      using reduce_to_n_unop[OF 1] vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
 next
   case (Size_mem \<Gamma> assms lv_l)
   {
