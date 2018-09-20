@@ -1,5 +1,17 @@
 theory Wasm_Inference_Rules imports Wasm_Assertions_Shallow begin
 
+lemma lv_neq_update:
+  assumes "lv_arb \<noteq> lv"
+  shows "var_st_get_lvar (var_st_set_lvar st lv_arb v) lv = var_st_get_lvar st lv"
+  using assms
+  unfolding var_st_get_lvar_def var_st_set_lvar_def
+  by (simp split: prod.splits)
+
+lemma lv_eq_update:
+  shows "var_st_get_lvar (var_st_set_lvar st lv_arb v) lv_arb = Some v"
+  unfolding var_st_get_lvar_def var_st_set_lvar_def
+  by (simp split: prod.splits)
+
 definition var_st_differ_on :: "'a var_st \<Rightarrow> var set \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "var_st_differ_on v_st vars v_st' \<equiv> (\<forall>var. var \<notin> vars \<longrightarrow> var_st_agree v_st var v_st')"
 
@@ -671,12 +683,12 @@ next
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
   have 1:"reifies_func (s.funcs s'') (inst.funcs i) fs"
-    using reduce_to_funcs[OF seq_value(1)] seq_value(5)
+    using reduce_to_funcs[OF seq_value(1)] seq_value(7)
     by simp
   have "\<forall>gn<length (inst.globs i).
        inst.globs i ! gn
        < length (s.globs s)"
-    using seq_value(6)
+    using seq_value(8)
     unfolding reifies_glob_def
     by metis         
   hence "\<forall>gn<length (inst.globs i).
@@ -702,9 +714,13 @@ next
     using var_st_differ_on_app
     by blast
 next
-  case (seq_nonvalue ves s vs es k s' vs' res es')
+  case (seq_nonvalue1 ves s vs es k s' vs' res)
   thus ?case
-    by (simp add: var_st_differ_on_arb_app3)
+    by (metis self_append_conv var_st_differ_on_arb_app3)
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  thus ?case
+    by (metis append_self_conv2 var_st_differ_on_arb_app3)
 next
   case (label_trap s vs es k n s' vs' les)
   thus ?case
@@ -868,6 +884,9 @@ definition is_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow
 definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
+definition is_lvar32_minus_one :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar32_minus_one lv h v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p (ConstInt32 int32_minus_one))"
+
 definition emp :: "heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "emp h v_st \<equiv> h = (Map.empty,None)"
 
@@ -877,6 +896,9 @@ definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rig
 
 definition is_i32_of_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_i32_of_lvar lv v v_st \<equiv> \<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> v = (ConstInt32 (int_of_nat vnat))"
+
+definition lvar_is_i32_of_lvar :: "lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "lvar_is_i32_of_lvar lv32 lv h v_st \<equiv> \<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 (int_of_nat vnat)))"
 
 definition make_pages where
   "make_pages old_l l \<equiv> map_of (zip [(old_l* Ki64)..<(l* Ki64)] (replicate ((l* Ki64) - (old_l* Ki64)) (0::byte)))"
@@ -905,11 +927,20 @@ definition lvar32_zero_pages_from_lvar_len :: "lvar \<Rightarrow> lvar \<Rightar
                                                     var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 c)) \<and>
                                                     make_pages old_l l = h_raw"
 
+lemma lvar32_zero_pages_from_lvar_len_neq_update:
+  assumes "lvar32_zero_pages_from_lvar_len lv1 lv2 h st"
+          "lv_arb \<noteq> lv1"
+          "lv_arb \<noteq> lv2"
+  shows "lvar32_zero_pages_from_lvar_len lv1 lv2 h (var_st_set_lvar st lv_arb v)"
+  using assms
+  unfolding lvar32_zero_pages_from_lvar_len_def
+  by (simp add: lv_neq_update)
+
 inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile> _" 60)
       and inf_triple :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> {_}_{_}" 60) where
   "\<Gamma>\<bullet>assms \<turnstile> {P} es {Q} \<equiv> \<Gamma>\<bullet>assms \<tturnstile> {(P,es,Q)}"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
-| Grow_mem:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)}"
+| Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
              length St = length tn;
              length St' = length tm;
@@ -1012,7 +1043,9 @@ lemma lvar32_zero_pages_from_lvar_len_reifies:
           "((mem s)!j) = m"
           "mem_size m = n"
           "mem_grow m (nat_of_int c) = mem'"
-  shows "\<exists>h'. ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)) [ConstInt32 (int_of_nat n)] h' st
+          "lv_arb \<noteq> lv"
+          "lv_arb \<noteq> lv_l"
+  shows "\<exists>h'. ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))) [ConstInt32 (int_of_nat n)] h' st
               \<and> heap_disj h' hf
               \<and> reifies_s (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>) i (heap_merge h' hf) st (fst \<Gamma>)"
 proof -
@@ -1049,7 +1082,11 @@ proof -
     done
   have "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)) [ConstInt32 (int_of_nat n)] h' st"
     using 2 h'_def 0 1
-    by (simp add: stack_ass_sat_def is_i32_of_lvar_def)
+    by (simp add: is_lvar32_def stack_ass_sat_def is_i32_of_lvar_def)
+  hence "ass_sat ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st))) [ConstInt32 (int_of_nat n)] h' (var_st_set_lvar st lv_arb (V_p (ConstInt32 (int_of_nat n))))"
+    by (simp add: typeof_def lvar32_zero_pages_from_lvar_len_neq_update assms(8,9) lv_neq_update lv_eq_update stack_ass_sat_def is_i32_of_lvar_def is_lvar32_def lvar_is_i32_of_lvar_def)
+  hence "ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))) [ConstInt32 (int_of_nat n)] h' st"
+    by fastforce
   moreover
   have "reifies_heap_contents (mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)) (fst (heap_merge h' hf))"
        "reifies_heap_length (mem_grow m (Wasm_Base_Defs.nat_of_int c)) (snd (heap_merge h' hf))"
@@ -1530,7 +1567,8 @@ proof(induction arbitrary: n rule:inf_triples.induct)
       using ass_is s_is local_assms(1) 1
       unfolding res_wf_def
       apply simp
-      by (metis prod.collapse)
+      apply (metis prod.collapse)
+      done
   }
   thus ?case
     unfolding valid_triple_defs
@@ -1538,20 +1576,109 @@ proof(induction arbitrary: n rule:inf_triples.induct)
     apply auto
     done
 next
-  case (Grow_mem \<Gamma> assms lv lv_l)
+  case (Grow_mem lv_arb lv lv_l \<Gamma> assms)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res Q
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l)::('a ass))"
                        "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Grow_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
-
-    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h lvar32_zero_pages_from_lvar_len lv lv_l)"
-      using lvar32_zero_pages_from_lvar_len_reifies
-      sorry
+                       "(Q::'a ass) = (Ex_ass lv_arb
+                                     ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h
+                                      (\<lambda>h v_st.
+                                        lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and>
+                                        lvar_is_i32_of_lvar lv_arb lv_l h v_st \<or>
+                                        is_lvar32_minus_one lv_arb h v_st \<and>
+                                        is_lvar_len lv_l h v_st)))"
+    obtain k_g where vcs_is:"vcs = [ConstInt32 k_g]"
+      using local_assms(3)
+      unfolding ass_wf_def
+      apply (simp add: list_all2_conv_all_nth stack_ass_sat_def is_lvar32_def)
+      apply (metis length_Suc_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
+      done
+    hence 0:"(s, locs, ($$* vcsf) @ [$C ConstInt32 k_g,$Grow_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4)
+      by simp
+      have ass_wf_is:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l) [ConstInt32 k_g] h st"
+                     "heap_disj h hf"
+                     "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                     "reifies_loc locs st"
+                     "reifies_lab labs \<Gamma>"
+                     "reifies_ret ret \<Gamma>"
+                     "snd (snd st) = lvar_st"
+        using local_assms(3) vcs_is
+        unfolding ass_wf_def
+        by simp_all
+    consider
+      (1) "\<exists>n j m.
+           (locs = locs' \<and> smem_ind s i = Some j \<and> s.mem s ! j = m \<and> mem_size m = n) \<and>
+           (s = s' \<and> res = RValue (vcsf @ [ConstInt32 int32_minus_one]))"
+    | (2) "\<exists>n j m.
+           (locs = locs' \<and> smem_ind s i = Some j \<and> s.mem s ! j = m \<and> mem_size m = n) \<and>
+           (s' = s\<lparr>s.mem := s.mem s[j := mem_grow (s.mem s ! j)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr> \<and>
+            res = RValue (vcsf @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)]))"
+      using reduce_to_n_grow_memory[OF 0]
+      by fastforce
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+    proof cases
+      case 1
+      then obtain j_m n_m m_m where mes_iss:"locs = locs'"
+                                            "smem_ind s i = Some j_m"
+                                            "s.mem s ! j_m = m_m \<and> mem_size m_m = n_m"
+                                            "s = s'"
+                                            "res = RValue (vcsf @ [ConstInt32 int32_minus_one])"
+        by blast
+      have "ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st))))  [ConstInt32 int32_minus_one] h st"
+        using ass_wf_is(1) Grow_mem
+        unfolding local_assms(5)
+        apply (simp add: pred_option_Some_def stack_ass_sat_def var_st_set_lvar_def lvar32_zero_pages_from_lvar_len_def is_lvar_len_def
+                         typeof_def lvar_is_i32_of_lvar_def is_lvar32_minus_one_def var_st_get_lvar_def is_lvar32_def
+               split: prod.splits)
+        apply (metis (mono_tags) snd_conv)
+        done
+      hence "ass_sat Q [ConstInt32 int32_minus_one] h st"
+        using ass_wf_is(1) Grow_mem
+        unfolding local_assms(5)
+        by (simp add: pred_option_Some_def stack_ass_sat_def var_st_set_lvar_def lvar32_zero_pages_from_lvar_len_def is_lvar_len_def
+                         typeof_def lvar_is_i32_of_lvar_def is_lvar32_minus_one_def var_st_get_lvar_def is_lvar32_def
+               split: prod.splits)
+      thus ?thesis
+        using local_assms(1,3) mes_iss ass_wf_is
+        unfolding ass_wf_def res_wf_def
+        apply simp
+        apply (metis prod.collapse)
+        done
+    next
+      case 2
+      then obtain j_m n_m m_m where mem_iss:"locs = locs'"
+                                            "smem_ind s i = Some j_m"
+                                            "s.mem s ! j_m = m_m"
+                                            "mem_size m_m = n_m"
+                                            "s' = s\<lparr>s.mem := s.mem s[j_m := mem_grow (s.mem s ! j_m)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr>"
+                                            "res = RValue (vcsf @ [ConstInt32 (int_of_nat n_m)])"
+        by fastforce
+      have "\<exists>h''.
+                             ass_sat Q [ConstInt32 (Wasm_Base_Defs.int_of_nat n_m)] h'' st
+                             \<and> heap_disj h'' hf
+                             \<and> reifies_s s' i (heap_merge h'' hf) st fs
+                             \<and> reifies_loc locs' st
+                             \<and> snd (snd st) = lvar_st"
+        using lvar32_zero_pages_from_lvar_len_reifies[OF ass_wf_is(1,2,3) mem_iss(2,3,4) _ Grow_mem(1,2)]
+              mem_iss ass_wf_is local_assms(1,5)
+        by auto
+      thus ?thesis
+        using mem_iss(6) local_assms(1)
+        unfolding res_wf_def
+        apply simp
+        apply (metis eq_snd_iff)
+        done
+    qed
   }
   thus ?case
-    sorry
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
 next
   case (Function cl tn tm tls es St St' H H' fs assms ls r)
   {
