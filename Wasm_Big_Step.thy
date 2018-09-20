@@ -429,6 +429,66 @@ next
     by (metis consts_app_snoc reduce_to_n_consts)
 qed auto
 
+lemma no_reduce_to_n_unop:
+  assumes "(s, vs, [$Unop t op]) \<Down>k{\<Gamma>} (s', vs', res)"
+  shows False
+  using assms
+  apply (induction "(s,vs,[$Unop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res k rule: reduce_to_n.induct)
+  apply simp_all
+  apply (metis append_eq_Cons_conv b_e.simps(749) consts_cons(2) e.inject(1) e_type_const_unwrap)
+  apply (metis consts_app_snoc is_const_list list.simps(8) self_append_conv2)
+  apply (metis Nil_is_append_conv append_eq_Cons_conv)
+  apply (metis Nil_is_append_conv append_eq_Cons_conv reduce_to_n_emp)
+  done
+
+lemma reduce_to_n_unop:
+  assumes "((s,vs,($$*ves)@[$C v, $Unop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RValue (ves@[(app_unop op v)])"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$C v, $Unop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k \<Gamma> s' vs' res ves ves')
+  consider (1) "es = [$Unop t op] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C v, $Unop t op] \<and> ves' = ves @ ves'')"
+    using consts_app_snoc_1[OF const_value(4)] is_const_def
+    by fastforce
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using no_reduce_to_n_unop const_value(1)
+      by blast
+  next
+    case 2
+    then obtain ves'' where "es = ($$* ves'') @ [$C v, $Unop t op]"
+                            "ves'  = ves @ ves''"
+      by blast
+    thus ?thesis
+      using const_value(2)
+      by auto
+  qed
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_value(7)]
+    by (metis b_e.distinct(727) e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves' s vs es k \<Gamma> s' vs' res)
+  show ?case
+    using consts_app_snoc_1[of _ es "ves" "v" "$Unop t op"] e_type_const_conv_vs[of ves']
+          no_reduce_to_n_unop seq_nonvalue1
+    apply (simp add: is_const_def)
+    apply blast
+    done
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
+    by (simp add: is_const_def)
+next
+qed auto
+
 lemma no_reduce_to_n_grow_memory:
   assumes "(s, vs, [$Grow_memory]) \<Down>k{(ls, r, i)} (s', vs', res)"
   shows False
@@ -472,10 +532,7 @@ next
     by (meson b_e.distinct(715) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves s vs es k vs' res ves')
-  have "es \<noteq> [$Grow_memory]"
-    using seq_nonvalue1(2) no_reduce_to_n_grow_memory
-    by fastforce
-  thus ?case
+  show ?case
     using consts_app_snoc_1[of _ es "ves'" "ConstInt32 c" "$Grow_memory"] e_type_const_conv_vs[of ves]
           no_reduce_to_n_grow_memory seq_nonvalue1
     apply (simp add: is_const_def)

@@ -881,6 +881,9 @@ definition zeros_ass :: "nat \<Rightarrow> t list \<Rightarrow> 'a var_st \<Righ
 definition is_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v)"
 
+definition is_lvar_unop :: "lvar \<Rightarrow> unop \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_unop lv op v v_st \<equiv> \<exists>v'. var_st_get_lvar v_st lv = Some (V_p v') \<and> v = (app_unop op v')"
+
 definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
@@ -939,6 +942,7 @@ lemma lvar32_zero_pages_from_lvar_len_neq_update:
 inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile> _" 60)
       and inf_triple :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> {_}_{_}" 60) where
   "\<Gamma>\<bullet>assms \<turnstile> {P} es {Q} \<equiv> \<Gamma>\<bullet>assms \<tturnstile> {(P,es,Q)}"
+| Unop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Unop t op] {[is_lvar_unop lv op] \<^sub>s|\<^sub>h emp }"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
 | Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
@@ -1528,6 +1532,9 @@ theorem
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
   using assms
 proof(induction arbitrary: n rule:inf_triples.induct)
+  case (Unop \<Gamma> assms lv t op)
+  then show ?case sorry
+next
   case (Size_mem \<Gamma> assms lv_l)
   {
     fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
