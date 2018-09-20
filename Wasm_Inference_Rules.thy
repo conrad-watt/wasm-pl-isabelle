@@ -868,6 +868,9 @@ definition is_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow
 definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
+definition emp :: "heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "emp h v_st \<equiv> h = (Map.empty,None)"
+
 definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar_len lv h v_st \<equiv> let (h_raw,l_opt) = h in
                             h_raw = Map.empty \<and> pred_option_Some (\<lambda>l. var_st_get_lvar v_st lv = Some (V_n l)) l_opt"
@@ -875,11 +878,38 @@ definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rig
 definition is_i32_of_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_i32_of_lvar lv v v_st \<equiv> \<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> v = (ConstInt32 (int_of_nat vnat))"
 
+definition make_pages where
+  "make_pages old_l l \<equiv> map_of (zip [(old_l* Ki64)..<(l* Ki64)] (replicate ((l* Ki64) - (old_l* Ki64)) (0::byte)))"
+
+lemma make_pages_dom_ran:
+  assumes "h_raw = make_pages old_l l"
+  shows "dom h_raw = {n::nat. (old_l * Ki64) \<le> n \<and> n < (l * Ki64)}"
+        "\<forall>n \<in> ran h_raw. n = (0::byte)"
+proof -
+  have 1:"length [(old_l* Ki64)..<(l* Ki64)] = length (replicate ((l* Ki64) - (old_l* Ki64)) (0::byte))"
+    by auto
+  have 2:"distinct [(old_l* Ki64)..<(l* Ki64)]"
+    by auto
+  show "dom h_raw = {n::nat. (old_l * Ki64) \<le> n \<and> n < (l * Ki64)}"
+       "\<forall>n \<in> ran h_raw. n = (0::byte)"
+    using dom_map_of_zip[OF 1] ran_map_of_zip[OF 1 2] assms
+    unfolding make_pages_def
+    by auto
+qed
+
+definition lvar32_zero_pages_from_lvar_len :: "lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "lvar32_zero_pages_from_lvar_len lv32 lv h v_st \<equiv> let (h_raw,l_opt) = h in
+                                                \<exists>l old_l c. l_opt = Some l \<and>
+                                                    var_st_get_lvar v_st lv = Some (V_n old_l) \<and>
+                                                    (l = old_l + nat_of_int c) \<and>
+                                                    var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 c)) \<and>
+                                                    make_pages old_l l = h_raw"
+
 inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile> _" 60)
       and inf_triple :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> {_}_{_}" 60) where
   "\<Gamma>\<bullet>assms \<turnstile> {P} es {Q} \<equiv> \<Gamma>\<bullet>assms \<tturnstile> {(P,es,Q)}"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
-(*| Grow_mem:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {[is_lvar32 lv'] \<^sub>s|\<^sub>h H}" *)
+| Grow_mem:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
              length St = length tn;
              length St' = length tm;
@@ -891,12 +921,148 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
              \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} [Callcl cl] {St' \<^sub>s|\<^sub>h H'}"
 | Asm:"\<lbrakk>(P, [$Call k], Q) \<in> assms\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} [$Call k] {Q}"
 | Seq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; \<Gamma>\<bullet>assms \<turnstile> {Q} es' {R}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es@es' {R}"
-| Conseq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t) \<and> (ass_sat Q' vs h vs_t \<longrightarrow> ass_sat Q vs h vs_t)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
+| Conseq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h v_st. (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and> (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
 | Frame:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; heap_ass_ind_on Hf (modset fs es); (\<forall>ass \<in> (set ls). \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha); pred_option (\<lambda>ass. \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha) rs\<rbrakk> \<Longrightarrow> (fs,map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h (H \<^emph> Hf)} es {St' \<^sub>s|\<^sub>h (H' \<^emph> Hf)}"
 | Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
 | Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Callcl (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
 | ConjI:"\<forall>(P,es,Q) \<in> specs. (\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}) \<Longrightarrow> \<Gamma>\<bullet>assms \<tturnstile> specs"
 | ConjE:"\<lbrakk>\<Gamma>\<bullet>assms \<tturnstile> specs; (P,es,Q) \<in> specs\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
+
+lemma make_pages_reifies:
+  assumes "h  = (make_pages n (n+c),Some (n+c))"
+          "\<forall>ind \<in> (dom (fst hf)). ind < mem_length m"
+          "(snd hf) = None"
+          "mem_length m = n * Ki64"
+          "reifies_heap_contents m (fst (heap_merge (Map.empty, Some n) hf))"
+          "heap_disj h hf"
+  shows "reifies_heap_contents (mem_grow m c) (fst (heap_merge h hf))"
+        "reifies_heap_length (mem_grow m c) (snd (heap_merge h hf))"
+proof -
+  have 0:"mem_length (mem_grow m c) = (n+c) * Ki64"
+    using assms(4) mem_grow_length
+    by (metis distrib_right)
+  hence 1:"\<forall>ind\<in>dom (fst (heap_merge h hf)). ind < mem_length (mem_grow m c)"
+    using assms(1,2,4) make_pages_dom_ran[of _ n "n+c"]
+    unfolding heap_merge_def
+    apply (simp split: prod.splits)
+    apply safe
+    apply simp
+    apply (metis add_leD1 add_mult_distrib2 domI mult.commute not_le)
+    done
+  have 2:"snd (heap_merge h hf) = Some (n+c)"
+    using assms(1,3)
+    unfolding heap_merge_def
+    by (auto split: prod.splits)
+  have "\<forall>ind\<in>dom (fst (heap_merge h hf)).
+         fst (heap_merge h hf) ind =
+         Some (byte_at (mem_grow m c) ind)"
+  proof -
+    {
+      fix ind
+      assume local_assms:"ind\<in>dom (fst (heap_merge h hf))"
+      have "fst (heap_merge h hf) ind = Some (byte_at (mem_grow m c) ind)"
+      proof (cases "mem_length m > ind")
+        case True
+        hence"ind\<in>dom (fst hf)"
+          using local_assms heap_merge_dom[OF local_assms]
+                make_pages_dom_ran assms
+          unfolding reifies_heap_contents_def heap_merge_def
+          by (auto split: prod.splits)
+        thus ?thesis
+          using True assms(5,6)
+          unfolding heap_disj_def map_disj_def disjnt_def reifies_heap_contents_def
+          by (auto simp add: True mem_grow_byte_at_m heap_merge_def split: prod.splits)
+      next
+        case False
+        hence f1:"byte_at (mem_grow m c) ind = 0"
+          using mem_grow_byte_at_m_n 1 local_assms
+          by auto
+        have "ind\<in>dom (fst h)"
+             "\<forall>n \<in> ran (fst h). n = (0::byte)"
+          using local_assms heap_merge_dom[OF local_assms] False
+                make_pages_dom_ran assms
+          unfolding reifies_heap_contents_def heap_merge_def
+          by (auto split: prod.splits)
+        hence "(fst (heap_merge h hf)) ind = Some (0::byte)"
+          using heap_disj_merge_maps1[OF assms(6)]
+          unfolding dom_def ran_def
+          by auto
+        thus ?thesis
+          using f1
+          by auto
+      qed
+    }
+    thus ?thesis
+      by blast
+  qed
+  thus "reifies_heap_contents (mem_grow m c) (fst (heap_merge h hf))"
+    using 1
+    unfolding reifies_heap_contents_def
+    by blast
+  show "reifies_heap_length (mem_grow m c) (snd (heap_merge h hf))"
+    unfolding reifies_heap_length_def
+    by (simp add: 0 2)
+qed
+
+lemma lvar32_zero_pages_from_lvar_len_reifies:
+  assumes "ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l) [(ConstInt32 c)] h st"
+          "heap_disj h hf"
+          "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+          "smem_ind s i = Some j"
+          "((mem s)!j) = m"
+          "mem_size m = n"
+          "mem_grow m (nat_of_int c) = mem'"
+  shows "\<exists>h'. ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)) [ConstInt32 (int_of_nat n)] h' st
+              \<and> heap_disj h' hf
+              \<and> reifies_s (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>) i (heap_merge h' hf) st (fst \<Gamma>)"
+proof -
+  have 0:"\<exists>n'. var_st_get_lvar st lv_l = Some (V_n n') \<and> h = (Map.empty, Some n')"
+         "var_st_get_lvar st lv = Some (V_p (ConstInt32 c))"
+    using assms(1)
+    by (auto simp add: is_lvar32_def is_lvar_len_def stack_ass_sat_def pred_option_Some_def typeof_def)
+  hence 1:"h = (Map.empty, Some n)"
+          "snd hf = None"
+          "\<forall>ind \<in> (dom (fst h)). ind < mem_length m"
+          "\<forall>ind \<in> (dom (fst hf)). ind < mem_length m"
+          "mem_length m = n * Ki64"
+    using assms(2,3,4,5,6)
+    unfolding smem_ind_def reifies_s_def reifies_heap_def
+    by (auto simp add: Option.is_none_def option_disj_def reifies_heap_length_def Ki64_def
+                       reifies_heap_contents_def heap_merge_def heap_disj_def mem_size_def
+             split: prod.splits if_splits)
+  obtain h' where h'_def:"lvar32_zero_pages_from_lvar_len lv lv_l h' st"
+    using 0 1
+    unfolding lvar32_zero_pages_from_lvar_len_def
+    by auto
+  hence 2:"fst h' = (make_pages n (n+(nat_of_int c)))"
+          "snd h' = Some (n+(nat_of_int c))"
+          "h' = ((make_pages n (n+(nat_of_int c))), Some (n+(nat_of_int c)))"
+    using 0 1
+    unfolding lvar32_zero_pages_from_lvar_len_def
+    by auto
+  hence 3:"heap_disj h' hf"
+    using 1 make_pages_dom_ran[OF 2(1)] not_less[of _ "(n + Wasm_Base_Defs.nat_of_int c) * Ki64"]
+    unfolding Ki64_def lvar32_zero_pages_from_lvar_len_def mem_length_def heap_disj_def map_disj_def disjnt_def
+    apply (simp add: option_disj_def Option.is_none_def)
+    apply safe
+    apply (metis domIff not_less option.distinct(1))
+    done
+  have "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)) [ConstInt32 (int_of_nat n)] h' st"
+    using 2 h'_def 0 1
+    by (simp add: stack_ass_sat_def is_i32_of_lvar_def)
+  moreover
+  have "reifies_heap_contents (mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)) (fst (heap_merge h' hf))"
+       "reifies_heap_length (mem_grow m (Wasm_Base_Defs.nat_of_int c)) (snd (heap_merge h' hf))"
+    using make_pages_reifies[OF 2(3) 1(4,2,5) _ 3]
+    by (metis 1(1) assms(3,4,5) option.sel reifies_heap_def reifies_s_def smem_ind_def)+
+  ultimately
+  show ?thesis
+    using 3 assms(3)
+    unfolding reifies_s_def
+    apply simp
+    apply (metis assms(4,5,7) length_list_update nth_list_update_eq option.sel prod.collapse reifies_heap_def smem_ind_def)
+    done
+qed
 
 lemma valid_triple_n_call_equiv_callcl:
   assumes "j < length fs"
@@ -1320,7 +1486,7 @@ proof -
     by (simp add: stack_ass_sat_def)
 qed
 
-lemma
+theorem
   assumes "\<Gamma>\<bullet>assms \<tturnstile> specs"
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
   using assms
@@ -1354,8 +1520,8 @@ proof(induction arbitrary: n rule:inf_triples.induct)
       by (simp add: stack_ass_sat_def)
     have "snd h = Some n"
       using ass_is(1,3) s_is(4,5)
-      by (auto simp add: stack_ass_sat_def is_lvar_len_def pred_option_Some_def reifies_s_def
-                         reifies_heap_def reifies_heap_length_def heap_merge_def smem_ind_def
+      by (auto simp add: stack_ass_sat_def is_lvar_len_def pred_option_Some_def reifies_s_def Ki64_def
+                         reifies_heap_def reifies_heap_length_def heap_merge_def smem_ind_def mem_size_def
                split: prod.splits if_splits)
     hence "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l) [ConstInt32 (Wasm_Base_Defs.int_of_nat n)] h st"
       using ass_is(1)
@@ -1371,6 +1537,21 @@ proof(induction arbitrary: n rule:inf_triples.induct)
     apply (cases \<Gamma>)
     apply auto
     done
+next
+  case (Grow_mem \<Gamma> assms lv lv_l)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Grow_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h lvar32_zero_pages_from_lvar_len lv lv_l)"
+      using lvar32_zero_pages_from_lvar_len_reifies
+      sorry
+  }
+  thus ?case
+    sorry
 next
   case (Function cl tn tm tls es St St' H H' fs assms ls r)
   {

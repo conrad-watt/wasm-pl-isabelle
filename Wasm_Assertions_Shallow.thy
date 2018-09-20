@@ -92,6 +92,33 @@ lemma heap_disj_merge_assoc:
   unfolding heap_disj_def heap_merge_def map_disj_def disjnt_def
   by (auto split: option.splits prod.splits)
 
+lemma heap_merge_dom:
+  assumes "x \<in> dom (fst (heap_merge h1 h2))"
+  shows "x \<in> dom (fst h1) \<or> x \<in> dom (fst h2)"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
+  by (auto simp add: map_add_comm split: option.splits prod.splits)
+
+lemma heap_disj_merge_maps1:
+  assumes "heap_disj h1 h2"
+          "(fst h1) x = Some y"
+  shows "fst (heap_merge h1 h2) x = Some y"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
+  apply (simp add: map_add_dom_app_simps map_add_comm split: option.splits prod.splits)
+  apply (metis fst_conv map_add_comm map_add_find_right)
+  done
+
+lemma heap_disj_merge_maps2:
+  assumes "heap_disj h1 h2"
+          "(fst h2) x = Some y"
+  shows "fst (heap_merge h1 h2) x = Some y"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
+  apply (simp add: map_add_dom_app_simps map_add_comm split: option.splits prod.splits)
+  apply (metis fst_conv map_add_find_right)
+  done
+
 (* local variable reification *)
 definition reifies_loc :: "[v list, 'a var_st] \<Rightarrow> bool" where
   "reifies_loc locs st \<equiv> (fst (snd st)) = locs"
@@ -112,7 +139,7 @@ definition reifies_heap_contents :: "[mem, ((nat, byte) map)] \<Rightarrow> bool
      \<forall>ind \<in> (dom byte_m). ind < mem_length m \<and> byte_m(ind) = Some (byte_at m ind)"
 
 definition reifies_heap_length :: "[mem, nat option] \<Rightarrow> bool" where
-  "reifies_heap_length m l_opt \<equiv> pred_option (\<lambda>l. mem_size m = l) l_opt"
+  "reifies_heap_length m l_opt \<equiv> pred_option (\<lambda>l. mem_length m = (l * Ki64)) l_opt"
 
 definition reifies_heap :: "[mem list, nat option, heap] \<Rightarrow> bool" where
   "reifies_heap ms im_opt h \<equiv> let im = the im_opt in

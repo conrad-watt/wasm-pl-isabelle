@@ -15,6 +15,29 @@ lemma mem_grow_size:
   unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
   by (auto simp add: Ki64_def)
 
+lemma mem_grow_length:
+  assumes "mem_grow m n = m'"
+  shows "(mem_length m + (n * Ki64)) = mem_length m'"
+  using assms Abs_mem_inverse Abs_bytes_inverse
+        bytes_replicate.rep_eq mem_append.rep_eq mem_length.rep_eq
+  unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
+  by auto
+
+lemma mem_grow_byte_at_m:
+  assumes "k < mem_length m"
+  shows "byte_at (mem_grow m n) k = byte_at m k"
+  using assms
+  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq
+  by (simp add: nth_append)
+
+lemma mem_grow_byte_at_m_n:
+  assumes "k \<ge> mem_length m"
+          "k < mem_length (mem_grow m n)"
+  shows "byte_at (mem_grow m n) k = (0::byte)"
+  using assms
+  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate.rep_eq
+  by (simp add: nth_append)
+
 lemma load_size:
   "(load m n off l = None) = (mem_length m < (off + n + l))"
   unfolding load_def

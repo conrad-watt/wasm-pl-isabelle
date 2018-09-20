@@ -965,6 +965,72 @@ proof -
   qed
 qed
 
+lemma consts_app_snoc_1:
+  assumes "($$* ves) @ es = ($$* ves') @ [$C v, e]"
+          "\<not>is_const e"
+  shows "(es = [e] \<and> ves = ves' @ [v]) \<or>
+         (\<exists>ves''. es = ($$*ves'')@[$C v, e] \<and> ves' = ves@ves'')"
+proof -
+  consider (1) "($$* ves) = ($$* ves' @ [v]) @ [e]" "es = []"
+         | (2) "(\<exists>ves'a ves''. ($$* ves) = ($$* ves'a) \<and> es = ($$* ves'') @ [e] \<and> ves' @ [v] = ves'a @ ves'')"
+    using consts_app_snoc[of "$$*ves" es "ves'@[v]" e] assms
+    by fastforce
+  thus ?thesis
+  proof (cases)
+    case 1
+    thus ?thesis
+      using consts_cons_last(2)[of "($$* ves' @ [v])" e] assms(2)
+      by metis
+  next
+    case 2
+    then obtain ves'a ves'' where
+         "($$* ves) = ($$* ves'a)"
+         "es = ($$* ves'') @ [e]"
+         "ves' @ [v] = ves'a @ ves''"
+      by blast
+    thus ?thesis
+      apply (cases ves'' rule : rev_cases)
+       apply (auto simp add: inj_basic_econst)
+      done
+  qed
+qed
+
+lemma consts_app_snoc_1_const_list:
+  assumes "es @ es' = ($$* ves') @ [$C v, e]"
+          "\<not>is_const e"
+          "\<not> const_list es"
+  shows "es' = []"
+  using consts_app_snoc[of es es' "ves'@[v]" e] assms is_const_list
+  apply simp
+  apply safe
+   apply blast
+  apply blast
+  done
+
+lemma consts_app_snoc_2_const_list:
+  assumes "es @ es' = ($$* ves') @ [$C v1, $C v2, e]"
+          "\<not>is_const e"
+          "\<not> const_list es"
+  shows "es' = []"
+  using consts_app_snoc[of es es' "ves'@[v1,v2]" e] assms is_const_list
+  apply simp
+  apply safe
+   apply blast
+  apply blast
+  done
+
+lemma consts_app_snoc_3_const_list:
+  assumes "es @ es' = ($$* ves') @ [$C v1, $C v2, $C v3, e]"
+          "\<not>is_const e"
+          "\<not> const_list es"
+  shows "es' = []"
+  using consts_app_snoc[of es es' "ves'@[v1,v2,v3]" e] assms is_const_list
+  apply simp
+  apply safe
+   apply blast
+  apply blast
+  done
+
 lemma consts_app:
   assumes "es @ es' = ($$* ves) @ es''"
   shows "(\<exists>ves' ves''. es = ($$* ves') \<and> es' = ($$* ves'')@es'' \<and> ves = ves'@ves'') \<or>
