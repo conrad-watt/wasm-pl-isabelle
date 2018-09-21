@@ -995,6 +995,27 @@ proof -
   qed
 qed
 
+lemma consts_app_snoc_2:
+  assumes "($$* ves) @ es = ($$* ves') @ [$C v1, $C v2, e]"
+          "\<not>is_const e"
+  shows "(es = [e] \<and> ves = ves' @ [v1, v2]) \<or>
+         (es = [$C v2, e] \<and> ves = ves'@[v1]) \<or>
+         (\<exists>ves''. es = ($$*ves'')@[$C v1, $C v2, e] \<and> ves' = ves@ves'')"
+proof -
+  consider (1) "es = [e] \<and> ves = (ves' @ [v1]) @ [v2]"
+         | (2) ves'' where "(es = ($$* ves'') @ [$C v2, e] \<and>  ves' @ [v1] = ves @ ves'')"
+  using consts_app_snoc_1[of ves es "ves'@[v1]" v2 e] assms
+  by fastforce
+  thus ?thesis
+  proof cases
+    case 2
+    thus ?thesis
+      apply (cases ves'' rule: rev_cases)
+       apply simp_all
+      done
+  qed simp_all
+qed
+
 lemma consts_app_snoc_1_const_list:
   assumes "es @ es' = ($$* ves') @ [$C v, e]"
           "\<not>is_const e"

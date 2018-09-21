@@ -872,6 +872,9 @@ lemma reifies_ret_ass_frame_inv: "reifies_ret ret (fs, ls, map_option (ass_frame
   unfolding reifies_ret_def
   by (metis (no_types, lifting) ass_stack_len_ass_frame_inv not_Some_eq option.simps(8,9) prod.sel(2))
 
+definition emp :: "heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "emp h v_st \<equiv> h = (Map.empty,None)"
+
 definition args_ass :: "'a stack_ass \<Rightarrow> nat \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "args_ass St n v_st \<equiv> (length St = n \<and> (\<forall>i < n. pred_option_Some (\<lambda>v. (St!i) v v_st) (var_st_get_local v_st i)))"
 
@@ -881,17 +884,38 @@ definition zeros_ass :: "nat \<Rightarrow> t list \<Rightarrow> 'a var_st \<Righ
 definition is_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v)"
 
+definition is_lvar_t :: "lvar \<Rightarrow> t \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_t lv t v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> (typeof v = t)"
+
 definition is_lvar_unop :: "lvar \<Rightarrow> unop \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar_unop lv op v v_st \<equiv> \<exists>v'. var_st_get_lvar v_st lv = Some (V_p v') \<and> v = (app_unop op v')"
+
+definition is_lvar_testop :: "lvar \<Rightarrow> testop \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_testop lv op v v_st \<equiv> \<exists>v'. var_st_get_lvar v_st lv = Some (V_p v') \<and> v = (app_testop op v')"
+
+definition can_lvar_binop :: "lvar \<Rightarrow> lvar \<Rightarrow> binop \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "can_lvar_binop lv1 lv2 op h v_st \<equiv> (emp h v_st) \<and> (\<exists>v1 v2. var_st_get_lvar v_st lv1 = Some (V_p v1) \<and> var_st_get_lvar v_st lv2 = Some (V_p v2) \<and> (\<exists>v. Some v = (app_binop op v1 v2)))"
+
+definition is_lvar_binop :: "lvar \<Rightarrow> lvar \<Rightarrow> binop \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_binop lv1 lv2 op v v_st \<equiv> \<exists>v1 v2. var_st_get_lvar v_st lv1 = Some (V_p v1) \<and> var_st_get_lvar v_st lv2 = Some (V_p v2) \<and> Some v = (app_binop op v1 v2)"
+
+definition is_lvar_relop :: "lvar \<Rightarrow> lvar \<Rightarrow> relop \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_relop lv1 lv2 op v v_st \<equiv> \<exists>v1 v2. var_st_get_lvar v_st lv1 = Some (V_p v1) \<and> var_st_get_lvar v_st lv2 = Some (V_p v2) \<and> v = (app_relop op v1 v2)"
+
+definition can_lvar_convert :: "lvar \<Rightarrow> t \<Rightarrow> sx option \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "can_lvar_convert lv t sx h v_st \<equiv> (emp h v_st) \<and> (\<exists>v'. var_st_get_lvar v_st lv = Some (V_p v') \<and> (\<exists>v. Some v = cvt t sx v'))"
+
+definition is_lvar_convert :: "lvar \<Rightarrow> t \<Rightarrow> sx option \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_convert lv t sx v v_st \<equiv> \<exists>v'. var_st_get_lvar v_st lv = Some (V_p v') \<and> Some v = cvt t sx v'"
+
+definition is_lvar_reinterpret :: "lvar \<Rightarrow> t  \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar_reinterpret lv t v v_st \<equiv> \<exists>v'. var_st_get_lvar v_st lv = Some (V_p v') \<and> v = (wasm_deserialise (bits v') t)"
 
 definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
 definition is_lvar32_minus_one :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32_minus_one lv h v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p (ConstInt32 int32_minus_one))"
-
-definition emp :: "heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "emp h v_st \<equiv> h = (Map.empty,None)"
 
 definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar_len lv h v_st \<equiv> let (h_raw,l_opt) = h in
@@ -943,6 +967,11 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
       and inf_triple :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> {_}_{_}" 60) where
   "\<Gamma>\<bullet>assms \<turnstile> {P} es {Q} \<equiv> \<Gamma>\<bullet>assms \<tturnstile> {(P,es,Q)}"
 | Unop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Unop t op] {[is_lvar_unop lv op] \<^sub>s|\<^sub>h emp }"
+| Testop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Testop t op] {[is_lvar_testop lv op] \<^sub>s|\<^sub>h emp }"
+| Binop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h can_lvar_binop lv1 lv2 op } [$Binop t op] {[is_lvar_binop lv1 lv2 op] \<^sub>s|\<^sub>h emp }"
+| Relop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h emp } [$Relop t op] {[is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp }"
+| Convert:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar_t lv t1] \<^sub>s|\<^sub>h can_lvar_convert lv t2 sx } [$(Cvtop t2 Convert t1 sx)] {[is_lvar_convert lv t2 sx] \<^sub>s|\<^sub>h emp }"
+| Reinterpret:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar_t lv t1] \<^sub>s|\<^sub>h emp } [$(Cvtop t2 Reinterpret t1 None)] {[is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp }"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
 | Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
@@ -1563,6 +1592,235 @@ proof(induction arbitrary: n rule:inf_triples.induct)
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_unop lv op] \<^sub>s|\<^sub>h emp)"
       using reduce_to_n_unop[OF 1] vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Testop \<Gamma> assms lv t op)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Testop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v where vcs_is:"vcs = [v]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0)
+      done
+    hence 0:"ass_sat ([is_lvar_testop lv op] \<^sub>s|\<^sub>h emp) [app_testop op v] h st"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
+                    var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Testop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_testop lv op] \<^sub>s|\<^sub>h emp)"
+      using reduce_to_n_testop[OF 1] vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Binop \<Gamma> assms lv1 lv2 op t)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h can_lvar_binop lv1 lv2 op)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Binop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h can_lvar_binop lv1 lv2 op) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v1 v2 where vcs_is:"vcs = [v1, v2]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def is_lvar_def var_st_get_lvar_def)
+      apply (metis list_all2_Cons1 list_all2_Nil)
+      done
+    then obtain v where v_def:"app_binop op v1 v2 = Some v"
+                              "emp h st"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def is_lvar_def var_st_get_lvar_def can_lvar_binop_def)
+      apply fastforce
+      done
+    hence 0:"ass_sat ([is_lvar_binop lv1 lv2 op] \<^sub>s|\<^sub>h emp) [v] h st"
+      using ass_is(1) vcs_is
+      by (simp add: stack_ass_sat_def is_lvar_binop_def is_lvar_def var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $Binop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "s = s' \<and> locs = locs' \<and> res = RValue (vcsf @ [v])"
+      using reduce_to_n_binop[OF 1] v_def
+      by simp
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_binop lv1 lv2 op] \<^sub>s|\<^sub>h emp)"
+      using vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Relop \<Gamma> assms lv1 lv2 t op)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Relop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v1 v2 where vcs_is:"vcs = [v1, v2]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def is_lvar_def var_st_get_lvar_def)
+      apply (metis list_all2_Cons1 list_all2_Nil)
+      done
+    hence 0:"ass_sat ([is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp) [app_relop op v1 v2] h st"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def is_lvar_relop_def is_lvar_def var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $Relop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp)"
+      using reduce_to_n_relop[OF 1] vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Convert \<Gamma> assms lv t1 t2 sx)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar_t lv t1] \<^sub>s|\<^sub>h can_lvar_convert lv t2 sx)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Cvtop t2 Convert t1 sx]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar_t lv t1] \<^sub>s|\<^sub>h can_lvar_convert lv t2 sx) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v where vcs_is:"vcs = [v]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0)
+      done
+    then obtain v' where v_def:"cvt t2 sx v = Some v'"
+                              "emp h st"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def is_lvar_t_def var_st_get_lvar_def can_lvar_convert_def)
+      apply fastforce
+      done
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Convert t1 sx]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have 2:"s = s' \<and> locs = locs' \<and> types_agree t1 v \<and> res = RValue (vcsf @ [v'])"
+      using reduce_to_n_convert[OF 1] v_def
+      by fastforce
+    hence 0:"ass_sat ([is_lvar_convert lv t2 sx] \<^sub>s|\<^sub>h emp) [v'] h st"
+      using ass_is(1) vcs_is 1 v_def
+      by (simp add: stack_ass_sat_def is_lvar_convert_def list_all2_conv_all_nth is_lvar_t_def
+                    var_st_get_lvar_def types_agree_def)
+    have 3:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Convert t1 sx]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_convert lv t2 sx] \<^sub>s|\<^sub>h emp)"
+      using 2 vcs_is local_assms(1,4) 0 ass_is 1 v_def
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Reinterpret \<Gamma> assms lv t1 t2)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar_t lv t1] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Cvtop t2 Reinterpret t1 None]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar_t lv t1] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v where vcs_is:"vcs = [v]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0)
+      done
+    hence 0:"ass_sat ([is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp) [(wasm_deserialise (bits v) t2)] h st"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def is_lvar_reinterpret_def list_all2_conv_all_nth is_lvar_t_def
+                    var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Reinterpret t1 None]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp)"
+      using reduce_to_n_reinterpret[OF 1] vcs_is local_assms(1,4) 0 ass_is
       unfolding res_wf_def
       apply simp
       apply (metis prod.exhaust prod.sel(2))
