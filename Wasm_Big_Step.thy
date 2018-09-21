@@ -429,17 +429,47 @@ next
     by (metis consts_app_snoc reduce_to_n_consts)
 qed auto
 
+lemma reduce_to_nop:
+  assumes "((s,vs,($$*ves)@[$Nop]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RValue (ves)"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$Nop])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k \<Gamma> s' vs' res ves')
+  thus ?case
+    using consts_app_snoc[OF const_value(4)]
+    apply (cases "es = []")
+    apply simp_all
+    apply (metis (no_types) b_e.distinct(95) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
+    apply (metis inj_basic_econst map_injective)
+    done
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    by (metis consts_app_snoc is_const_list)
+next
+  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  thus ?case
+    by (metis consts_app_snoc)
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)]
+    apply simp
+    apply (metis reduce_to_n_consts)
+    done
+qed auto
+
 lemma no_reduce_to_n:
   assumes "(s, vs, [e]) \<Down>k{\<Gamma>} (s', vs', res)"
           "(e = $Unop t uop) \<or> (e = $Testop t testop) \<or> (e = $Binop t bop) \<or> (e = $Relop t rop) \<or>
-           e = $(Cvtop t2 cvtop t1 sx)"
+           (e = $(Cvtop t2 cvtop t1 sx)) \<or> e = $(Drop)"
   shows False
   using assms
 proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
     using e_type_const_unwrap consts_cons(2) append_eq_Cons_conv
-    by (metis b_e.distinct e.inject(1))
+    by (metis b_e.distinct(145) b_e.distinct(727) b_e.distinct(729) b_e.distinct(731) b_e.distinct(733) b_e.distinct(735) e.inject(1))
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
   thus ?case
@@ -499,6 +529,11 @@ lemma no_reduce_to_n_unop:
   shows False
   using assms no_reduce_to_n
   by blast
+
+lemma reduce_to_n_drop:
+  assumes "((s,vs,($$*ves)@[$C v, $Drop]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RValue (ves)"
+  using assms
 
 lemma reduce_to_n_unop:
   assumes "((s,vs,($$*ves)@[$C v, $Unop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
