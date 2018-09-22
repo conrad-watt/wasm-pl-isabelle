@@ -429,36 +429,6 @@ next
     by (metis consts_app_snoc reduce_to_n_consts)
 qed auto
 
-lemma reduce_to_nop:
-  assumes "((s,vs,($$*ves)@[$Nop]) \<Down>k{\<Gamma>} (s',vs',res))"
-  shows "s = s' \<and> vs = vs' \<and> res = RValue (ves)"
-  using assms
-proof (induction "(s,vs,($$*ves)@[$Nop])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
-  case (const_value s vs es k \<Gamma> s' vs' res ves')
-  thus ?case
-    using consts_app_snoc[OF const_value(4)]
-    apply (cases "es = []")
-    apply simp_all
-    apply (metis (no_types) b_e.distinct(95) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
-    apply (metis inj_basic_econst map_injective)
-    done
-next
-  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
-  thus ?case
-    by (metis consts_app_snoc is_const_list)
-next
-  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
-  thus ?case
-    by (metis consts_app_snoc)
-next
-  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
-  thus ?case
-    using consts_app_snoc[OF seq_nonvalue2(5)]
-    apply simp
-    apply (metis reduce_to_n_consts)
-    done
-qed auto
-
 lemma no_reduce_to_n:
   assumes "(s, vs, [e]) \<Down>k{\<Gamma>} (s', vs', res)"
           "(e = $Unop t uop) \<or> (e = $Testop t testop) \<or> (e = $Binop t bop) \<or> (e = $Relop t rop) \<or>
