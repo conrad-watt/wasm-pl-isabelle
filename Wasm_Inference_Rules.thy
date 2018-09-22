@@ -914,8 +914,25 @@ definition is_lvar_reinterpret :: "lvar \<Rightarrow> t  \<Rightarrow> v \<Right
 definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
+definition is_lvar32_zero :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar32_zero lv h v_st \<equiv> \<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_eq n 0"
+
+definition is_lvar32_n :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar32_n lv h v_st \<equiv> \<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_ne n 0"
+
 definition is_lvar32_minus_one :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32_minus_one lv h v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p (ConstInt32 int32_minus_one))"
+
+definition lvar_is_lvar_and_lvar32_0 :: "lvar \<Rightarrow> lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "lvar_is_lvar_and_lvar32_0 lv1 lv2 lv32 h v_st \<equiv> \<exists>v. var_st_get_lvar v_st lv1 = Some (V_p v) \<and>
+                                                       var_st_get_lvar v_st lv2 = Some (V_p v) \<and>
+                                                       is_lvar32_zero lv32 h v_st"
+
+definition lvar_is_lvar_and_lvar32_n :: "lvar \<Rightarrow> lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "lvar_is_lvar_and_lvar32_n lv1 lv2 lv32 h v_st \<equiv> \<exists>v. var_st_get_lvar v_st lv1 = Some (V_p v) \<and>
+                                                       var_st_get_lvar v_st lv2 = Some (V_p v) \<and>
+                                                       is_lvar32_n lv32 h v_st"
+
 
 definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar_len lv h v_st \<equiv> let (h_raw,l_opt) = h in
@@ -974,6 +991,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Reinterpret:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar_t lv t1] \<^sub>s|\<^sub>h emp } [$(Cvtop t2 Reinterpret t1 None)] {[is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp }"
 | Nop:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h emp } [$Nop] {[] \<^sub>s|\<^sub>h emp }"
 | Drop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Drop] {[] \<^sub>s|\<^sub>h emp }"
+| Select:"\<lbrakk>lv_arb \<noteq> lv1; lv_arb \<noteq> lv2; lv_arb \<noteq> lv32\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp } [$Select] {Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st)) }"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
 | Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
@@ -1910,6 +1928,83 @@ next
       apply simp
       apply (metis prod.collapse)
       done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Select lv_arb lv1 lv2 lv32 \<Gamma> assms)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Select]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v1 v2 c where vcs_is:"vcs = [v1, v2, ConstInt32 c]"
+                                "var_st_get_lvar st lv1 = Some (V_p v1)"
+                                "var_st_get_lvar st lv2 = Some (V_p v2)"
+                                "var_st_get_lvar st lv32 = Some (V_p (ConstInt32 c))"
+      using ass_is(1) typeof_i32
+      by (fastforce simp add: list_all2_Cons1 stack_ass_sat_def is_lvar_def is_lvar32_def var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $C ConstInt32 c, $Select]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have 2:"s = s'"
+           "locs = locs'"
+           "((res = RValue (vcsf @ [v2]) \<and> int_eq c 0) \<or> (res = RValue (vcsf @ [v1]) \<and> \<not> int_eq c 0))"
+      using reduce_to_n_select[OF 1]
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st)))"
+    proof (cases "(res = RValue (vcsf @ [v2]) \<and> int_eq c 0)")
+      case True
+      hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st))) [v2] h st"
+        using Select vcs_is
+        apply (cases st)
+        apply (simp add: stack_ass_sat_def lvar_is_lvar_and_lvar32_0_def var_st_get_lvar_def
+                         var_st_set_lvar_def is_lvar_def is_lvar32_zero_def
+                    split: prod.splits)
+        done
+      hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st))) [v2] h st"
+        by auto
+      thus ?thesis
+        using local_assms(1) True ass_is
+        unfolding res_wf_def
+        apply simp
+        apply (metis 2(1,2) prod.exhaust_sel)
+        done
+    next
+      case False
+      hence False2:"(res = RValue (vcsf @ [v1]) \<and> \<not> int_eq c 0)"
+        using 2(3)
+        by blast
+      hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st))) [v1] h st"
+        using Select vcs_is
+        apply (cases st)
+        apply (simp add: stack_ass_sat_def lvar_is_lvar_and_lvar32_n_def var_st_get_lvar_def
+                         var_st_set_lvar_def is_lvar_def is_lvar32_n_def
+                    split: prod.splits)
+        done
+      hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st))) [v1] h st"
+        by auto
+      thus ?thesis
+        using local_assms(1) False2 ass_is
+        unfolding res_wf_def
+        apply simp
+        apply (metis 2(1,2) prod.exhaust_sel)
+          done
+      qed
   }
   thus ?case
     unfolding valid_triple_defs
