@@ -972,6 +972,8 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Relop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h emp } [$Relop t op] {[is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp }"
 | Convert:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar_t lv t1] \<^sub>s|\<^sub>h can_lvar_convert lv t2 sx } [$(Cvtop t2 Convert t1 sx)] {[is_lvar_convert lv t2 sx] \<^sub>s|\<^sub>h emp }"
 | Reinterpret:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar_t lv t1] \<^sub>s|\<^sub>h emp } [$(Cvtop t2 Reinterpret t1 None)] {[is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp }"
+| Nop:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h emp } [$Nop] {[] \<^sub>s|\<^sub>h emp }"
+| Drop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Drop] {[] \<^sub>s|\<^sub>h emp }"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
 | Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
@@ -1824,6 +1826,89 @@ next
       unfolding res_wf_def
       apply simp
       apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Nop \<Gamma> assms)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Nop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have vcs_is:"vcs = []"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      done
+    hence 0:"ass_sat ([] \<^sub>s|\<^sub>h emp) [] h st"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
+                    var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$Nop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h emp)"
+      using reduce_to_n_nop[OF 1] vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Drop \<Gamma> assms lv)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Drop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v where vcs_is:"vcs = [v]"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0)
+      done
+    hence 0:"ass_sat ([] \<^sub>s|\<^sub>h emp) [] h st"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
+                    var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Drop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h emp)"
+      using reduce_to_n_drop[OF 1] vcs_is local_assms(1,4) 0 ass_is
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.collapse)
       done
   }
   thus ?case
