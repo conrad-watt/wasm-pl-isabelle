@@ -1219,7 +1219,7 @@ next
 qed auto
 
 
-lemma reduce_to_n_br:
+lemma reduce_to_n_br_n:
   assumes "(s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)"
           "ls!j = n"
           "length vcs = n"
