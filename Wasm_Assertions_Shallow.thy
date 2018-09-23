@@ -356,6 +356,18 @@ lemma res_wf_conseq:
   apply fastforce+
   done
 
+lemma stack_ass_sat_len:
+  assumes "ass_sat P vcs h st"
+  shows "length vcs = ass_stack_len P"
+  using assms
+proof (induction rule: ass_sat.induct)
+  case (1 St H ves h v_st)
+  thus ?case
+    apply (simp add: stack_ass_sat_def)
+    apply (metis list_all2_lengthD)
+    done
+qed auto
+
 lemma ass_wf_conseq:
   assumes "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
           "\<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t)"

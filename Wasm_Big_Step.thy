@@ -40,7 +40,7 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
 | if_false:"\<lbrakk>int_eq n 0; const_list ves; (s,vs,ves@[$(Block tf e2s)]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>{\<Gamma>} (s',vs',res)"
 | if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Block tf e1s)]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>length vcs = n; k < length ls; ls!k = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br k)])) \<Down>{(ls,r,i)} (s,vs,RBreak k vcs)"
+| br:"\<lbrakk>length vcs = n; ls!k = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br k)])) \<Down>{(ls,r,i)} (s,vs,RBreak k vcs)"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Br_if k)]) \<Down>{\<Gamma>} (s,vs,RValue [])"
 | br_if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Br k)]) \<Down>{\<Gamma>} (s',vs',res) \<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(Br_if k)]) \<Down>{\<Gamma>} (s',vs',res)"
@@ -138,7 +138,7 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
 | if_false:"\<lbrakk>int_eq n 0; const_list ves; (s,vs,ves@[$(Block tf e2s)]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>k{\<Gamma>} (s',vs',res)"
 | if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Block tf e1s)]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>k{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>length vcs = n; j < length ls; ls!j = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br j)])) \<Down>k{(ls,r,i)} (s,vs,RBreak j vcs)"
+| br:"\<lbrakk>length vcs = n; ls!j = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br j)])) \<Down>k{(ls,r,i)} (s,vs,RBreak j vcs)"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Br_if j)]) \<Down>k{\<Gamma>} (s,vs,RValue [])"
 | br_if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Br j)]) \<Down>k{\<Gamma>} (s',vs',res) \<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(Br_if j)]) \<Down>k{\<Gamma>} (s',vs',res)"
@@ -1099,6 +1099,172 @@ next
     apply fastforce
     done
 qed (fastforce intro: reduce_to_n.intros)+
+
+lemma reduce_to_n_br_imp_length:
+  assumes "(s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  shows "length vcs \<ge> (ls!j) \<and> (\<exists>vcs'. res = RBreak j vcs')"
+  using assms
+proof (induction "(s,vs,($$* vcs) @ [$Br j])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (br vcs' n j' s vs k)
+  hence "j = j'" "vcs = vcs'"
+    using inj_basic_econst
+    by auto
+  thus ?case
+    using br
+    by simp
+next
+  case (const_value s vs es k s' vs' res ves)
+  have "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es = ($$* ves'') @ [$Br j] \<and> vcs = ves' @ ves'')"
+    using const_value consts_app_snoc[OF const_value(4)]
+    by (metis b_e.simps(387) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
+  thus ?case
+    using const_value(2)
+    by (metis res_b.distinct(1))
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    by (metis consts_app_snoc is_const_list)
+next
+  case (seq_nonvalue1 ves s vs es k s' vs' res)
+  thus ?case
+    by (metis consts_app_snoc length_append trans_le_add2)
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  thus ?case
+    by (metis (no_types, lifting) consts_app_snoc reduce_to_consts reduce_to_n_imp_reduce_to)
+qed auto
+
+lemma reduce_to_n_br:
+  assumes "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)"
+          "length vcs = (ls!j)"
+  shows "((s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)) \<and> s = s' \<and> vs = vs' \<and> (res = RBreak j vcs)"
+  using assms
+proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
+  case (br vcs' n j' s vs k)
+  hence "vcs = vcs' \<and> j = j'"
+    using inj_basic_econst
+    apply simp
+    apply (metis append_eq_append_conv append_eq_append_conv2 length_map map_injective)
+    done
+  thus ?case
+    by (metis br(1,2) reduce_to_n.br)
+next
+  case (const_value s vs es k s' vs' res ves)
+  then consider
+      (1) "($$* ves) = ($$* vcsf @ vcs) @ [$Br j] \<and> es = []"
+    | (2) ves' ves'' where "ves = ves' \<and> es = ($$* ves'') @ [$Br j] \<and> vcsf @ vcs = ves' @ ves''"
+    using consts_app_snoc[of "($$* ves)" es "vcsf@vcs" "$Br j"] inj_basic_econst
+    by fastforce
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      by (metis b_e.distinct(365) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
+  next
+    case 2
+    show ?thesis
+    proof (cases "length ves'' \<ge> ls ! j")
+      case True
+      then obtain ves''_1  where "ves'' = ves''_1@vcs"
+        using const_value(5) 2
+        by (metis (no_types, lifting) append_eq_append_conv append_eq_append_conv_if le_antisym length_append pl_pl_rels)
+      hence 3:"es = ($$* ves''_1) @ ($$* vcs) @ [$Br j]"
+        using 2
+        by simp
+      show ?thesis
+        using const_value(2)[OF 3] const_value(5)
+        by simp
+    next
+      case False
+      thus ?thesis
+        using const_value
+        by (metis 2 reduce_to_n_br_imp_length)
+    qed
+  qed
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[of es es' "vcsf@vcs" "$Br j"]
+    apply simp
+    apply (metis is_const_list)
+    done
+next
+  case (seq_nonvalue1 ves s vs es k s' vs' res)
+  then obtain ves' ves'' where ves'_def:"ves = ($$* ves') \<and> es = ($$* ves'') @ [$Br j] \<and> vcsf @ vcs = ves' @ ves''"
+    using consts_app_snoc[of ves es "vcsf@vcs" "$Br j"]
+    by fastforce
+  show ?case
+  proof (cases "length ves'' \<ge> ls ! j")
+    case True
+    then obtain ves''_1  where "ves'' = ves''_1@vcs"
+      using seq_nonvalue1(8)
+      by (metis (no_types, lifting) append_eq_append_conv append_eq_append_conv_if le_antisym length_append pl_pl_rels ves'_def)
+    thus ?thesis
+      using ves'_def seq_nonvalue1
+      by (metis append_assoc map_append)
+  next
+    case False
+    thus ?thesis
+      using ves'_def seq_nonvalue1
+      by (metis reduce_to_n_br_imp_length)
+  qed
+
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc[of es es' "vcsf@vcs" "$Br j"]
+    apply simp
+    apply (metis reduce_to_n_consts)
+    done
+qed auto
+
+
+lemma reduce_to_n_br:
+  assumes "(s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)"
+          "ls!j = n"
+          "length vcs = n"
+  shows "res = RBreak j vcs"
+  using assms
+proof (induction "(s,vs,($$* vcs) @ [$Br j])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (br vcs n j s vs k)
+  thus ?case
+    using inj_basic_econst
+    by auto
+next
+  case (const_value s vs es k s' vs' res ves)
+  thus ?case
+    using consts_app_snoc[OF const_value(4)]
+    apply simp
+    apply safe
+    apply (metis b_e.simps(387) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
+    apply (metis le_add2 le_antisym length_append reduce_to_n_br_imp_length)
+    done
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(7)]
+    apply simp
+    apply (metis is_const_list)
+    done
+next
+  case (seq_nonvalue1 ves s vs es k s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue1(7)]
+    apply safe
+    apply simp_all
+    apply (metis add_le_same_cancel2 le_zero_eq length_0_conv reduce_to_n_br_imp_length)
+    apply (metis add_le_same_cancel2 le_zero_eq length_0_conv reduce_to_n_br_imp_length)
+    done
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)]
+    apply safe
+    apply simp_all
+    apply (metis reduce_to_n_consts)
+    apply (metis reduce_to_n_consts)
+    done
+qed auto
 
 lemma calln: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)) = ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>k{(ls,r,i)} (s',vs',res))"
   using calln_imp reduce_to_n.call
