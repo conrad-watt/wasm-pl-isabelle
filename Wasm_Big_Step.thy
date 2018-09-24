@@ -290,7 +290,7 @@ next
 next
   case (br_if_true n ves k \<Gamma>)
   thus ?case
-    using consts_cons_last2(3) e_type_const_unwrap
+    using consts_cons_last2(3) e_type_const_unwrap                                   
     by (metis b_e.distinct(403) e.inject(1))
 next
   case (br_table ks c ves \<Gamma> k)
@@ -432,14 +432,25 @@ qed auto
 lemma no_reduce_to_n:
   assumes "(s, vs, [e]) \<Down>k{\<Gamma>} (s', vs', res)"
           "(e = $Unop t uop) \<or> (e = $Testop t testop) \<or> (e = $Binop t bop) \<or> (e = $Relop t rop) \<or>
-           (e = $(Cvtop t2 cvtop t1 sx)) \<or> (e = $Drop) \<or> (e = $Select) \<or> (e = $Br_if j)"
+           (e = $(Cvtop t2 cvtop t1 sx)) \<or> (e = $Drop) \<or> (e = $Select) \<or> (e = $Br_if j) \<or> (e = $Br_table js j)"
   shows False
   using assms
 proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
-    using e_type_const_unwrap consts_cons(2) append_eq_Cons_conv
-    by (metis b_e.distinct(145) b_e.distinct(193) b_e.distinct(403) b_e.distinct(727) b_e.distinct(729) b_e.distinct(731) b_e.distinct(733) b_e.distinct(735) e.inject(1))
+    using e_type_const_unwrap consts_cons(2)
+    apply safe
+            apply simp_all
+    apply (metis append_eq_Cons_conv b_e.distinct(727) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.distinct(731) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.distinct(729) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.distinct(733) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.distinct(735) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.simps(167) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.distinct(193) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.simps(425) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.simps(461) e.inject(1))
+    done
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
   thus ?case
@@ -1973,6 +1984,67 @@ next
       using seq_nonvalue1(3)[OF 2(1)]
       apply simp
       apply (metis append_is_Nil_conv not_Cons_self2 reduce_to_n.seq_nonvalue1 seq_nonvalue1.hyps(1,4,5) ves_is)
+      done
+  qed
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
+    by (simp add: is_const_def)
+qed auto
+
+lemma reduce_to_n_br_table:
+  assumes "((s,vs,($$*vesf)@[$C ConstInt32 c, $Br_table js j]) \<Down>k{\<Gamma>} (s',vs',res))"
+          "(nat_of_int c) = c'"
+  shows "(((s,vs,($$*vesf)@[$Br (js!c')]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> c' < length js) \<or> (((s,vs,($$*vesf)@[$Br j]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> c' \<ge> length js)"
+  using assms
+proof (induction "(s,vs,($$*vesf)@[$C ConstInt32 c, $Br_table js j])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vesf rule: reduce_to_n.induct)
+  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  consider (1) "es = [$Br_table js j]" "ves = vesf @ [ConstInt32 c]"
+         | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $Br_table js j]" "vesf = ves @ ves''"
+    using consts_app_snoc_1[OF const_value(4)]
+    by (fastforce simp add: is_const_def)
+  thus ?case
+  proof (cases)
+    case 1
+    thus ?thesis
+      using no_reduce_to_n const_value(1)
+      by blast
+  next
+    case 2
+    thus ?thesis
+      using const_value(2)[OF 2(1)]
+      apply simp
+      apply (metis const_value.hyps(3) const_value.prems reduce_to_n.const_value)
+      done
+  qed
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    by (metis b_e.distinct(439) consts_app_snoc_1_const_list e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  obtain vcs where ves_is:"ves = $$*vcs"
+    using seq_nonvalue1(1)
+    by (metis e_type_const_conv_vs)
+  then consider (1) "es = [$Br_table js j] \<and> vcs = vesf @ [ConstInt32 c]"
+              | (2) ves'' where"es = ($$* ves'') @ [$C ConstInt32 c, $Br_table js j]" "vesf = vcs @ ves''"
+    using consts_app_snoc_1[of vcs es vesf "ConstInt32 c" "$Br_table js j"] seq_nonvalue1(7)
+    by (metis b_e.distinct(439) e.inject(1) e_type_const_unwrap)
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      by (metis no_reduce_to_n seq_nonvalue1.hyps(2))
+  next
+    case 2
+    thus ?thesis
+      using seq_nonvalue1(3)[OF 2(1)]
+      apply simp
+      apply (metis append_is_Nil_conv not_Cons_self2 reduce_to_n.seq_nonvalue1 seq_nonvalue1.hyps(1,4,5) seq_nonvalue1.prems ves_is)
       done
   qed
 next

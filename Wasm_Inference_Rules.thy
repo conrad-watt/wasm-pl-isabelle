@@ -920,6 +920,12 @@ definition is_lvar32_zero :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<
 definition is_lvar32_n :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32_n lv h v_st \<equiv> (emp h v_st) \<and> (\<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_ne n 0)"
 
+definition is_lvar32_eq_n :: "lvar \<Rightarrow> nat \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar32_eq_n lv n h v_st \<equiv> (emp h v_st) \<and> (\<exists>c. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 c)) \<and> nat_of_int c = n)"
+
+definition is_lvar32_geq_n :: "lvar \<Rightarrow> nat \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_lvar32_geq_n lv n h v_st \<equiv> (emp h v_st) \<and> (\<exists>c. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 c)) \<and> nat_of_int c \<ge> n)"
+
 definition is_lvar32_minus_one :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32_minus_one lv h v_st \<equiv> (emp h v_st) \<and> var_st_get_lvar v_st lv = Some (V_p (ConstInt32 int32_minus_one))"
 
@@ -993,6 +999,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Select:"\<lbrakk>lv_arb \<noteq> lv1; lv_arb \<noteq> lv2; lv_arb \<noteq> lv32\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp } [$Select] {Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st)) }"
 | Br:"\<lbrakk>j < length ls\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {ls ! j} [$Br j] { Q }"
 | Br_if:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$Br j] { Q }\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_if j] { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) }"
+| Br_table:"\<lbrakk>\<forall>jn < (length js). (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv jn) } [$Br (js!jn)] { Q }); (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js)) } [$Br j] { Q })\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_table js j] { Q }"
 | Return:"(fs,ls,Some r')\<bullet>assms \<turnstile> {r'} [$Return] { Q }"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
 | Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))}"
@@ -2141,6 +2148,95 @@ next
         apply simp
         apply (metis res_b.simps(5))
         done
+    qed
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Br_table js \<Gamma> assms St H lv Q j)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs ((St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br_table js j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat (St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have 1:"list_all2 (\<lambda>Si v. Si v st) (St @ [is_lvar32 lv]) vcs"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def var_st_get_lvar_def)
+    obtain vcs' v where vcs_is:"vcs = vcs'@[v]" "is_lvar32 lv v st"
+                               "stack_ass_sat St vcs' st"
+      using list_all2_snoc1[OF 1]
+      by (fastforce simp add: stack_ass_sat_def)
+    then obtain c where v_is:"v = ConstInt32 c"
+      using typeof_i32
+      by (fastforce simp add: is_lvar32_def var_st_get_lvar_def)
+    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $Br_table js j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by simp
+    obtain c' where c'_def:"nat_of_int c = c'"
+      by blast
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+    proof (cases "c' < (length js)")
+      case True
+      hence true_is:"(s, locs, ($$* vcsf @ vcs') @ [$Br (js !  c')]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+        using reduce_to_n_br_table[OF 2]
+        by (metis c'_def le_antisym less_imp_le_nat nat_neq_iff)
+      moreover
+      have "\<Gamma> \<Turnstile>_n {(St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv c'))} [$Br (js!c')] {Q}"
+        using Br_table(1) local_assms c'_def True
+        unfolding valid_triple_defs
+        by simp
+      moreover
+      have 0:"ass_sat (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv c')) vcs' h st"
+        using ass_is vcs_is True v_is
+        by (fastforce simp add: stack_ass_sat_def is_lvar_unop_def is_lvar_def is_lvar32_def heap_disj_def Option.is_none_def
+                         c'_def is_lvar32_eq_n_def option_disj_def map_disj_def disjnt_def var_st_get_lvar_def is_lvar32_zero_def sep_conj_def emp_def heap_merge_def
+                      split: option.splits prod.splits)
+      hence 1:"ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs' (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv c'))"
+        using local_assms(3)
+        unfolding ass_wf_def
+        by fastforce
+      ultimately
+      show ?thesis
+        unfolding valid_triple_defs
+        by (metis append.assoc map_append)
+    next
+      case False
+      hence false_is:"(s, locs, ($$* vcsf @ vcs') @ [$Br j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+        using reduce_to_n_br_table[OF 2]
+        by (metis c'_def)
+      moreover
+      have "\<Gamma> \<Turnstile>_n {(St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js)))} [$Br j] {Q}"
+        using Br_table(2) local_assms c'_def False
+        unfolding valid_triple_defs
+        by simp
+      moreover
+      have 0:"ass_sat (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js))) vcs' h st"
+        using ass_is vcs_is False v_is
+        by (fastforce simp add: stack_ass_sat_def is_lvar_unop_def is_lvar_def is_lvar32_def heap_disj_def Option.is_none_def
+                         c'_def is_lvar32_geq_n_def option_disj_def map_disj_def disjnt_def var_st_get_lvar_def is_lvar32_zero_def sep_conj_def emp_def heap_merge_def
+                      split: option.splits prod.splits)
+      hence 1:"ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs' (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js)))"
+        using local_assms(3)
+        unfolding ass_wf_def
+        by fastforce
+      ultimately
+      show ?thesis
+        unfolding valid_triple_defs
+        by (metis append.assoc map_append)
     qed
   }
   thus ?case
