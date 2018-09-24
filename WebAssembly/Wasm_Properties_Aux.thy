@@ -1814,4 +1814,15 @@ proof -
     using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_s_typing.intros(1)
     by fastforce+
 qed
+
+lemma list_all2_snoc1:
+  assumes "list_all2 f (es@[e]) es'"
+  shows "\<exists>es'1 e'. es' = es'1@[e'] \<and> list_all2 f es es'1 \<and> f e e'"
+proof -
+  have "list_all2 f (e#(rev es)) (rev es')"
+    using assms list_all2_rev
+    by (metis rev.simps(2) rev_rev_ident)
+  thus ?thesis
+    by (metis list_all2_Cons1 list_all2_rev1 rev_eq_Cons_iff)
+qed
 end

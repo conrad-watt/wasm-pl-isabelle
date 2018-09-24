@@ -915,24 +915,23 @@ definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarr
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
 definition is_lvar32_zero :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "is_lvar32_zero lv h v_st \<equiv> \<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_eq n 0"
+  "is_lvar32_zero lv h v_st \<equiv> (emp h v_st) \<and> (\<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_eq n 0)"
 
 definition is_lvar32_n :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "is_lvar32_n lv h v_st \<equiv> \<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_ne n 0"
+  "is_lvar32_n lv h v_st \<equiv> (emp h v_st) \<and> (\<exists>n. var_st_get_lvar v_st lv = Some (V_p (ConstInt32 n)) \<and> int_ne n 0)"
 
 definition is_lvar32_minus_one :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "is_lvar32_minus_one lv h v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p (ConstInt32 int32_minus_one))"
+  "is_lvar32_minus_one lv h v_st \<equiv> (emp h v_st) \<and> var_st_get_lvar v_st lv = Some (V_p (ConstInt32 int32_minus_one))"
 
 definition lvar_is_lvar_and_lvar32_0 :: "lvar \<Rightarrow> lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "lvar_is_lvar_and_lvar32_0 lv1 lv2 lv32 h v_st \<equiv> \<exists>v. var_st_get_lvar v_st lv1 = Some (V_p v) \<and>
-                                                       var_st_get_lvar v_st lv2 = Some (V_p v) \<and>
-                                                       is_lvar32_zero lv32 h v_st"
+  "lvar_is_lvar_and_lvar32_0 lv1 lv2 lv32 h v_st \<equiv> (emp h v_st) \<and> (\<exists>v. var_st_get_lvar v_st lv1 = Some (V_p v) \<and>
+                                                                       var_st_get_lvar v_st lv2 = Some (V_p v) \<and>
+                                                                       is_lvar32_zero lv32 h v_st)"
 
 definition lvar_is_lvar_and_lvar32_n :: "lvar \<Rightarrow> lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "lvar_is_lvar_and_lvar32_n lv1 lv2 lv32 h v_st \<equiv> \<exists>v. var_st_get_lvar v_st lv1 = Some (V_p v) \<and>
-                                                       var_st_get_lvar v_st lv2 = Some (V_p v) \<and>
-                                                       is_lvar32_n lv32 h v_st"
-
+  "lvar_is_lvar_and_lvar32_n lv1 lv2 lv32 h v_st \<equiv> (emp h v_st) \<and> (\<exists>v. var_st_get_lvar v_st lv1 = Some (V_p v) \<and>
+                                                                         var_st_get_lvar v_st lv2 = Some (V_p v) \<and>
+                                                                         is_lvar32_n lv32 h v_st)"
 
 definition is_lvar_len :: "lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar_len lv h v_st \<equiv> let (h_raw,l_opt) = h in
@@ -942,7 +941,7 @@ definition is_i32_of_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rig
   "is_i32_of_lvar lv v v_st \<equiv> \<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> v = (ConstInt32 (int_of_nat vnat))"
 
 definition lvar_is_i32_of_lvar :: "lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
-  "lvar_is_i32_of_lvar lv32 lv h v_st \<equiv> \<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 (int_of_nat vnat)))"
+  "lvar_is_i32_of_lvar lv32 lv h v_st \<equiv> (emp h v_st) \<and> (\<exists>vnat. var_st_get_lvar v_st lv = Some (V_n vnat) \<and> var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 (int_of_nat vnat))))"
 
 definition make_pages where
   "make_pages old_l l \<equiv> map_of (zip [(old_l* Ki64)..<(l* Ki64)] (replicate ((l* Ki64) - (old_l* Ki64)) (0::byte)))"
@@ -993,8 +992,10 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Drop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Drop] {[] \<^sub>s|\<^sub>h emp }"
 | Select:"\<lbrakk>lv_arb \<noteq> lv1; lv_arb \<noteq> lv2; lv_arb \<noteq> lv32\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp } [$Select] {Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st)) }"
 | Br:"\<lbrakk>j < length ls\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {ls ! j} [$Br j] { Q }"
+| Br_if:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$Br j] { Q }\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_if j] { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) }"
+| Return:"(fs,ls,Some r')\<bullet>assms \<turnstile> {r'} [$Return] { Q }"
 | Size_mem:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Current_memory] {[is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l}"
-| Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))}"
+| Grow_mem:"\<lbrakk>lv_arb \<noteq> lv; lv_arb \<noteq> lv_l\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l} [$Grow_memory] {Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))}"
 | Function:"\<lbrakk>cl = Func_native i (tn _> tm) tls es;
              length St = length tn;
              length St' = length tm;
@@ -1099,7 +1100,7 @@ lemma lvar32_zero_pages_from_lvar_len_reifies:
           "mem_grow m (nat_of_int c) = mem'"
           "lv_arb \<noteq> lv"
           "lv_arb \<noteq> lv_l"
-  shows "\<exists>h'. ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))) [ConstInt32 (int_of_nat n)] h' st
+  shows "\<exists>h'. ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))) [ConstInt32 (int_of_nat n)] h' st
               \<and> heap_disj h' hf
               \<and> reifies_s (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>) i (heap_merge h' hf) st (fst \<Gamma>)"
 proof -
@@ -1137,9 +1138,12 @@ proof -
   have "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)) [ConstInt32 (int_of_nat n)] h' st"
     using 2 h'_def 0 1
     by (simp add: is_lvar32_def stack_ass_sat_def is_i32_of_lvar_def)
-  hence "ass_sat ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st))) [ConstInt32 (int_of_nat n)] h' (var_st_set_lvar st lv_arb (V_p (ConstInt32 (int_of_nat n))))"
-    by (simp add: typeof_def lvar32_zero_pages_from_lvar_len_neq_update assms(8,9) lv_neq_update lv_eq_update stack_ass_sat_def is_i32_of_lvar_def is_lvar32_def lvar_is_i32_of_lvar_def)
-  hence "ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. (lvar32_zero_pages_from_lvar_len lv lv_l h v_st \<and> lvar_is_i32_of_lvar lv_arb lv_l h v_st) \<or> (is_lvar32_minus_one lv_arb h v_st \<and> is_lvar_len lv_l h v_st)))) [ConstInt32 (int_of_nat n)] h' st"
+  hence "ass_sat ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st))) [ConstInt32 (int_of_nat n)] h' (var_st_set_lvar st lv_arb (V_p (ConstInt32 (int_of_nat n))))"
+    by (auto simp add: typeof_def lvar32_zero_pages_from_lvar_len_neq_update assms(8,9) lv_neq_update lv_eq_update stack_ass_sat_def is_i32_of_lvar_def
+                       is_lvar32_def lvar_is_i32_of_lvar_def sep_conj_def lvar32_zero_pages_from_lvar_len_def heap_disj_def map_disj_def disjnt_def
+                       option_disj_def emp_def heap_merge_def
+             split: prod.splits)
+  hence "ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))) [ConstInt32 (int_of_nat n)] h' st"
     by fastforce
   moreover
   have "reifies_heap_contents (mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)) (fst (heap_merge h' hf))"
@@ -1151,7 +1155,8 @@ proof -
     using 3 assms(3)
     unfolding reifies_s_def
     apply simp
-    apply (metis assms(4,5,7) length_list_update nth_list_update_eq option.sel prod.collapse reifies_heap_def smem_ind_def)
+    apply (metis assms(4,5,7) length_list_update nth_list_update_eq option.sel prod.exhaust_sel
+                 reifies_heap_def smem_ind_def)
     done
 qed
 
@@ -1953,6 +1958,9 @@ next
       using local_assms(3)
       unfolding ass_wf_def
       by blast+
+    have emp_h:"emp h st"
+      using ass_is(1)
+      by fastforce
     obtain v1 v2 c where vcs_is:"vcs = [v1, v2, ConstInt32 c]"
                                 "var_st_get_lvar st lv1 = Some (V_p v1)"
                                 "var_st_get_lvar st lv2 = Some (V_p v2)"
@@ -1971,10 +1979,10 @@ next
     proof (cases "(res = RValue (vcsf @ [v2]) \<and> int_eq c 0)")
       case True
       hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st))) [v2] h st"
-        using Select vcs_is
+        using Select vcs_is emp_h
         apply (cases st)
         apply (simp add: stack_ass_sat_def lvar_is_lvar_and_lvar32_0_def var_st_get_lvar_def
-                         var_st_set_lvar_def is_lvar_def is_lvar32_zero_def
+                         var_st_set_lvar_def is_lvar_def is_lvar32_zero_def emp_def
                     split: prod.splits)
         done
       hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st))) [v2] h st"
@@ -1991,10 +1999,10 @@ next
         using 2(3)
         by blast
       hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st))) [v1] h st"
-        using Select vcs_is
+        using Select vcs_is emp_h
         apply (cases st)
         apply (simp add: stack_ass_sat_def lvar_is_lvar_and_lvar32_n_def var_st_get_lvar_def
-                         var_st_set_lvar_def is_lvar_def is_lvar32_n_def
+                         var_st_set_lvar_def is_lvar_def is_lvar32_n_def emp_def
                     split: prod.splits)
         done
       hence "ass_sat (Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st))) [v1] h st"
@@ -2043,6 +2051,134 @@ next
       apply simp
       apply safe
       apply (metis Br.hyps)
+      apply (metis prod.collapse)
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (auto split: prod.splits)
+    done
+next
+  case (Br_if \<Gamma> assms St H lv j Q)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs ((St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br_if j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat (St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have 1:"list_all2 (\<lambda>Si v. Si v st) (St @ [is_lvar32 lv]) vcs"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def var_st_get_lvar_def)
+    obtain vcs' v where vcs_is:"vcs = vcs'@[v]" "is_lvar32 lv v st"
+                               "stack_ass_sat St vcs' st"
+      using list_all2_snoc1[OF 1]
+      by (fastforce simp add: stack_ass_sat_def)
+    then obtain c where v_is:"v = ConstInt32 c"
+      using typeof_i32
+      by (fastforce simp add: is_lvar32_def var_st_get_lvar_def)
+    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $Br_if j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by simp
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv))"
+    proof (cases "int_eq c 0")
+      case True
+      hence true_is:"s = s' \<and> locs = locs' \<and> res = RValue (vcsf @ vcs')"
+        using reduce_to_n_br_if[OF 2]
+        by metis
+      hence 0:"ass_sat  (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv)) vcs' h st"
+        using ass_is vcs_is True v_is
+        by (fastforce simp add: stack_ass_sat_def is_lvar_unop_def is_lvar_def is_lvar32_def heap_disj_def Option.is_none_def
+                                option_disj_def map_disj_def disjnt_def var_st_get_lvar_def is_lvar32_zero_def sep_conj_def emp_def heap_merge_def
+                      split: option.splits prod.splits)
+      thus ?thesis
+        using true_is local_assms(1) ass_is vcs_is
+        unfolding res_wf_def
+        apply (cases st)
+        apply simp
+        apply (metis surj_pair)
+        done
+    next
+      case False
+      hence false_is:"((s, locs, ($$* vcsf @ vcs') @ [$Br j]) \<Down>n{(labs, ret, i)} (s', locs', res))"
+        using reduce_to_n_br_if[OF 2]
+        by metis
+      moreover
+      have "\<Gamma> \<Turnstile>_n {(St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv))} [$Br j] {Q}"
+        using Br_if(2) local_assms
+        unfolding valid_triple_defs
+        by simp
+      moreover
+      have "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs' ((St \<^sub>s|\<^sub>h H)::('a ass))"
+        using vcs_is local_assms(3)
+        unfolding ass_wf_def
+        by simp
+      hence "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs' ((St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv))::('a ass))"
+        using False
+        unfolding ass_wf_def
+        apply (simp add: sep_conj_def is_lvar32_n_def heap_disj_def map_disj_def disjnt_def
+                         option_disj_def Option.is_none_def emp_def heap_merge_def
+                    split: option.splits prod.splits)
+        apply (metis is_lvar32_def v_is vcs_is(2))
+        apply (metis is_lvar32_def option.sel v_is vcs_is(2))
+        done
+      ultimately
+      have 3:"res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+        apply simp
+        apply (metis res_wf_valid_triple_n_intro)
+        done
+      show ?thesis
+        using res_wf_valid_triple_n_not_rvalue[OF 3] reduce_to_n_br_imp_length[OF false_is]
+        apply simp
+        apply (metis res_b.simps(5))
+        done
+    qed
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Return fs ls r' assms Q)
+  {
+    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,Some r')"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs r'"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Return]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat (r') vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain ret' where "ret = Some ret'"
+                      "length vcs = ret'"
+      using ass_is(6) local_assms(1) stack_ass_sat_len[OF ass_is(1)] Return
+      unfolding reifies_ret_def
+      by simp
+    hence "s = s' \<and> locs = locs' \<and> res = RReturn vcs"
+      using reduce_to_n_return[OF local_assms(4)]
+      by metis
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+      using ass_is local_assms(1)
+      unfolding res_wf_def
+      apply simp
+      apply safe
       apply (metis prod.collapse)
       done
   }
@@ -2354,11 +2490,6 @@ next
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
                        "(s, locs, ($$* vcsf) @ ($$* vcs) @ es @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
-    consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs, ret, i)} (s',locs',res)))"
-      | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
-      using reduce_to_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]
-            local_assms(4)
-      by fastforce
     consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs, ret, i)} (s',locs',res)))"
       | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
       using reduce_to_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]

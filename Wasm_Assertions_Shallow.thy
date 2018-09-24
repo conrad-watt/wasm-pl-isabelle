@@ -305,6 +305,14 @@ lemma res_wf_valid_triple_n_intro:
   unfolding valid_triple_n_def
   by blast
 
+lemma res_wf_valid_triple_n_not_rvalue:
+  assumes "res_wf lvar_st \<Gamma> res locs s hf vcsf Q"
+          "\<nexists>vs. res = RValue vs"
+  shows "res_wf lvar_st \<Gamma> res locs s hf vcsf Q'"
+  using assms
+  unfolding res_wf_def
+  by (cases res) auto
+
 lemma extend_context_call:
   assumes "(fs,ls,rs) \<Turnstile>_n {P} [$Call j] {Q}"
   shows "(fs,ls',rs') \<Turnstile>_n {P} [$Call j] {Q}"
