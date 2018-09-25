@@ -35,6 +35,12 @@ definition var_st_set_global :: "'a var_st \<Rightarrow> nat \<Rightarrow> globa
                               then (gs[n := g], vs, lvs)
                               else st)"
 
+definition var_st_set_global_v :: "'a var_st \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> 'a var_st" where
+  "var_st_set_global_v st n v \<equiv> let (gs, vs, lvs) = st in
+                                (if (n < length gs)
+                                then (gs[n := ((gs!n)\<lparr>g_val := v\<rparr>)], vs, lvs)
+                                else st)"
+
 definition var_st_get_lvar :: "'a var_st \<Rightarrow> lvar \<Rightarrow> 'a lvar_v option" where
   "var_st_get_lvar st lv \<equiv> let st_lv = (snd (snd st)) in st_lv lv"
 

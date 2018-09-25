@@ -433,7 +433,7 @@ lemma no_reduce_to_n:
   assumes "(s, vs, [e]) \<Down>k{\<Gamma>} (s', vs', res)"
           "(e = $Unop t uop) \<or> (e = $Testop t testop) \<or> (e = $Binop t bop) \<or> (e = $Relop t rop) \<or>
            (e = $(Cvtop t2 cvtop t1 sx)) \<or> (e = $Drop) \<or> (e = $Select) \<or> (e = $Br_if j) \<or> (e = $Br_table js j) \<or>
-           (e = $Set_local j) \<or> (e = $Tee_local j)"
+           (e = $Set_local j) \<or> (e = $Tee_local j) \<or> (e = $Set_global j)"
   shows False
   using assms
 proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res k rule: reduce_to_n.induct)
@@ -453,6 +453,7 @@ proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs'
     apply (metis append_eq_Cons_conv b_e.simps(461) e.inject(1))
     apply (metis append_eq_Cons_conv b_e.distinct(589) e.inject(1))
     apply (metis append_eq_Cons_conv b_e.distinct(613) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.distinct(655) e.inject(1))
     done
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
@@ -692,6 +693,77 @@ next
     done
 next
   case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
+    by (simp add: is_const_def)
+qed auto
+
+lemma reduce_to_n_get_global:
+  assumes "((s,vs,($$*ves)@[$Get_global j]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RValue (ves@[(sglob_val s i j)])"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$Get_global j])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves ves')
+  thus ?case
+    using consts_app_snoc[OF const_value(4)]
+    apply safe
+    apply simp_all
+    apply ((metis const_value.hyps(4) consts_app_ex(2) reduce_to_n_consts)+)[2]
+    apply (metis b_e.simps(657) e.inject(1) last_map last_snoc)
+    apply (metis inj_basic_econst map_injective)
+    done
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(7)]
+    by (metis is_const_list)
+next
+  case (seq_nonvalue1 ves' s vs es k s' vs' res)
+  show ?case
+    using consts_app_snoc[OF seq_nonvalue1(7)]
+    by (metis seq_nonvalue1.hyps(3,4,6))
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)]
+    by (metis is_const_list seq_nonvalue2.hyps(4))
+qed auto
+
+lemma reduce_to_n_set_global:
+  assumes "((s,vs,($$*ves)@[$C v, $Set_global j]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  shows "(supdate_glob s i j v) = s' \<and> vs = vs' \<and> res = RValue (ves)"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$C v, $Set_global j])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves ves')
+  thus ?case
+    using consts_app_snoc_1[OF const_value(4)]
+    apply simp
+    apply (metis (no_types, lifting) b_e.distinct(655) e.inject(1) e_type_const_unwrap no_reduce_to_n)
+    done
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_value(7)]
+    by (meson b_e.distinct(655) e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves' s vs es k s' vs' res)
+  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+    using seq_nonvalue1 e_type_const_conv_vs
+    by blast
+  show ?case
+    using consts_app_snoc_1[of vcs' es ves v "$Set_global j"] seq_nonvalue1(7)  ves'_is
+          local.seq_nonvalue1(2) no_reduce_to_n seq_nonvalue1.hyps(3,4)
+    apply (simp add: is_const_def)
+    apply blast
+    done
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
   have "\<not> const_list es"
     using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
     by metis

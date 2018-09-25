@@ -914,6 +914,9 @@ definition is_lvar_reinterpret :: "lvar \<Rightarrow> t  \<Rightarrow> v \<Right
 definition local_is_lvar :: "nat \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "local_is_lvar j lv h v_st \<equiv> (emp h v_st) \<and> var_st_get_lvar v_st lv = map_option V_p (var_st_get_local v_st j)"
 
+definition global_is_lvar :: "nat \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "global_is_lvar j lv h v_st \<equiv> (emp h v_st) \<and> var_st_get_lvar v_st lv = map_option (\<lambda>g. V_p (g_val g)) (var_st_get_global v_st j)"
+
 definition is_lvar32 :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar32 lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v) \<and> typeof v = T_i32"
 
@@ -1003,6 +1006,8 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Get_local:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h local_is_lvar j lv } [$Get_local j] {[is_lvar lv] \<^sub>s|\<^sub>h local_is_lvar j lv }"
 | Set_local:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_local j] {[] \<^sub>s|\<^sub>h local_is_lvar j lv }"
 | Tee_local:"\<lbrakk> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv,is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_local j] { Q } \<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Tee_local j] { Q }"
+| Get_global:"\<lbrakk>j < length (inst.globs i)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h global_is_lvar j lv } [$Get_global j] {[is_lvar lv] \<^sub>s|\<^sub>h global_is_lvar j lv }"
+| Set_global:"\<lbrakk>j < length (inst.globs i)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_global j] {[] \<^sub>s|\<^sub>h global_is_lvar j lv }"
 | Br:"\<lbrakk>j < length ls\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {ls ! j} [$Br j] { Q }"
 | Br_if:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$Br j] { Q }\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_if j] { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) }"
 | Br_table:"\<lbrakk>\<forall>jn < (length js). (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv jn) } [$Br (js!jn)] { Q }); (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js)) } [$Br j] { Q })\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_table js j] { Q }"
@@ -2185,6 +2190,121 @@ next
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
       using res_wf_valid_triple_n_intro[OF 2 _ 4]
       by blast
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Get_global j \<Gamma> assms lv)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h global_is_lvar j lv)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Get_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h global_is_lvar j lv) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have vcs_is:"vcs = []"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      done
+    have 1:"(s, locs, ($$* vcsf) @ [$Get_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have 2:"s = s'"
+           "locs = locs'"
+           "res = RValue (vcsf @ [(sglob_val s i j)])"
+      using reduce_to_n_get_global[OF 1]
+      by auto
+    hence 0:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h global_is_lvar j lv) [(sglob_val s i j)] h st"
+      using ass_is(1) 2 ass_is(3)
+      apply (cases st)
+      apply (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
+                       var_st_get_lvar_def global_is_lvar_def var_st_get_local_def reifies_loc_def
+                       reifies_s_def reifies_glob_def sglob_val_def sglob_def sglob_ind_def
+                       Get_global.hyps var_st_get_global_def
+                  split: if_splits)
+      done
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar lv] \<^sub>s|\<^sub>h global_is_lvar j lv)"
+      using vcs_is local_assms(1,4) 0 ass_is 2
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Set_global j \<Gamma> assms lv)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Set_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain v where vcs_is:"vcs = [v]"
+                          "emp h st"
+                          "lvar_st lv = Some (V_p v)"
+      using ass_is(1,7)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      apply (metis length_Suc_conv list_exhaust_size_eq0)
+      done
+    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have 3:"j < length (fst st)"
+      using Set_global ass_is(3)
+      unfolding reifies_s_def reifies_glob_def
+      apply (cases st)
+      apply auto
+      done
+    have 2:"supdate_glob s i j v = s'"
+           "locs = locs'"
+           "res = RValue vcsf"
+      using reduce_to_n_set_global[OF 1]
+      by auto
+    hence 0:"ass_sat ([] \<^sub>s|\<^sub>h global_is_lvar j lv) [] h (var_st_set_global_v st j v)"
+      using ass_is(1) 2 ass_is(4) vcs_is(1,3) 3
+      apply (cases st)
+      apply (auto simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def emp_def
+                       var_st_get_lvar_def global_is_lvar_def var_st_get_local_def reifies_loc_def
+                       var_st_set_global_v_def var_st_get_global_def
+                  split: if_splits)
+      done
+    have 4:"reifies_s s' i (heap_merge h hf) (var_st_set_global_v st j v) (fst \<Gamma>)"
+      using ass_is(3) 2 Set_global local_assms(1)
+      by (auto simp add: var_st_set_global_v_def reifies_glob_def Let_def reifies_heap_def
+                            reifies_s_def supdate_glob_def sglob_ind_def supdate_glob_s_def
+                            reifies_func_def nth_list_update encapsulated_inst_globs
+                  split: prod.splits)
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h global_is_lvar j lv)"
+      using res_wf_intro_value[OF 0 _ ass_is(2) _ 4] ass_is(4,7) 3 2 local_assms(1)
+      apply (cases st)
+      apply (auto simp add: reifies_loc_def var_st_set_global_v_def)
+      done
   }
   thus ?case
     unfolding valid_triple_defs
