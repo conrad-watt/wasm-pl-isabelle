@@ -275,6 +275,9 @@ definition valid_triples_assms_n :: "'a triple_context \<Rightarrow> 'a triple s
 lemmas valid_triple_defs = valid_triple_def valid_triples_def valid_triples_assms_def
                            valid_triple_n_def valid_triples_n_def valid_triples_assms_n_def
 
+definition ass_conseq :: "'a ass \<Rightarrow> 'a ass \<Rightarrow> v list \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "ass_conseq P P' vcs h st \<equiv> ass_stack_len P = ass_stack_len P' \<and> (ass_sat P vcs h st \<longrightarrow> ass_sat P' vcs h st)"
+
 lemma extend_context_res_wf:
   assumes "res_wf lvar_st' (fs,[],None) res locs' s' hf vcsf Q"
   shows "res_wf lvar_st' (fs,ls,rs) res locs' s' hf vcsf Q"
@@ -361,14 +364,43 @@ lemma valid_triples_n_emp: "\<Gamma> \<TTurnstile>_n {}"
   by blast
 
 lemma res_wf_conseq:
-  assumes "res_wf l_st \<Gamma> res locs' s' hf vcsf P"
-          "\<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t)"
-  shows "res_wf l_st \<Gamma> res locs' s' hf vcsf P'"
-  using assms
-  unfolding res_wf_def
-  apply (cases res)
-  apply fastforce+
-  done
+  assumes "res_wf l_st (fs,ls,rs) res locs' s' hf vcsf P"
+          "\<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls ls')"
+          "\<forall>vs h v_st. (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs rs')"
+          "\<forall>vs h v_st. (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st)"
+  shows "res_wf l_st (fs,ls',rs') res locs' s' hf vcsf P'"
+proof (cases res)
+  case (RValue x1)
+  thus ?thesis
+    using assms
+    unfolding res_wf_def
+    apply simp
+    apply metis
+    done
+next
+  case (RBreak x21 x22)
+  thus ?thesis
+    using assms
+    unfolding res_wf_def
+    apply (simp add: ass_conseq_def)
+    apply (metis (no_types, lifting) list_all2_conv_all_nth)
+    done
+next
+  case (RReturn x3)
+  thus ?thesis
+    using assms(1,3)
+    unfolding res_wf_def
+    apply (cases rs; cases rs')
+    apply (simp_all add: ass_conseq_def)
+    apply blast
+    done
+next
+  case RTrap
+  thus ?thesis
+    using assms
+    unfolding res_wf_def
+    by simp
+qed
 
 lemma stack_ass_sat_len:
   assumes "ass_sat P vcs h st"
@@ -382,38 +414,60 @@ proof (induction rule: ass_sat.induct)
     done
 qed auto
 
-lemma ass_wf_conseq:
-  assumes "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-          "\<forall>vs h vs_t. (ass_sat P vs h vs_t \<longrightarrow> ass_sat P' vs h vs_t)"
-  shows "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P'"
+lemma ass_sat_len_eq_lab:
+  assumes "(list_all2 (\<lambda>L L'. ass_conseq L L' vcs h st) ls ls')"
+  shows "map ass_stack_len ls = map ass_stack_len ls'"
   using assms
-  unfolding ass_wf_def
-  apply fastforce+
+  unfolding ass_conseq_def list_all2_conv_all_nth
+  by (simp add: nth_equalityI)
+
+lemma ass_sat_len_eq_ret:
+  assumes "(rel_option (\<lambda>R R'. ass_conseq R R' vcs h st) rs rs')"
+  shows "map_option ass_stack_len rs = map_option ass_stack_len rs'"
+  using assms
+  unfolding ass_conseq_def
+  apply (cases rs; cases rs')
+     apply auto
   done
 
+lemma ass_wf_conseq1:
+  assumes "ass_wf lvar_st ret (fs,ls,rs) labs locs s hf st h vcs P"
+          "(ass_sat P vcs h st \<longrightarrow> ass_sat P' vcs h st)"
+  shows "ass_wf lvar_st ret (fs,ls,rs) labs locs s hf st h vcs P'"
+  using assms
+  unfolding ass_wf_def
+  by (auto simp add:ass_sat_len_eq_lab ass_sat_len_eq_ret reifies_lab_def reifies_ret_def)
+
+lemma ass_wf_conseq2:
+  assumes "(list_all2 (\<lambda>L L'. ass_conseq L L' vcs h st) ls ls')"
+          "(rel_option (\<lambda>R R'. ass_conseq R R' vcs h st) rs rs')"
+  shows "ass_wf lvar_st ret (fs,ls,rs) labs locs s hf st h vcs P = ass_wf lvar_st ret (fs,ls',rs') labs locs s hf st h vcs P"
+  using assms
+  unfolding ass_wf_def
+  by (auto simp add:ass_sat_len_eq_lab ass_sat_len_eq_ret reifies_lab_def reifies_ret_def)
+
+
 lemma valid_triple_n_conseq:
-  assumes "\<Gamma> \<Turnstile>_n {P'} es {Q'}"
-          "\<forall>vs h vs_t.
-             (ass_sat P vs h vs_t \<longrightarrow>
-              ass_sat P' vs h vs_t) \<and>
-             (ass_sat Q' vs h vs_t \<longrightarrow>
-              ass_sat Q vs h vs_t)"
-  shows "\<Gamma> \<Turnstile>_n {P} es {Q}"
+  assumes "(fs,ls,rs) \<Turnstile>_n {P'} es {Q'}"
+          "\<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls ls') \<and>
+                       (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs rs') \<and>
+                       (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and>
+                       (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)"
+  shows "(fs,ls',rs') \<Turnstile>_n {P} es {Q}"
 proof -
   show ?thesis
-    using assms res_wf_conseq ass_wf_conseq
+    using assms res_wf_conseq ass_wf_conseq1 ass_wf_conseq2
     unfolding valid_triple_defs
     by metis
 qed
 
 lemma valid_triple_assms_n_conseq:
-  assumes "(\<Gamma>\<bullet>assms \<TTurnstile>_n {(P',es,Q')})"
-          "\<forall>vs h vs_t.
-             (ass_sat P vs h vs_t \<longrightarrow>
-              ass_sat P' vs h vs_t) \<and>
-             (ass_sat Q' vs h vs_t \<longrightarrow>
-              ass_sat Q vs h vs_t)"
-  shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n {(P,es,Q)})"
+  assumes "((fs,ls,rs)\<bullet>assms \<TTurnstile>_n {(P',es,Q')})"
+          "\<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls ls') \<and>
+                       (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs rs') \<and>
+                       (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and>
+                       (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)"
+  shows "((fs,ls',rs')\<bullet>assms \<TTurnstile>_n {(P,es,Q)})"
   using valid_triple_n_conseq[OF _ assms(2)] assms(1)
   unfolding valid_triples_assms_n_def valid_triples_n_def
   by simp

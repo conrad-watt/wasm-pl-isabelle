@@ -433,7 +433,8 @@ lemma no_reduce_to_n:
   assumes "(s, vs, [e]) \<Down>k{\<Gamma>} (s', vs', res)"
           "(e = $Unop t uop) \<or> (e = $Testop t testop) \<or> (e = $Binop t bop) \<or> (e = $Relop t rop) \<or>
            (e = $(Cvtop t2 cvtop t1 sx)) \<or> (e = $Drop) \<or> (e = $Select) \<or> (e = $Br_if j) \<or> (e = $Br_table js j) \<or>
-           (e = $Set_local j) \<or> (e = $Tee_local j) \<or> (e = $Set_global j)"
+           (e = $Set_local j) \<or> (e = $Tee_local j) \<or> (e = $Set_global j) \<or> (e = $Load t tp_sx a off) \<or>
+           (e = $Store t tp a off)"
   shows False
   using assms
 proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res k rule: reduce_to_n.induct)
@@ -454,6 +455,8 @@ proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs'
     apply (metis append_eq_Cons_conv b_e.distinct(589) e.inject(1))
     apply (metis append_eq_Cons_conv b_e.distinct(613) e.inject(1))
     apply (metis append_eq_Cons_conv b_e.distinct(655) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.simps(695) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.simps(711) e.inject(1))
     done
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
@@ -471,7 +474,7 @@ qed auto
 
 lemma no_reduce_to_n2:
   assumes "(s, vs, [$C v, e]) \<Down>k{\<Gamma>} (s', vs', res)"
-          "(e = $Binop t bop) \<or> (e = $Relop t rop) \<or> (e = $Select)"
+          "(e = $Binop t bop) \<or> (e = $Relop t rop) \<or> (e = $Select) \<or> (e = $Store t tp a off)"
   shows False
 proof -
   have 0:"\<not>is_const e"
@@ -486,7 +489,7 @@ proof -
       by simp
     thus ?thesis
       using no_reduce_to_n const_value(1) assms(2)
-      by blast
+      by metis
   next
     case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
     thus ?case
@@ -498,7 +501,7 @@ proof -
       by (metis append_Cons append_is_Nil_conv butlast.simps(2) butlast_append list.simps(8,9) self_append_conv2)
     thus ?thesis
       using no_reduce_to_n seq_nonvalue1(2) assms(2)
-      by blast
+      by metis
   next
     case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
     thus ?thesis
@@ -553,7 +556,7 @@ lemma no_reduce_to_n_unop:
   assumes "(s, vs, [($Unop t uop)]) \<Down>k{\<Gamma>} (s', vs', res)"
   shows False
   using assms no_reduce_to_n
-  by blast
+  by metis
 
 lemma reduce_to_n_nop:
   assumes "((s,vs,($$*ves)@[$Nop]) \<Down>k{\<Gamma>} (s',vs',res))"
@@ -646,7 +649,7 @@ next
     using consts_app_snoc_1[of vcs' es ves v "$Set_local j"] seq_nonvalue1(7)  ves'_is
           local.seq_nonvalue1(2) no_reduce_to_n seq_nonvalue1.hyps(3,4)
     apply (simp add: is_const_def)
-    apply blast
+    apply metis
     done
 next
   case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
@@ -760,7 +763,93 @@ next
     using consts_app_snoc_1[of vcs' es ves v "$Set_global j"] seq_nonvalue1(7)  ves'_is
           local.seq_nonvalue1(2) no_reduce_to_n seq_nonvalue1.hyps(3,4)
     apply (simp add: is_const_def)
+    apply metis
+    done
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
+    by (simp add: is_const_def)
+qed auto
+
+lemma reduce_to_n_load:
+  assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $Load t None a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (t_length t) = Some bs \<and> res = RValue (ves@[(wasm_deserialise bs t)])) \<or> (load m (nat_of_int c) off (t_length t) = None \<and> res = RTrap)))"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Load t None a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves ves')
+  consider (1) "es = [$Load t None a off] \<and> ves = ves' @ [ConstInt32 c]"
+         | (2) ves'' where "(es = ($$* ves'') @ [$C ConstInt32 c, $Load t None a off] \<and> ves' = ves @ ves'')"
+    using consts_app_snoc_1[OF const_value(4)]
+    by (fastforce simp add: is_const_def)
+  thus ?case
+    using const_value
+    apply (cases)
+    apply simp_all
+    apply (meson no_reduce_to_n)
     apply blast
+    done
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_value(7)]
+    by (metis b_e.simps(695) e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves' s vs es k s' vs' res)
+  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+    using seq_nonvalue1 e_type_const_conv_vs
+    by blast
+  show ?case
+    using consts_app_snoc_1[of vcs' es ves "ConstInt32 c" "$Load t None a off"] seq_nonvalue1(7)  ves'_is
+          local.seq_nonvalue1(2) no_reduce_to_n seq_nonvalue1.hyps(3,4)
+    apply (simp add: is_const_def)
+    apply metis
+    done
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
+    by (simp add: is_const_def)
+qed auto
+
+lemma reduce_to_n_load_packed:
+  assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> (\<exists>bs. (load_packed sx m (nat_of_int c) off (tp_length tp) (t_length t) = Some bs \<and> res = RValue (ves@[(wasm_deserialise bs t)])) \<or> (load_packed sx m (nat_of_int c) off (tp_length tp) (t_length t) = None \<and> res = RTrap)))"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves ves')
+  consider (1) "es = [$(Load t (Some (tp, sx)) a off)] \<and> ves = ves' @ [ConstInt32 c]"
+         | (2) ves'' where "(es = ($$* ves'') @ [$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)] \<and> ves' = ves @ ves'')"
+    using consts_app_snoc_1[OF const_value(4)]
+    by (fastforce simp add: is_const_def)
+  thus ?case
+    using const_value
+    apply (cases)
+    apply simp_all
+    apply (meson no_reduce_to_n)
+    apply blast
+    done
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_value(7)]
+    by (metis b_e.simps(695) e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves' s vs es k s' vs' res)
+  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+    using seq_nonvalue1 e_type_const_conv_vs
+    by blast
+  show ?case
+    using consts_app_snoc_1[of vcs' es ves "ConstInt32 c" "$(Load t (Some (tp, sx)) a off)"] seq_nonvalue1(7)  ves'_is
+          local.seq_nonvalue1(2) no_reduce_to_n seq_nonvalue1.hyps(3,4)
+    apply (simp add: is_const_def)
+    apply metis
     done
 next
   case (seq_nonvalue2 s vs es k s' vs' res es')
@@ -786,7 +875,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Drop])" k "\<Gamma>" "(s',vs',res)" arb
     case 1
     thus ?thesis
       using no_reduce_to_n const_value(1)
-      by blast
+      by metis
   next
     case 2
     then obtain ves'' where "es = ($$* ves'') @ [$C v, $Drop]"
@@ -926,7 +1015,7 @@ lemma no_reduce_to_n_testop:
   assumes "(s, vs, [$Testop t op]) \<Down>k{\<Gamma>} (s', vs', res)"
   shows False
   using assms no_reduce_to_n
-  by blast
+  by metis
 
 lemma reduce_to_n_testop:
   assumes "((s,vs,($$*ves)@[$C v, $Testop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
@@ -980,7 +1069,7 @@ lemma no_reduce_to_n_binop:
   assumes "(s, vs, [$Binop t op]) \<Down>k{\<Gamma>} (s', vs', res)"
   shows False
   using assms no_reduce_to_n
-  by blast
+  by metis
 
 lemma no_reduce_to_n2_binop:
   assumes "(s, vs, [$C v, $Binop t op]) \<Down>k{\<Gamma>} (s', vs', res)"
@@ -1044,7 +1133,7 @@ lemma no_reduce_to_n_relop:
   assumes "(s, vs, [$Relop t op]) \<Down>k{\<Gamma>} (s', vs', res)"
   shows False
   using assms no_reduce_to_n
-  by blast
+  by metis
 
 lemma no_reduce_to_n2_relop:
   assumes "(s, vs, [$C v, $Relop t op]) \<Down>k{\<Gamma>} (s', vs', res)"
@@ -1115,7 +1204,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Cvtop t2 Convert t1 sx])" k "\<Gamma>" 
     case 1
     thus ?thesis
       using no_reduce_to_n const_value(1)
-      by blast
+      by metis
   next
     case 2
     then obtain ves'' where "es = ($$* ves'') @ [$C v, $Cvtop t2 Convert t1 sx]"
@@ -1162,7 +1251,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Cvtop t2 Reinterpret t1 None])" k "\<Ga
     case 1
     thus ?thesis
       using no_reduce_to_n const_value(1)
-      by blast
+      by metis
   next
     case 2
     then obtain ves'' where "es = ($$* ves'') @ [$C v, $Cvtop t2 Reinterpret t1 None]"
@@ -2202,7 +2291,7 @@ proof (induction "(s,vs,($$*vesf)@[$C ConstInt32 c, $Br_table js j])" k \<Gamma>
     case 1
     thus ?thesis
       using no_reduce_to_n const_value(1)
-      by blast
+      by metis
   next
     case 2
     thus ?thesis

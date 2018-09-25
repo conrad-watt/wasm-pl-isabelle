@@ -1025,7 +1025,8 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
              \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} [Callcl cl] {St' \<^sub>s|\<^sub>h H'}"
 | Asm:"\<lbrakk>(P, [$Call k], Q) \<in> assms\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} [$Call k] {Q}"
 | Seq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; \<Gamma>\<bullet>assms \<turnstile> {Q} es' {R}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es@es' {R}"
-| Conseq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h v_st. (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and> (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
+| Conseq:"\<lbrakk>(fs,ls',rs')\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls' ls) \<and> (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs' rs) \<and> (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and> (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)\<rbrakk> \<Longrightarrow> (fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}"
+| Exists:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,(map (\<lambda>l. Ex_ass lv l) ls),(map_option) (\<lambda>l. Ex_ass lv l) rs)\<bullet>assms \<turnstile> {Ex_ass lv P} es {Ex_ass lv Q}"
 | Frame:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; heap_ass_ind_on Hf (modset fs es); (\<forall>ass \<in> (set ls). \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha); pred_option (\<lambda>ass. \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha) rs\<rbrakk> \<Longrightarrow> (fs,map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h (H \<^emph> Hf)} es {St' \<^sub>s|\<^sub>h (H' \<^emph> Hf)}"
 | Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
 | Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Callcl (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
@@ -2953,10 +2954,86 @@ next
     apply auto
     done
 next
-  case (Conseq \<Gamma> assms P' es Q' P Q)
+  case (Conseq fs ls' rs' assms P' es Q' ls rs P Q)
   thus ?case
     using valid_triple_assms_n_conseq
     by blast
+next
+  case (Exists fs ls r assms P es Q lv)
+  {
+    fix \<Gamma> vcs h st s locs labs ret lvar_st vcsf s' locs' res hf
+    assume local_assms:"\<Gamma> = (fs, map (Ex_ass lv) ls, map_option (Ex_ass lv) r)"
+                       "(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
+                       "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (Ex_ass lv P))"
+                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', res)"
+    have ass_wf_is:"ass_sat (Ex_ass lv P) vcs h st"
+                   "heap_disj h hf"
+                   "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                   "reifies_loc locs st"
+                   "reifies_lab labs \<Gamma>"
+                   "reifies_ret ret \<Gamma>"
+                   "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by auto
+    obtain st' v where st'_is:"ass_sat P vcs h st'"
+                              "st' = (var_st_set_lvar st lv v)"
+      using ass_wf_is(1)
+      by simp blast
+    have "reifies_s s i (heap_merge h hf) st' (fst \<Gamma>)"
+         "reifies_loc locs st'"
+      using st'_is local_assms(1) ass_wf_is(3,4)
+      by (simp_all add: reifies_loc_def var_st_set_lvar_def reifies_s_def reifies_glob_def
+                   split: prod.splits)
+    hence 0:"(ass_wf (snd (snd st')) ret (fs, ls, r) labs locs s hf st' h vcs P)"
+      using st'_is ass_wf_is(2,5,6) local_assms(1)
+      unfolding ass_wf_def
+      apply (simp add: reifies_lab_def reifies_ret_def)
+      apply (metis (mono_tags, lifting) ass_stack_len.simps(2) comp_def map_option_cong option.map_comp)
+      done
+    have 1:"(fs, ls, r) \<Turnstile>_n {P} es {Q}"
+      using Exists(2) local_assms(2) local_assms(1)
+      unfolding valid_triple_defs
+      by auto
+    have res_q:"res_wf (snd (snd st')) (fs, ls, r) res locs' s' hf vcsf Q"
+      using res_wf_valid_triple_n_intro[OF 1 0 local_assms(4)]
+      by -
+    have "res_wf lvar_st (fs, map (Ex_ass lv) ls, map_option (Ex_ass lv) r) res locs' s' hf vcsf (Ex_ass lv Q)"
+    proof (cases res)
+      case (RValue x1)
+      thus ?thesis
+        using res_q local_assms(1) st'_is
+        unfolding res_wf_def
+        apply (simp add: var_st_set_lvar_def reifies_s_def reifies_loc_def reifies_glob_def split: prod.splits)
+        apply (metis ass_wf_is(7) prod.sel(2))
+        done
+    next
+      case (RBreak x21 x22)
+      thus ?thesis
+        using res_q local_assms(1) st'_is
+        unfolding res_wf_def
+        apply (simp add: var_st_set_lvar_def reifies_s_def reifies_loc_def reifies_glob_def split: prod.splits)
+        apply (metis ass_wf_is(7) prod.sel(2))
+        done
+    next
+      case (RReturn x3)
+      thus ?thesis
+        using res_q local_assms(1) st'_is
+        unfolding res_wf_def
+        apply (simp add: var_st_set_lvar_def reifies_s_def reifies_loc_def reifies_glob_def split: prod.splits)
+        apply (metis ass_wf_is(7) prod.sel(2))
+        done
+    next
+      case RTrap
+      thus ?thesis
+        using res_q
+        unfolding res_wf_def
+        by simp
+    qed
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    by auto
 next
   case (Frame fs ls rs assms St H es St' H' Hf)
   {
