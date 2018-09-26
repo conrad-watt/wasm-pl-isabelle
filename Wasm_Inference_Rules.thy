@@ -881,6 +881,9 @@ definition args_ass :: "'a stack_ass \<Rightarrow> nat \<Rightarrow> 'a var_st \
 definition zeros_ass :: "nat \<Rightarrow> t list \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "zeros_ass n ts v_st \<equiv> (\<forall>i < (length ts). (var_st_get_local v_st (i+n)) = Some (bitzero (ts!i)))"
 
+definition is_v :: "v \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_v v stack_v v_st \<equiv> v = stack_v"
+
 definition is_lvar :: "lvar \<Rightarrow> v \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "is_lvar lv v v_st \<equiv> var_st_get_lvar v_st lv = Some (V_p v)"
 
@@ -994,6 +997,7 @@ lemma lvar32_zero_pages_from_lvar_len_neq_update:
 inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile> _" 60)
       and inf_triple :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> {_}_{_}" 60) where
   "\<Gamma>\<bullet>assms \<turnstile> {P} es {Q} \<equiv> \<Gamma>\<bullet>assms \<tturnstile> {(P,es,Q)}"
+| Const:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h emp } [$C v] {[is_v v] \<^sub>s|\<^sub>h emp }"
 | Unop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Unop t op] {[is_lvar_unop lv op] \<^sub>s|\<^sub>h emp }"
 | Testop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Testop t op] {[is_lvar_testop lv op] \<^sub>s|\<^sub>h emp }"
 | Binop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h can_lvar_binop lv1 lv2 op } [$Binop t op] {[is_lvar_binop lv1 lv2 op] \<^sub>s|\<^sub>h emp }"
@@ -1606,6 +1610,55 @@ theorem
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
   using assms
 proof(induction arbitrary: n rule:inf_triples.induct)
+  case (Const \<Gamma> assms v)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h emp )::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$C v]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h emp) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have vcs_is:"vcs = []"
+      using ass_is(1)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
+      done
+    have 1:"(s, locs, ($$* vcsf) @ [$C v]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have 2:"s = s'"
+           "locs = locs'"
+           "res = RValue (vcsf @ [v])"
+      using reduce_to_n_consts[of _ _ "vcsf@[v]"] 1
+      by auto
+    hence 0:"ass_sat ([is_v v] \<^sub>s|\<^sub>h emp) [v] h st"
+      using ass_is(1) 2 ass_is(4)
+      apply (cases st)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def
+                       var_st_get_lvar_def is_v_def var_st_get_local_def reifies_loc_def
+                  split: if_splits)
+      done
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_v v] \<^sub>s|\<^sub>h emp)"
+      using vcs_is local_assms(1,4) 0 ass_is 2
+      unfolding res_wf_def
+      apply simp
+      apply (metis prod.exhaust prod.sel(2))
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
   case (Unop \<Gamma> assms lv t op)
   {
     fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
