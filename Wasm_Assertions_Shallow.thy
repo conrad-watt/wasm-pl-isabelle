@@ -105,6 +105,13 @@ lemma heap_merge_dom:
   unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
   by (auto simp add: map_add_comm split: option.splits prod.splits)
 
+lemma heap_dom_merge:
+  assumes "x \<in> dom (fst h1) \<or> x \<in> dom (fst h2)"
+  shows "x \<in> dom (fst (heap_merge h1 h2))"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
+  by (auto simp add: map_add_comm split: option.splits prod.splits)
+
 lemma heap_disj_merge_maps1:
   assumes "heap_disj h1 h2"
           "(fst h1) x = Some y"

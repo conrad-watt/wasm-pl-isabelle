@@ -41,6 +41,24 @@ lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightar
 lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m n bs. (take n m) @ bs @ (drop (n + length bs) m))" .
 lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is append .
 
+lemma take_drop_map:
+  assumes "ind+n \<le> length bs"
+  shows "(take n (drop ind bs)) = (map ((!) bs) [ind..<ind + n])"
+proof -
+  have "(drop ind bs) = (map ((!) bs) [ind..<length bs])"
+    using drop_map map_nth
+    by (metis add.commute add.right_neutral drop_upt)
+  thus ?thesis
+    by (simp add: assms(1) take_map)
+qed
+
+lemma read_bytes_map:
+  assumes "ind+n \<le> mem_length m"
+  shows "read_bytes m ind n = Abs_bytes (map (\<lambda>k. byte_at m k) [ind..<ind+n])"
+  using assms
+  unfolding read_bytes_def byte_at_def mem_length_def
+  by (simp add: take_drop_map)
+
 \<comment> \<open>host\<close>
 typedecl host
 typedecl host_state

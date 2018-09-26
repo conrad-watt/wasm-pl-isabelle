@@ -977,6 +977,44 @@ proof -
     by auto
 qed
 
+definition make_bs_t where
+  "make_bs_t ind n bs \<equiv> map_of (zip [ind..<(ind+n)] (Rep_bytes bs))"
+
+lemma make_bs_t_dom_ran:
+  assumes "h_raw = make_bs_t ind n bs"
+          "n = length (Rep_bytes bs)"
+  shows "dom h_raw = {k::nat. ind \<le> k \<and> k < ind+n}"
+        "\<forall>k \<in> dom h_raw. h_raw k = Some ((Rep_bytes bs)!(k-ind))"
+proof -
+  have 1:"length [ind..<(ind+n)] = length (Rep_bytes bs)"
+    using assms(2)
+    by auto
+  have 2:"distinct [ind..<(ind+n)]"
+    by auto
+  show "dom h_raw = {k::nat. ind \<le> k \<and> k < ind+n}"
+        "\<forall>k \<in> dom h_raw. h_raw k = Some ((Rep_bytes bs)!(k-ind))"
+    using dom_map_of_zip[OF 1] ran_map_of_zip[OF 1 2] assms
+    unfolding make_bs_t_def
+     apply (simp_all add: in_set_zip)
+     apply fastforce
+    apply safe
+    apply simp
+    apply (metis add_diff_cancel_left' add_less_cancel_left le_Suc_ex nth_upt)
+    done
+qed
+
+definition is_n_locs_from_lvar32_off :: "bytes \<Rightarrow> nat \<Rightarrow> lvar \<Rightarrow> nat \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_n_locs_from_lvar32_off bs n lv32 off h v_st \<equiv> let (h_raw,l_opt) = h in
+                                                l_opt = None \<and>
+                                                (\<exists>c. var_st_get_lvar v_st lv32 = Some (V_p (ConstInt32 c)) \<and>
+                                                (let k = (nat_of_int c) in
+                                                 length (Rep_bytes bs) = n \<and>
+                                                 h_raw = make_bs_t (k+off) n bs))"
+
+definition is_n_locs_from_lvar32_off_n_packed_signed :: "bytes \<Rightarrow> nat \<Rightarrow> lvar \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> sx \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
+  "is_n_locs_from_lvar32_off_n_packed_signed bs n lv32 off n_p sx h v_st \<equiv>
+     \<exists>bs'. is_n_locs_from_lvar32_off bs' n lv32 off h v_st \<and> bs = (sign_extend sx n bs')"
+
 definition lvar32_zero_pages_from_lvar_len :: "lvar \<Rightarrow> lvar \<Rightarrow> heap \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "lvar32_zero_pages_from_lvar_len lv32 lv h v_st \<equiv> let (h_raw,l_opt) = h in
                                                 \<exists>l old_l c. l_opt = Some l \<and>
@@ -1012,6 +1050,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Tee_local:"\<lbrakk> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv,is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_local j] { Q } \<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Tee_local j] { Q }"
 | Get_global:"\<lbrakk>j < length (inst.globs i)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h global_is_lvar j lv } [$Get_global j] {[is_lvar lv] \<^sub>s|\<^sub>h global_is_lvar j lv }"
 | Set_global:"\<lbrakk>j < length (inst.globs i)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_global j] {[] \<^sub>s|\<^sub>h global_is_lvar j lv }"
+| Load:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off bs (t_length t) lv off } [$(Load t None a off)] {[is_v (wasm_deserialise bs t)] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off bs (t_length t) lv off }"
 | Br:"\<lbrakk>j < length ls\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {ls ! j} [$Br j] { Q }"
 | Br_if:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$Br j] { Q }\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_if j] { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) }"
 | Br_table:"\<lbrakk>\<forall>jn < (length js). (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv jn) } [$Br (js!jn)] { Q }); (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js)) } [$Br j] { Q })\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_table js j] { Q }"
@@ -1111,6 +1150,58 @@ proof -
   show "reifies_heap_length (mem_grow m c) (snd (heap_merge h hf))"
     unfolding reifies_heap_length_def
     by (simp add: 0 2)
+qed
+
+lemma make_bs_t_reifies:
+  assumes "h = ((make_bs_t (k+off) n bs), None)"
+          "n = length (Rep_bytes bs)"
+          "heap_disj h hf"
+          "reifies_heap_contents m (fst (heap_merge h hf))"
+          "reifies_heap_length m (snd (heap_merge h hf))"
+          "n \<ge> 4"
+  shows "load m k off n = Some bs"
+proof -
+  obtain h_raw where h_raw_def:"h_raw = (make_bs_t (k+off) n bs)"
+    by blast
+  have "k+off+n-1 \<in> dom (make_bs_t (k + off) n bs)"
+    using make_bs_t_dom_ran[OF _ assms(2), of _ "k+off"] assms(6)
+    by simp
+  hence "mem_length m > (k+off+n-1)"
+    using heap_dom_merge assms(1,4,6)
+    unfolding reifies_heap_contents_def
+    by simp
+  hence 1:"mem_length m \<ge> (k+off+n)"
+    by simp
+  have 2:"(read_bytes m (k+off) n) = Abs_bytes (map (byte_at m) [(k+off)..<(k+off) + n])"
+    using make_bs_t_dom_ran[OF _ assms(2), of _ "k+off"] read_bytes_map 1
+    by simp
+  {
+    fix i
+    assume "i < length (Rep_bytes bs)"
+    hence "i + k + off \<in> dom h_raw"
+      using make_bs_t_dom_ran(1)[OF h_raw_def assms(2)] assms(2)
+      by auto
+    hence "h_raw (i + k + off) = Some (Rep_bytes bs ! i)"
+      using make_bs_t_dom_ran(2)[OF h_raw_def assms(2)]
+      by simp
+    hence "(fst (heap_merge h hf)) (i + k + off) = Some (Rep_bytes bs ! i)"
+      using assms(3) h_raw_def
+      by (simp add: assms(1) heap_disj_merge_maps2 heap_disj_sym heap_merge_disj_sym)
+    hence "Rep_mem m ! (k + off + i) = Rep_bytes bs ! i"
+      using assms(2,4)
+      unfolding reifies_heap_contents_def byte_at_def
+      apply simp
+      apply (metis (no_types, hide_lams) add.commute add.left_commute domIff option.distinct(1) option.sel)
+      done
+  }
+  hence "(map (byte_at m) [(k+off)..<(k+off) + n]) = Rep_bytes bs"
+    using assms(2,4) make_bs_t_dom_ran[OF h_raw_def assms(2)]
+    unfolding list_eq_iff_nth_eq reifies_heap_contents_def byte_at_def
+    by simp
+  thus ?thesis
+    using 1 2 Rep_bytes_inverse
+    unfolding load_def read_bytes_def
+    by simp
 qed
 
 lemma lvar32_zero_pages_from_lvar_len_reifies:
@@ -2325,6 +2416,71 @@ next
       using ass_is(1,7)
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       apply (metis length_Suc_conv list_exhaust_size_eq0)
+      done
+    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    have 3:"j < length (fst st)"
+      using Set_global ass_is(3)
+      unfolding reifies_s_def reifies_glob_def
+      apply (cases st)
+      apply auto
+      done
+    have 2:"supdate_glob s i j v = s'"
+           "locs = locs'"
+           "res = RValue vcsf"
+      using reduce_to_n_set_global[OF 1]
+      by auto
+    hence 0:"ass_sat ([] \<^sub>s|\<^sub>h global_is_lvar j lv) [] h (var_st_set_global_v st j v)"
+      using ass_is(1) 2 ass_is(4) vcs_is(1,3) 3
+      apply (cases st)
+      apply (auto simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def emp_def
+                       var_st_get_lvar_def global_is_lvar_def var_st_get_local_def reifies_loc_def
+                       var_st_set_global_v_def var_st_get_global_def
+                  split: if_splits)
+      done
+    have 4:"reifies_s s' i (heap_merge h hf) (var_st_set_global_v st j v) (fst \<Gamma>)"
+      using ass_is(3) 2 Set_global local_assms(1)
+      by (auto simp add: var_st_set_global_v_def reifies_glob_def Let_def reifies_heap_def
+                            reifies_s_def supdate_glob_def sglob_ind_def supdate_glob_s_def
+                            reifies_func_def nth_list_update encapsulated_inst_globs
+                  split: prod.splits)
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h global_is_lvar j lv)"
+      using res_wf_intro_value[OF 0 _ ass_is(2) _ 4] ass_is(4,7) 3 2 local_assms(1)
+      apply (cases st)
+      apply (auto simp add: reifies_loc_def var_st_set_global_v_def)
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+| Load:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off bs (t_length t) lv off } [$(Load t None a off)] {[is_v (wasm_deserialise bs t)] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off bs (t_length t) lv off }"
+
+  case (Load \<Gamma> assms lv bs t off a)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off bs (t_length t) lv off)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Load t None a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off bs (t_length t) lv off) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain c where vcs_is:"vcs = [ConstInt32 c]"
+                          "lvar_st lv = Some (V_p (ConstInt32 c))"
+      using ass_is(1,7)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
       done
     have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
