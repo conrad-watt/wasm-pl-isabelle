@@ -21,14 +21,12 @@ declare Quotient_i32[transfer_rule]
 \<comment> \<open>memory\<close>
 type_synonym byte = "8 word"
 
-typedef bytes = "UNIV :: (byte list) set" ..
-setup_lifting type_definition_bytes
-declare Quotient_bytes[transfer_rule]
+type_synonym bytes = "byte list"
 
 lift_definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" is "(\<lambda>(a::8 word) n as. takefill a n as)" .
 lift_definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" is "(\<lambda>n (b::8 word). replicate n b)" .
 definition msbyte :: "bytes \<Rightarrow> byte" where
-  "msbyte bs = last (Rep_bytes bs)"
+  "msbyte bs = last ( bs)"
 
 typedef mem = "UNIV :: (byte list) set" ..
 setup_lifting type_definition_mem
@@ -37,9 +35,9 @@ declare Quotient_mem[transfer_rule]
 lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>m n. m!n)::byte list \<Rightarrow> nat \<Rightarrow> byte" .
 lift_definition mem_length :: "mem \<Rightarrow> nat" is "length" .
 
-lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. take l (drop n m))" .
-lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m n bs. (take n m) @ bs @ (drop (n + length bs) m))" .
-lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is append .
+lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. (take l (drop n m))::(byte list))" .
+lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m n bs. ((take n m) @ bs @ (drop (n + length bs) m))::(byte list))" .
+lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m bs. append m bs::(byte list))" .
 
 lemma take_drop_map:
   assumes "ind+n \<le> length bs"
@@ -54,7 +52,7 @@ qed
 
 lemma read_bytes_map:
   assumes "ind+n \<le> mem_length m"
-  shows "read_bytes m ind n = Abs_bytes (map (\<lambda>k. byte_at m k) [ind..<ind+n])"
+  shows "read_bytes m ind n = (map (\<lambda>k. byte_at m k) [ind..<ind+n])"
   using assms
   unfolding read_bytes_def byte_at_def mem_length_def
   by (simp add: take_drop_map)

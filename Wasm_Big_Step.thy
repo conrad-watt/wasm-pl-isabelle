@@ -818,9 +818,10 @@ next
     by (simp add: is_const_def)
 qed auto
 
+(*   "load_packed sx m n off lp l = map_option (sign_extend sx l) (load m n off lp)" *)
 lemma reduce_to_n_load_packed:
   assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> (\<exists>bs. (load_packed sx m (nat_of_int c) off (tp_length tp) (t_length t) = Some bs \<and> res = RValue (ves@[(wasm_deserialise bs t)])) \<or> (load_packed sx m (nat_of_int c) off (tp_length tp) (t_length t) = None \<and> res = RTrap)))"
+  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (tp_length tp) = Some bs \<and> res = RValue (ves@[(wasm_deserialise (sign_extend sx (t_length t) bs) t)])) \<or> (load m (nat_of_int c) off (tp_length tp) = None \<and> res = RTrap)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -859,7 +860,7 @@ next
   thus ?case
     using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
     by (simp add: is_const_def)
-qed auto
+qed (auto simp add: load_packed_def)
 
 lemma reduce_to_n_drop:
   assumes "((s,vs,($$*ves)@[$C v, $Drop]) \<Down>k{\<Gamma>} (s',vs',res))"

@@ -5,7 +5,7 @@ typedef lvar = "UNIV :: (nat) set" ..
 (* global, local, logical variables*)
 datatype var = Gl nat | Lc nat | Lv lvar
 
-datatype 'a lvar_v = V_p v | V_n nat | V_a 'a
+datatype 'a lvar_v = V_p v | V_n nat | V_b byte | V_a 'a
 
 (* variable store *)
 (* global, local, logical variables*)

@@ -11,14 +11,14 @@ lemma old_mem_size_def:
 lemma mem_grow_size:
   assumes "mem_grow m n = m'"
   shows "(mem_size m + n) = mem_size m'"
-  using assms Abs_mem_inverse Abs_bytes_inverse
+  using assms Abs_mem_inverse
   unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
   by (auto simp add: Ki64_def)
 
 lemma mem_grow_length:
   assumes "mem_grow m n = m'"
   shows "(mem_length m + (n * Ki64)) = mem_length m'"
-  using assms Abs_mem_inverse Abs_bytes_inverse
+  using assms Abs_mem_inverse
         bytes_replicate.rep_eq mem_append.rep_eq mem_length.rep_eq
   unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
   by auto
@@ -57,7 +57,7 @@ lemma store_size1:
 lemma store_size:
   assumes "(store m n off v l = Some m')"
   shows "mem_size m = mem_size m'"
-  using assms Abs_mem_inverse Abs_bytes_inverse mem_length.rep_eq
+  using assms Abs_mem_inverse mem_length.rep_eq
   unfolding store_def write_bytes_def bytes_takefill_def
   by (cases "n + off + l \<le> mem_length m") (auto simp add: old_mem_size_def)
 
