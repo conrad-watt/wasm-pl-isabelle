@@ -19,7 +19,7 @@ lemma mem_grow_length:
   assumes "mem_grow m n = m'"
   shows "(mem_length m + (n * Ki64)) = mem_length m'"
   using assms Abs_mem_inverse
-        bytes_replicate.rep_eq mem_append.rep_eq mem_length.rep_eq
+        bytes_replicate_def mem_append.rep_eq mem_length.rep_eq
   unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
   by auto
 
@@ -35,7 +35,7 @@ lemma mem_grow_byte_at_m_n:
           "k < mem_length (mem_grow m n)"
   shows "byte_at (mem_grow m n) k = (0::byte)"
   using assms
-  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate.rep_eq
+  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate_def
   by (simp add: nth_append)
 
 lemma load_size:
@@ -60,6 +60,13 @@ lemma store_size:
   using assms Abs_mem_inverse mem_length.rep_eq
   unfolding store_def write_bytes_def bytes_takefill_def
   by (cases "n + off + l \<le> mem_length m") (auto simp add: old_mem_size_def)
+
+lemma store_length:
+  assumes "(store m n off v l = Some m')"
+  shows "mem_length m = mem_length m'"
+  using assms Abs_mem_inverse mem_length.rep_eq
+  unfolding store_def write_bytes_def bytes_takefill_def
+  by (cases "n + off + l \<le> mem_length m") auto
 
 lemma store_packed_size1:
   "(store_packed m n off v l = None) = (mem_length m < (off + n + l))"

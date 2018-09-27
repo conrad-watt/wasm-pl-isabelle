@@ -1238,6 +1238,87 @@ proof -
     by simp
 qed
 
+lemma write_bytes_byte_at_outside:
+  assumes "mem_length m \<ge> k+l"
+          "m' = (write_bytes m k (bytes_takefill 0 l bs))"
+          "j < k \<or> (j \<ge> k+l \<and> j < mem_length m)"
+  shows "byte_at m' j = byte_at m j"
+proof -
+  have "mem_length m = mem_length m'"
+    using store_length[of m k 0 bs l m'] assms
+    unfolding store_def
+    by simp
+  {
+    assume "\<not> j - min (length (Rep_mem m)) k < l"
+    assume a1: "j < length (Rep_mem m)"
+    assume "k + l \<le> j"
+    then have "k \<le> length (Rep_mem m)"
+      using a1 by simp
+    then have "Rep_mem m ! (k + j - min (length (Rep_mem m)) k) = Rep_mem m ! j"
+      by (metis (no_types) Nat.diff_diff_right add.left_neutral add_diff_cancel_left' rev_min_pm1 zero_diff)
+  }
+  thus ?thesis
+    using assms
+    unfolding write_bytes_def bytes_takefill_def byte_at_def mem_length_def
+    by (auto simp add: Abs_mem_inverse nth_append)
+qed
+
+lemma write_bytes_byte_at_inside:
+  assumes "mem_length m \<ge> k+l"
+          "m' = (write_bytes m k (bytes_takefill 0 l bs))"
+          "j \<ge> k \<and> j < k+l"
+        shows "byte_at m' j = (bytes_takefill 0 l bs)!(j-k)"
+proof -
+  have 0:"min (length (Rep_mem m)) k = k"
+    using assms(1)
+    unfolding mem_length_def
+    by simp
+  show ?thesis
+    using assms
+    unfolding mem_length_def write_bytes_def bytes_takefill_def byte_at_def
+    by (auto simp add: Abs_mem_inverse nth_append 0)
+qed
+
+lemma make_bs_t_store_reifies:
+  assumes "h = ((make_bs_t k l bs'), None)"
+          "l = length bs'"
+          "heap_disj h hf"
+          "reifies_heap_contents m (fst (heap_merge h hf))"
+          "reifies_heap_length m (snd (heap_merge h hf))"
+          "mem_length m \<ge> k+l"
+          "m' = (write_bytes m k (bytes_takefill 0 l bs))"
+          "h' = ((make_bs_t k l (bytes_takefill 0 l bs)), None)"
+  shows "heap_disj h' hf"
+        "reifies_heap_contents m' (fst (heap_merge h' hf))"
+        "reifies_heap_length m' (snd (heap_merge h' hf))"
+proof -
+  have 2:"mem_length m = mem_length m'"
+    using store_length[of m k 0 bs l m'] assms(6,7)
+    unfolding store_def
+    by simp
+  thus "reifies_heap_length m' (snd (heap_merge h' hf))"
+    using assms(1,5,8)
+    unfolding reifies_heap_length_def heap_merge_def Let_def
+    by (simp split: prod.splits)
+  have 0:"l = length (bytes_takefill 0 l bs)"
+    unfolding bytes_takefill_def
+    by simp
+  have 1:"dom (fst h) = dom (fst h')"
+    using assms(1,8) make_bs_t_dom_ran(1)[OF _ assms(2)] make_bs_t_dom_ran(1)[OF _ 0]
+    by simp
+  thus "heap_disj h' hf"
+    using assms(1,3,8)
+    unfolding heap_disj_def map_disj_def
+    by simp
+  hence 3:"dom (fst (heap_merge h hf)) = dom (fst (heap_merge h' hf))"
+    using 1 heap_dom_merge_eq
+    by blast
+  show "reifies_heap_contents m' (fst (heap_merge h' hf))"
+    using assms(1,4,8) 1 make_bs_t_dom_ran(2)[OF _ assms(2)] make_bs_t_dom_ran(2)[OF _ 0] 2 3
+    unfolding reifies_heap_contents_def
+    apply auto
+qed
+
 lemma make_bs_t_packed_reifies:
   assumes "h = ((make_bs_t (k+off) np bs), None)"
           "np = length bs"

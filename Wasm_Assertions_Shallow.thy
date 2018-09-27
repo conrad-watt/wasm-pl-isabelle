@@ -112,6 +112,15 @@ lemma heap_dom_merge:
   unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
   by (auto simp add: map_add_comm split: option.splits prod.splits)
 
+lemma heap_dom_merge_eq:
+  assumes "dom (fst h1) = dom(fst h2)"
+  shows "dom (fst (heap_merge h1 hf)) = dom (fst (heap_merge h2 hf))"
+  using assms
+  unfolding heap_disj_def heap_merge_def option_disj_def heap_disj_def map_disj_def disjnt_def
+  apply (simp add: map_add_comm split: option.splits prod.splits)
+  apply force
+  done
+
 lemma heap_disj_merge_maps1:
   assumes "heap_disj h1 h2"
           "(fst h1) x = Some y"

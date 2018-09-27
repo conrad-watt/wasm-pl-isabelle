@@ -23,8 +23,12 @@ type_synonym byte = "8 word"
 
 type_synonym bytes = "byte list"
 
-lift_definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" is "(\<lambda>(a::8 word) n as. takefill a n as)" .
-lift_definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" is "(\<lambda>n (b::8 word). replicate n b)" .
+definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" where
+  "bytes_takefill = (\<lambda>(a::8 word) n as. takefill a n as)"
+
+definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" where
+  "bytes_replicate = (\<lambda>n (b::8 word). replicate n b)"
+
 definition msbyte :: "bytes \<Rightarrow> byte" where
   "msbyte bs = last ( bs)"
 
