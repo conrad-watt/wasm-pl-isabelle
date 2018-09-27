@@ -1306,17 +1306,63 @@ proof -
   have 1:"dom (fst h) = dom (fst h')"
     using assms(1,8) make_bs_t_dom_ran(1)[OF _ assms(2)] make_bs_t_dom_ran(1)[OF _ 0]
     by simp
-  thus "heap_disj h' hf"
+  thus h'_disj:"heap_disj h' hf"
     using assms(1,3,8)
     unfolding heap_disj_def map_disj_def
     by simp
   hence 3:"dom (fst (heap_merge h hf)) = dom (fst (heap_merge h' hf))"
     using 1 heap_dom_merge_eq
     by blast
-  show "reifies_heap_contents m' (fst (heap_merge h' hf))"
-    using assms(1,4,8) 1 make_bs_t_dom_ran(2)[OF _ assms(2)] make_bs_t_dom_ran(2)[OF _ 0] 2 3
+  have 4:"\<And>ind b. fst (heap_merge h hf) ind = Some b \<Longrightarrow> ind < mem_length m \<and> b = byte_at m ind"
+    using assms(4)
     unfolding reifies_heap_contents_def
-    apply auto
+    by (metis domI option.sel)
+  have "\<And>ind b. fst (heap_merge h' hf) ind = Some b \<Longrightarrow> b = byte_at m' ind"
+  proof -
+    {
+      fix ind b
+      assume local_assms:"fst (heap_merge h' hf) ind = Some b"
+      hence loc_1:"ind \<in> dom (fst (heap_merge h' hf))"
+        by (simp add: domI)
+      hence "ind < mem_length m"
+        using assms(4) 3
+        unfolding reifies_heap_contents_def
+        by auto
+      then consider (1) "ind \<ge> k \<and> ind < k+l" | (2) "ind < k \<or> (ind \<ge> k+l \<and> ind < mem_length m)"
+        using not_le_imp_less
+        by blast
+      hence "b = byte_at m' ind"
+      proof cases
+        case 1
+        hence a1_1:"ind \<in> dom (fst h')"
+          using local_assms assms(8) make_bs_t_dom_ran[OF _ 0] heap_merge_dom[OF loc_1]
+          by auto
+        show ?thesis
+          using write_bytes_byte_at_inside[OF assms(6,7) 1] heap_dom_merge
+          apply simp
+          apply clarify
+          apply (metis 0 a1_1 assms(8) fst_conv h'_disj heap_disj_merge_maps2 heap_disj_sym heap_merge_disj_sym local_assms make_bs_t_dom_ran(2) option.inject)
+          done
+      next
+        case 2
+        hence "ind \<in> dom (fst hf)"
+          using local_assms assms(8) make_bs_t_dom_ran[OF _ 0] heap_merge_dom[OF loc_1]
+          by auto
+        thus ?thesis
+          using write_bytes_byte_at_outside[OF assms(6,7) 2] 4 heap_dom_merge
+          apply simp
+          apply clarify
+          apply (metis h'_disj assms(3) heap_disj_merge_maps1 heap_disj_sym heap_merge_disj_sym local_assms)
+          done
+      qed
+    }
+    thus "\<And>ind b. fst (heap_merge h' hf) ind = Some b \<Longrightarrow> b = byte_at m' ind"
+      by blast
+  qed
+  thus "reifies_heap_contents m' (fst (heap_merge h' hf))"
+    using assms(4) 2 3
+    unfolding reifies_heap_contents_def
+    by auto
 qed
 
 lemma make_bs_t_packed_reifies:
@@ -2830,34 +2876,12 @@ next
       apply (cases h)
       apply (auto simp add: is_n_locs_from_lvar32_off_def var_st_get_lvar_def)
       done
-    have "mem_length m \<ge> (Wasm_Base_Defs.nat_of_int c) + off + (t_length t)"
+    have 7:"mem_length m \<ge> ((Wasm_Base_Defs.nat_of_int c) + off) + (t_length t)"
       using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is
       unfolding reifies_s_def reifies_heap_def
       by (metis 2(3,4) option.sel smem_ind_def)
-    have 5:"h = (make_bs_t ((Wasm_Base_Defs.nat_of_int c) + off) (t_length t) bs, None)"
-           "(t_length t) = length bs"
-      using ass_is(1) list_all2_bs_unique[OF bs_def] vcs_is
-      apply (simp_all add: is_n_locs_from_lvar32_off_lvars_def is_n_locs_from_lvar32_off_def split: prod.splits)
-       apply (metis ass_is(7) lvar_v.inject(1) option.inject prod.exhaust_sel v.inject(1) var_st_get_lvar_def)
-      apply (metis prod.exhaust_sel)
-      done
-    have 6:"load m (Wasm_Base_Defs.nat_of_int c) off (t_length t) = Some bs"
-      using 2(1,2,3,4) make_bs_t_reifies[OF 5(1) 5(2) ass_is(2) _ _ 6] ass_is(3)
-      unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
-      by simp
-    hence 3:"res = RValue (vcsf @ [wasm_deserialise bs t])"
-      using 2(5)
-      by fastforce
-    have 4:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (t_length t) lv off) [ConstInt32 c] h st"
-      using ass_is(1) vcs_is
-      by simp
-    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvs lvs t] \<^sub>s|\<^sub>h
-      is_n_locs_from_lvar32_off_lvars lvs (t_length t) lv off)"
-      using is_n_locs_from_lvar32_off_reifies[OF 4] 3 local_assms(1) ass_is 2(1,2)
-      unfolding res_wf_def
-      apply simp
-      apply (metis ass_is(2) ass_is(7) bs_def eq_snd_iff)
-      done
+    have PPP
+      using make_bs_t_store_reifies[OF _ _ ass_is(2) _ _ 7]
   }
   thus ?case
     unfolding valid_triple_defs
