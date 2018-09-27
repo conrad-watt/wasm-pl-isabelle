@@ -861,6 +861,59 @@ next
     using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
     by (simp add: is_const_def)
 qed (auto simp add: load_packed_def)
+(* | store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs,RValue [])"
+*)
+lemma reduce_to_n_store:
+  assumes "((s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
+  shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mem s ! j = m \<and>
+           ((s = s' \<and> store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and> res = RTrap) \<or>
+            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some mem' \<and> s' = s\<lparr>s.mem := s.mem s[j := mem']\<rparr> \<and> res = RValue ves)))"
+  using assms
+proof (induction "(s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+  case (const_value s vs es k s' vs' res ves ves')
+  consider (1) "(es = [$Store t None a off] \<and> ves = ves' @ [ConstInt32 c, v])"
+         | (2) "(es = [$C v, $Store t None a off] \<and> ves = ves'@[ConstInt32 c])"
+         | (3) "(\<exists>ves''. es = ($$*ves'')@[$C ConstInt32 c, $C v, $Store t None a off] \<and> ves' = ves@ves'')"
+    using consts_app_snoc_2[OF const_value(4)] is_const_def
+    by fastforce
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using no_reduce_to_n const_value(1)
+      by metis
+  next
+    case 2
+    thus ?thesis
+      using no_reduce_to_n2 const_value(1)
+      by blast
+  next
+    case 3
+    thus ?thesis
+      using const_value.hyps(2)
+      by auto
+  qed
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc_2_const_list[OF seq_value(7)]
+    by (meson b_e.distinct(689) e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves' s vs es k s' vs' res)
+  show ?case
+    using consts_app_snoc_2[of _ es "ves" "ConstInt32 c" "v" "$Store t None a off"]
+    apply (simp add: is_const_def)
+    apply (metis (no_types, lifting) e_type_const_conv_vs no_reduce_to_n no_reduce_to_n2 seq_nonvalue1.hyps(1,2,3,4) seq_nonvalue1.hyps(7))
+    done
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  have "\<not> const_list es"
+    using seq_nonvalue2(1,3) reduce_to_consts e_type_const_conv_vs reduce_to_n_imp_reduce_to
+    by metis
+  thus ?case
+    using consts_app_snoc_2_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
+    by (simp add: is_const_def)
+qed auto
 
 lemma reduce_to_n_drop:
   assumes "((s,vs,($$*ves)@[$C v, $Drop]) \<Down>k{\<Gamma>} (s',vs',res))"
