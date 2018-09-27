@@ -2601,6 +2601,88 @@ case (Load \<Gamma> assms lv lvs t off a)
     apply auto
     done
 next
+  case (Load_packed \<Gamma> assms lv lvs tp off t sx a)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Load t (Some (tp,sx)) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain c where vcs_is:"vcs = [ConstInt32 c]"
+                          "lvar_st lv = Some (V_p (ConstInt32 c))"
+      using ass_is(1,7)
+      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def)
+      apply (metis Suc_length_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
+      done
+    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t (Some (tp,sx)) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    obtain j m where  2:"s = s'" "locs = locs'"
+                         "smem_ind s i = Some j"
+                         "s.mem s ! j = m"
+                       "((\<exists>bs. load m (Wasm_Base_Defs.nat_of_int c)
+                                off (tp_length tp) =
+                               Some bs \<and>
+                               res =
+                               RValue
+                                (vcsf @
+                                 [wasm_deserialise
+                                   (sign_extend sx (t_length t) bs)
+                                   t]) \<or>
+                               load m (Wasm_Base_Defs.nat_of_int c)
+                                off (tp_length tp) =
+                               None \<and>
+               res = RTrap))"
+      using reduce_to_n_load_packed[OF 1]
+      by blast
+    obtain bs where bs_def:"list_all2 (\<lambda>lv b. var_st_get_lvar st lv = Some (V_b b)) lvs bs"
+      using ass_is(1)
+      apply (simp add: is_n_locs_from_lvar32_off_lvars_def)
+      apply blast
+      done
+    have 6:"(tp_length tp) \<ge> 1"
+      by (simp add: tp_length_def split: tp.splits)
+    have 5:"h = (make_bs_t ((Wasm_Base_Defs.nat_of_int c) + off) (tp_length tp) bs, None)"
+           "(tp_length tp) = length bs"
+      using ass_is(1) list_all2_bs_unique[OF bs_def] vcs_is
+      apply (simp_all add: is_n_locs_from_lvar32_off_lvars_def is_n_locs_from_lvar32_off_def split: prod.splits)
+       apply (metis ass_is(7) lvar_v.inject(1) option.inject prod.exhaust_sel v.inject(1) var_st_get_lvar_def)
+      apply (metis prod.exhaust_sel)
+      done
+    have 6:"load m (Wasm_Base_Defs.nat_of_int c) off (tp_length tp) = Some bs"
+      using 2(1,2,3,4) make_bs_t_reifies[OF 5(1) 5(2) ass_is(2) _ _ 6] ass_is(3)
+      unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
+      by simp
+    hence 3:"res = RValue  (vcsf @ [wasm_deserialise (sign_extend sx (t_length t) bs) t])"
+      using 2(5)
+      by fastforce
+    have 4:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off) [ConstInt32 c] h st"
+      using ass_is(1) vcs_is
+      by simp
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvs_packed lvs t sx (t_length t)] \<^sub>s|\<^sub>h
+      is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off)"
+      using is_n_locs_from_lvar32_off_packed_reifies[OF 4] 3 local_assms(1) ass_is 2(1,2)
+      unfolding res_wf_def
+      apply simp
+      apply (metis ass_is(2) ass_is(7) bs_def eq_snd_iff)
+      done
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
   case (Br j ls fs r assms Q)
   {
     fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
