@@ -1939,7 +1939,7 @@ next
     done
 qed auto
 
-lemma
+lemma reduce_to_n_label:
   assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
@@ -2014,6 +2014,20 @@ next
     apply blast
     done
 qed auto
+
+lemma reduce_to_n_label_emp:
+  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  shows "(((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
+         (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
+         (\<exists>n rvs s'' vs''. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
+  using reduce_to_n_label[OF assms]
+  apply safe
+  apply simp_all
+  apply (metis map_append reduce_to_consts reduce_to_n_imp_reduce_to)
+  apply (metis map_append reduce_to_consts reduce_to_n_imp_reduce_to)
+  done
 
 lemma callcl_native_imp_local_length:
   assumes "(s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
