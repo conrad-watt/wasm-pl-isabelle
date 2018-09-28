@@ -434,7 +434,7 @@ lemma no_reduce_to_n:
           "(e = $Unop t uop) \<or> (e = $Testop t testop) \<or> (e = $Binop t bop) \<or> (e = $Relop t rop) \<or>
            (e = $(Cvtop t2 cvtop t1 sx)) \<or> (e = $Drop) \<or> (e = $Select) \<or> (e = $Br_if j) \<or> (e = $Br_table js j) \<or>
            (e = $Set_local j) \<or> (e = $Tee_local j) \<or> (e = $Set_global j) \<or> (e = $Load t tp_sx a off) \<or>
-           (e = $Store t tp a off)"
+           (e = $Store t tp a off) \<or> (e = $If tf es1 es2)"
   shows False
   using assms
 proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res k rule: reduce_to_n.induct)
@@ -457,6 +457,7 @@ proof (induction "(s,vs,[e])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs'
     apply (metis append_eq_Cons_conv b_e.distinct(655) e.inject(1))
     apply (metis append_eq_Cons_conv b_e.simps(695) e.inject(1))
     apply (metis append_eq_Cons_conv b_e.simps(711) e.inject(1))
+    apply (metis append_eq_Cons_conv b_e.simps(347) e.inject(1))
     done
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
@@ -1856,6 +1857,64 @@ next
   thus ?case
     using consts_app_snoc[OF seq_nonvalue2(5)]
     by (metis reduce_to_n_consts)
+qed auto
+
+lemma reduce_to_n_if:
+  assumes "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<or>
+         ((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es2)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  using assms
+proof (induction "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  thus ?case
+    using consts_app_snoc_1[OF const_value(4)]
+    apply (simp add: is_const_def)
+    apply safe
+      apply simp_all
+      apply (metis no_reduce_to_n)
+    apply (metis no_reduce_to_n)
+    apply (metis reduce_to_n.const_value)
+    done
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_value(7)]
+    by (metis b_e.distinct(326) e.inject(1) e_type_const_unwrap)
+next
+  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  obtain vesc where ves_is:"ves = $$* vesc"
+    using e_type_const_conv_vs[OF seq_nonvalue1(1)]
+    by blast
+  then consider (1) "es = [$If (t1s _> t2s) es1 es2]" "vesc = vcs @ [ConstInt32 c]"
+              | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $If (t1s _> t2s) es1 es2]"
+                                "vcs = vesc @ ves''"
+    using consts_app_snoc_1[of vesc es vcs "ConstInt32 c" "$(If (t1s _> t2s) es1 es2)"]
+          seq_nonvalue1(7)
+    by (fastforce simp add: is_const_def)
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using no_reduce_to_n seq_nonvalue1(2)
+      apply simp
+      apply metis
+      done
+  next
+    case 2
+    thus ?thesis
+      using seq_nonvalue1(3)[OF 2(1)]
+      apply simp
+      apply (metis ves_is append_is_Nil_conv not_Cons_self2 reduce_to_n.seq_nonvalue1 seq_nonvalue1.hyps(1,4,5))
+      done
+  qed
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  thus ?case
+    using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)]
+    apply (simp add: is_const_def)
+    apply safe
+    apply (metis e_type_const_conv_vs reduce_to_n_consts)
+    done
 qed auto
 
 lemma reduce_to_n_block:
