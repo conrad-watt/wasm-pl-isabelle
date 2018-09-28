@@ -2876,12 +2876,42 @@ next
       apply (cases h)
       apply (auto simp add: is_n_locs_from_lvar32_off_def var_st_get_lvar_def)
       done
+    obtain h' m' where m'_def:"m' =
+                          write_bytes m
+                           (Wasm_Base_Defs.nat_of_int c + off)
+                           (bytes_takefill 0 (t_length t) (bits v))"
+                        "h' =
+                            ((make_bs_t (Wasm_Base_Defs.nat_of_int c + off)
+                              (t_length t)
+                              (bytes_takefill 0 (t_length t) (bits v))), None::(nat option))"
+                      
+      by blast
     have 7:"mem_length m \<ge> ((Wasm_Base_Defs.nat_of_int c) + off) + (t_length t)"
       using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is
       unfolding reifies_s_def reifies_heap_def
       by (metis 2(3,4) option.sel smem_ind_def)
-    have PPP
-      using make_bs_t_store_reifies[OF _ _ ass_is(2) _ _ 7]
+    have res_is:"store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some m'"
+         "s' = s\<lparr>s.mem := s.mem s[j := m']\<rparr>"
+         "res = RValue vcsf"
+      using 2(4,5) 7 m'_def(1)
+      unfolding store_def
+      by (simp_all split: if_splits)
+    have h'_is:"heap_disj h' hf"
+         "reifies_heap_contents m' (fst (heap_merge h' hf))"
+         "reifies_heap_length m' (snd (heap_merge h' hf))"
+      using make_bs_t_store_reifies[OF bs_is(1,2) ass_is(2) _ _ 7 m'_def(1,2)] ass_is(3) 2(2,3,4)
+      unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
+      by simp_all
+    have ass_sat_is:"ass_sat ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (t_length t) lv32 off) [] h' st"
+      using vcs_is(2,3) ass_is(7) m'_def(2)
+      by (simp add: bytes_takefill_def stack_ass_sat_def is_n_locs_from_lvar32_off_lvar_def is_n_locs_from_lvar32_off_def var_st_get_lvar_def split: prod.splits)
+    have reifies_s_is:"reifies_s s' i (heap_merge h' hf) st fs"
+      using ass_is(3) res_is(1,2) 2(3,4) local_assms(1) h'_is
+      unfolding reifies_s_def
+      by (auto simp add: reifies_heap_def Let_def smem_ind_def)
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (t_length t) lv32 off)"
+      using 2(1) local_assms(1) res_is res_wf_intro_value[OF ass_sat_is _ h'_is(1) _ reifies_s_is ass_is(4,7)]
+      by simp
   }
   thus ?case
     unfolding valid_triple_defs
