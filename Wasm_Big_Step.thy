@@ -1860,11 +1860,11 @@ next
 qed auto
 
 lemma reduce_to_n_if:
-  assumes "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "(((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or>
-         (((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es2)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_eq c 0)"
+  assumes "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "(((s,vs,($$*vcs) @ [$(Block tf es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or>
+         (((s,vs,($$*vcs) @ [$(Block tf es2)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_eq c 0)"
   using assms
-proof (induction "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
     using consts_app_snoc_1[OF const_value(4)]
@@ -1884,10 +1884,10 @@ next
   obtain vesc where ves_is:"ves = $$* vesc"
     using e_type_const_conv_vs[OF seq_nonvalue1(1)]
     by blast
-  then consider (1) "es = [$If (t1s _> t2s) es1 es2]" "vesc = vcs @ [ConstInt32 c]"
-              | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $If (t1s _> t2s) es1 es2]"
+  then consider (1) "es = [$If tf es1 es2]" "vesc = vcs @ [ConstInt32 c]"
+              | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $If tf es1 es2]"
                                 "vcs = vesc @ ves''"
-    using consts_app_snoc_1[of vesc es vcs "ConstInt32 c" "$(If (t1s _> t2s) es1 es2)"]
+    using consts_app_snoc_1[of vesc es vcs "ConstInt32 c" "$(If tf es1 es2)"]
           seq_nonvalue1(7)
     by (fastforce simp add: is_const_def)
   thus ?case

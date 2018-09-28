@@ -2479,7 +2479,76 @@ next
     done
 next
   case (If \<Gamma> assms St H lv tf es1 Q es2)
-  then show ?case sorry
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs ((St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H)::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$If tf es1 es2]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat (St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have block_is:"\<Gamma> \<Turnstile>_n {St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv)} [$Block tf es1] {Q}"
+         "\<Gamma> \<Turnstile>_n {St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv)} [$Block tf es2] {Q}"
+      using If(3,4)[of n] local_assms(1,2)
+      unfolding valid_triple_defs
+      by auto
+    have 1:"list_all2 (\<lambda>Si v. Si v st) (St @ [is_lvar32 lv]) vcs"
+      using ass_is(1)
+      by (simp add: stack_ass_sat_def var_st_get_lvar_def)
+    obtain vcs' v where vcs_is:"vcs = vcs'@[v]" "is_lvar32 lv v st"
+                               "stack_ass_sat St vcs' st"
+      using list_all2_snoc1[OF 1]
+      by (fastforce simp add: stack_ass_sat_def)
+    then obtain c where v_is:"v = ConstInt32 c"
+      using typeof_i32
+      by (fastforce simp add: is_lvar32_def var_st_get_lvar_def)
+    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $If tf es1 es2]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by simp
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+    proof (cases "int_eq c 0")
+      case True
+      hence true_is:"(s, locs, ($$* vcsf) @ ($$* vcs') @ [$Block tf es2]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+        using reduce_to_n_if[OF 2]
+        by (metis append_assoc map_append)
+      hence 0:"ass_sat  (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv)) vcs' h st"
+        using ass_is vcs_is True v_is
+        by (fastforce simp add: stack_ass_sat_def is_lvar_unop_def is_lvar_def is_lvar32_def heap_disj_def Option.is_none_def
+                                option_disj_def map_disj_def disjnt_def var_st_get_lvar_def is_lvar32_zero_def sep_conj_def emp_def heap_merge_def
+                      split: option.splits prod.splits)
+      thus ?thesis
+        using res_wf_valid_triple_n_intro[OF block_is(2) _ true_is]
+        unfolding ass_wf_def
+        by (metis ass_is(2,3,4,5,6,7))
+    next
+      case False
+      hence false_is:"(s, locs, ($$* vcsf) @ ($$* vcs') @ [$Block tf es1]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+        using reduce_to_n_if[OF 2]
+        by (metis append_assoc map_append)
+      hence 0:"ass_sat  (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv)) vcs' h st"
+        using ass_is vcs_is False v_is
+        by (fastforce simp add: stack_ass_sat_def is_lvar_unop_def is_lvar_def is_lvar32_def heap_disj_def Option.is_none_def
+                                option_disj_def map_disj_def disjnt_def var_st_get_lvar_def is_lvar32_n_def sep_conj_def emp_def heap_merge_def
+                      split: option.splits prod.splits)
+      thus ?thesis
+        using res_wf_valid_triple_n_intro[OF block_is(1) _ false_is]
+        unfolding ass_wf_def
+        by (metis ass_is(2,3,4,5,6,7))
+    qed
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
 next
   case (Get_local \<Gamma> assms j lv)
   {
