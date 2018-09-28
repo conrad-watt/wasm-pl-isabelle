@@ -1861,8 +1861,8 @@ qed auto
 
 lemma reduce_to_n_if:
   assumes "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<or>
-         ((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es2)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "(((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or>
+         (((s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es2)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_eq c 0)"
   using assms
 proof (induction "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
@@ -1870,10 +1870,9 @@ proof (induction "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If (t1s _> t2s) es1 es2)]
     using consts_app_snoc_1[OF const_value(4)]
     apply (simp add: is_const_def)
     apply safe
-      apply simp_all
-      apply (metis no_reduce_to_n)
-    apply (metis no_reduce_to_n)
-    apply (metis reduce_to_n.const_value)
+    apply simp_all
+    apply ((metis no_reduce_to_n)+)[6]
+    apply ((metis reduce_to_n.const_value)+)[3]
     done
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
@@ -1912,7 +1911,6 @@ next
   thus ?case
     using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)]
     apply (simp add: is_const_def)
-    apply safe
     apply (metis e_type_const_conv_vs reduce_to_n_consts)
     done
 qed auto

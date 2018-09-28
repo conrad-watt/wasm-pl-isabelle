@@ -1066,6 +1066,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Drop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Drop] {[] \<^sub>s|\<^sub>h emp }"
 | Select:"\<lbrakk>lv_arb \<noteq> lv1; lv_arb \<noteq> lv2; lv_arb \<noteq> lv32\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp } [$Select] {Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st)) }"
 | Block:"\<lbrakk>(fs,Q#ls,r)\<bullet>assms \<turnstile> {P} ($*es) {Q}; length tn = n; length tm = m; ass_stack_len P = n; ass_stack_len Q = m\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {P} [$(Block (tn _> tm) es)] {Q}"
+| If:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$(Block tf es1)] {Q}; \<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) } [$(Block tf es2)] {Q}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St@[is_lvar32 lv] \<^sub>s|\<^sub>h H } [$(If tf es1 es2)] {Q}"
 | Get_local:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h local_is_lvar j lv } [$Get_local j] {[is_lvar lv] \<^sub>s|\<^sub>h local_is_lvar j lv }"
 | Set_local:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_local j] {[] \<^sub>s|\<^sub>h local_is_lvar j lv }"
 | Tee_local:"\<lbrakk> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv,is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_local j] { Q } \<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Tee_local j] { Q }"
@@ -2476,6 +2477,9 @@ next
     unfolding valid_triple_defs
     apply auto
     done
+next
+  case (If \<Gamma> assms St H lv tf es1 Q es2)
+  then show ?case sorry
 next
   case (Get_local \<Gamma> assms j lv)
   {
