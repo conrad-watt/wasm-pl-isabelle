@@ -1859,83 +1859,98 @@ next
 qed auto
 
 lemma reduce_to_n_block:
-  assumes "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  assumes "(s,vs,($$*vcsf) @ ($$*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
           "length ($$*vcs) = n"
           "length t1s = n"
           "length t2s = m"
-  shows "(s,vs,[Label m [] (($$*vcs) @ ($* es))]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "(s,vs,($$*vcsf) @ [Label m [] (($$*vcs) @ ($* es))]) \<Down>k{\<Gamma>} (s',vs',res)"
   using assms
-proof (induction "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($$*vcsf) @ ($$*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
   case (const_value s vs es' k \<Gamma> s' vs' res ves)
-  consider (1) "($$* ves) = ($$* vcs) @ [$(Block (t1s _> t2s) es)]" "es' = []"
-         | (2) "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es' = ($$* ves'') @ [$(Block (t1s _> t2s) es)] \<and> vcs = ves' @ ves'')"
-    using consts_app_snoc[OF const_value(4)] inj_basic_econst
-    by auto
+  consider (1) ves_p1 ves_p2 where "es' = ($$* ves_p2) @ [$Block (t1s _> t2s) es]" "vcs = ves_p1 @ ves_p2" "ves = vcsf @ ves_p1"
+         | (2) ves_p1' ves_p2' where "es' = ($$* ves_p2') @ ($$* vcs) @ [$Block (t1s _> t2s) es]" "vcsf = ves_p1' @ ves_p2'" "ves = ves_p1'"
+    using consts_app_app_consts1[OF const_value(4)]
+    by (fastforce simp add: is_const_def)
   thus ?case
   proof cases
     case 1
-    thus ?thesis
-      using consts_cons_last[OF 1(1)[symmetric]] is_const_def
-      by simp
-  next
-    case 2
-    then obtain ves' ves'' where ves'_def:"($$* ves) = $$* ves'"
-                                           "es' = ($$* ves'') @ [$(Block (t1s _> t2s) es)]"
-                                           "vcs = ves' @ ves''"
-      by blast
     show ?thesis
-    proof (cases "length ves'' \<ge> length t1s")
+    proof (cases "length ves_p2 \<ge> n")
       case True
-      hence "ves'' = vcs"
-        using ves'_def const_value(5,6)
+      hence "ves_p2 = vcs"
+        using 1 const_value(5)
         by auto
       thus ?thesis
-        using const_value
-              ves'_def inj_basic_econst
-        by simp
+        using const_value 1
+        apply simp
+        apply (metis append_Nil list.simps(8) reduce_to_n.const_value)
+        done
     next
       case False
       thus ?thesis
-        using reduce_to_n_block_imp_length const_value(1,5) ves'_def(2)
-        by fastforce
+        using const_value reduce_to_n_block_imp_length
+        by simp (metis 1(1))
     qed
+  next
+    case 2
+    thus ?thesis
+      using const_value(2)[OF 2(1)] const_value
+      apply simp
+      apply (metis reduce_to_n.const_value)
+      done
   qed
 next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
   thus ?case
-    using consts_app_snoc[OF seq_value(7)]
+    using consts_app_app_consts[OF seq_value(7)]
     apply simp
-    apply (metis reduce_to_n_consts res_b.inject(1))
+    apply safe
+    apply (metis (mono_tags, lifting) append_self_conv b_e.distinct(239) e.inject(1) e_type_const_unwrap is_const_list map_append)
     done
 next
   case (seq_nonvalue1 ves s vs es' k \<Gamma> s' vs' res)
-  obtain ves' ves'' where ves'_def:"ves = $$* ves'"
-                                   "es' = ($$* ves'') @ [$Block (t1s _> t2s) es]"
-                                   "vcs = ves' @ ves''"
-    using consts_app_snoc[OF seq_nonvalue1(7)] seq_nonvalue1(6)
-    by blast
-  show ?case
-  proof (cases "length ves'' \<ge> length t1s")
-    case True
-    hence "ves'' = vcs"
-      using ves'_def seq_nonvalue1
-      by auto
+  consider (1) ves_p1 ves_p2 where "es' = ($$* ves_p2) @ [$Block (t1s _> t2s) es]"
+                                   "vcs = ves_p1 @ ves_p2"
+                                   "ves = ($$* vcsf) @ ($$* ves_p1)"
+          | (2) ves_p1' ves_p2' where "es' = ($$* ves_p2') @ ($$* vcs) @ [$Block (t1s _> t2s) es]"
+                                       "vcsf = ves_p1' @ ves_p2' \<and> ves = $$* ves_p1'"
+    using consts_app_app_consts[OF seq_nonvalue1(7)] seq_nonvalue1
+    by (fastforce simp add: is_const_def)
+  thus ?case
+  proof cases
+    case 1
     thus ?thesis
-      using seq_nonvalue1
-            ves'_def inj_basic_econst
-      by simp
+    proof (cases "length ves_p2 \<ge> n")
+      case True
+      hence "ves_p2 = vcs"
+        using 1 seq_nonvalue1
+        by auto
+      thus ?thesis
+        using seq_nonvalue1 1
+        apply simp
+        apply (metis Nil_is_map_conv not_Cons_self2 reduce_to_n.seq_nonvalue1 self_append_conv2)
+        done
+    next
+      case False
+      thus ?thesis
+        using seq_nonvalue1 reduce_to_n_block_imp_length
+        by simp (metis 1(1))
+    qed
   next
-    case False
+    case 2
     thus ?thesis
-      using reduce_to_n_block_imp_length seq_nonvalue1.hyps(2) ves'_def(2)
+      using seq_nonvalue1(3)[OF 2(1)] reduce_to_n.seq_nonvalue1 seq_nonvalue1.hyps(1,4,5) seq_nonvalue1.prems(1,2,3)
       by auto
   qed
 next
-  case (seq_nonvalue2 s vs es k s' vs' res es')
-  thus ?case
-    using consts_app_snoc[OF seq_nonvalue2(5)] reduce_to_n_consts
+  case (seq_nonvalue2 s vs es'' k \<Gamma> s' vs' res es')
+  show ?case
+    using consts_app_snoc[of es'' es' "vcsf@vcs" "$Block (t1s _> t2s) es"] seq_nonvalue2(1,3,4,5)
     apply simp
-    apply blast
+    apply safe
+    apply simp_all
+    apply (metis reduce_to_n_consts)
+    apply (metis reduce_to_n_consts)
     done
 qed auto
 

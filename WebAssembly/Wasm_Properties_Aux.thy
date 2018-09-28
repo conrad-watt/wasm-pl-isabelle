@@ -1039,6 +1039,49 @@ proof -
   qed simp_all
 qed
 
+lemma consts_app_app_consts:
+  assumes "es @ es' = ($$* ves') @ ($$* ves'') @ [e]"
+          "\<not>is_const e"
+  shows "(es  = ($$* ves') @ ($$* ves'') @ [e] \<or> es' = []) \<or>
+         (\<exists>ves_p1 ves_p2. es' = ($$*ves_p2)@[e] \<and> ves'' = ves_p1@ves_p2 \<and> es = ($$*ves')@($$*ves_p1)) \<or>
+         (\<exists>ves_p1 ves_p2. es' = ($$*ves_p2)@($$*ves'')@[e] \<and> ves' = ves_p1@ves_p2 \<and> es = ($$*ves_p1))"
+proof -
+  have 1:"es @ es' = ($$* (ves'@ves'')) @ [e]"
+    using assms(1)
+    by simp
+  consider (a) "es = ($$* ves' @ ves'') @ [e] \<and> es' = []"
+         | (b) ves'a ves''a where "es = $$* ves'a"
+                                   "es' = ($$* ves''a) @ [e]"
+                                   "ves' @ ves'' = ves'a @ ves''a"
+    using consts_app_snoc[OF 1]
+    by (metis assms(2) consts_cons_last(2))
+  thus ?thesis
+  proof cases
+    case a
+    thus ?thesis
+      by simp
+  next
+    case b
+    thus ?thesis
+      unfolding append_eq_append_conv2
+      by safe auto
+  qed
+qed
+
+lemma consts_app_app_consts1:
+  assumes "($$* ves) @ es = ($$* ves') @ ($$* ves'') @ [e]"
+          "\<not>is_const e"
+  shows "(\<exists>ves_p1 ves_p2. es = ($$*ves_p2)@[e] \<and> ves'' = ves_p1@ves_p2 \<and> ves = ves'@ves_p1) \<or>
+         (\<exists>ves_p1 ves_p2. es = ($$*ves_p2)@($$*ves'')@[e] \<and> ves' = ves_p1@ves_p2 \<and> ves = ves_p1)"
+  using consts_app_app_consts[OF assms]
+  apply safe
+  apply simp_all
+  apply (metis append_assoc assms(2) consts_cons_last(2))
+  apply (metis append_Nil2 append_assoc assms(1) assms(2) consts_cons_last(2))
+  apply (metis inj_basic_econst map_append map_injective)
+  apply (metis inj_basic_econst map_injective)
+  done
+
 lemma consts_app_snoc_1_const_list:
   assumes "es @ es' = ($$* ves') @ [$C v, e]"
           "\<not>is_const e"
