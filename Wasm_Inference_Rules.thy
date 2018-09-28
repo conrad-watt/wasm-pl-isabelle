@@ -2401,7 +2401,7 @@ next
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n' assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Block (tn _> tm) es]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Block (tn _> tm) es]) \<Down>n'{(labs, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat P vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2415,29 +2415,65 @@ next
     have vcs_is:"length vcs = n"
       using Block(4) stack_ass_sat_len[OF ass_is(1)]
       by simp
-    have 2:"s = s'"
-           "locs = locs'"
-           "j < length locs"
-           "res = RValue (vcsf @ [locs ! j])"
-      using reduce_to_n_block[OF local_assms(4)]
+    hence 2:"(s, locs, ($$* vcsf) @ [Label m [] (($$* vcs) @ ($* es))]) \<Down>n'{(labs, ret, i)} (s', locs', res)"
+      using reduce_to_n_block[OF local_assms(4)] Block(2,3)
       by auto
-    hence 0:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h local_is_lvar j lv) [(locs!j)] h st"
-      using ass_is(1) 2 ass_is(4)
-      apply (cases st)
-      apply (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
-                       var_st_get_lvar_def local_is_lvar_def var_st_get_local_def reifies_loc_def
-                  split: if_splits)
-      done
-    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar lv] \<^sub>s|\<^sub>h local_is_lvar j lv)"
-      using vcs_is local_assms(1,4) 0 ass_is 2
-      unfolding res_wf_def
-      apply simp
-      apply (metis prod.exhaust prod.sel(2))
-      done
+    obtain res' where res'_def:"(s, locs, ($$* []) @ ($$* vcs) @ ($* es)) \<Down>n'{(m # labs, ret, i)} (s', locs', res')"
+                      "(res' = RTrap \<and> res = RTrap \<or>
+                            (\<exists>rvs. res' = RValue rvs \<and>
+                                   res = RValue (vcsf @ rvs)) \<or>
+                            (\<exists>rvs. res' = RReturn rvs \<and>
+                                   res = RReturn rvs) \<or>
+                            (\<exists>n rvs.
+                                res' = RBreak (Suc n) rvs \<and>
+                                res = RBreak n rvs) \<or>
+                            (\<exists>rvs. res' = RBreak 0 rvs \<and>
+               res = RValue (vcsf @ rvs)))"
+      using reduce_to_n_label_emp1[OF 2]
+      by fastforce
+    have r_lab':"reifies_lab (m#labs) (fs, Q # ls, r)"
+      using local_assms(1) ass_is(5) Block(5)
+      unfolding reifies_lab_def
+      by auto
+    have 3:"(fs, Q # ls, r) \<Turnstile>_n' {P} $* es {Q}"
+      using Block(6) local_assms(2)
+      unfolding valid_triple_defs
+      by auto
+    hence res_wf':"res_wf lvar_st (fs, Q # ls, r) res' locs' s' hf [] Q"
+      using res_wf_valid_triple_n_intro[OF 3 _ res'_def(1)] ass_is r_lab' local_assms(1)
+      unfolding ass_wf_def reifies_ret_def
+      by auto
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+    proof (cases res')
+      case (RValue x1)
+      thus ?thesis
+        using res_wf' local_assms(1) res'_def(2)
+        unfolding res_wf_def
+        by simp
+    next
+      case (RBreak x21 x22)
+      thus ?thesis
+        using res_wf' local_assms(1) res'_def(2)
+        unfolding res_wf_def
+        apply (cases x21)
+         apply simp_all
+        done
+    next
+      case (RReturn x3)
+      thus ?thesis
+        using res_wf' local_assms(1) res'_def(2)
+        unfolding res_wf_def
+        by simp
+    next
+      case RTrap
+      thus ?thesis
+        using res_wf'
+        unfolding res_wf_def
+        by simp
+    qed
   }
   thus ?case
     unfolding valid_triple_defs
-    apply (cases \<Gamma>)
     apply auto
     done
 next

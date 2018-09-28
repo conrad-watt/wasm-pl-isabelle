@@ -1960,8 +1960,8 @@ lemma reduce_to_n_label:
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
-         (\<exists>n rvs s'' vs''. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
-                           ((s'',vs'',($$*vcs)@($$*rvs)@les) \<Down>k{(ls,r,i)} (s',vs',res)))"
+         (\<exists>rvs s'' vs''. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
+                         ((s'',vs'',($$*vcs)@($$*rvs)@les) \<Down>k{(ls,r,i)} (s',vs',res)))"
   using assms
 proof (induction "(s,vs,($$*vcs)@[Label m les es])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (const_value s vs es' k s' vs' res ves)
@@ -2036,13 +2036,24 @@ lemma reduce_to_n_label_emp:
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
-         (\<exists>n rvs s'' vs''. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
   using reduce_to_n_label[OF assms]
   apply safe
   apply simp_all
   apply (metis map_append reduce_to_consts reduce_to_n_imp_reduce_to)
   apply (metis map_append reduce_to_consts reduce_to_n_imp_reduce_to)
   done
+
+lemma reduce_to_n_label_emp1:
+  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  shows "\<exists>res'. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',res')) \<and>
+         ((res' = RTrap \<and> res = RTrap) \<or>
+          (\<exists>rvs. res' = RValue rvs \<and> res = RValue (vcs@rvs)) \<or>
+          (\<exists>rvs. res' = RReturn rvs \<and> res = RReturn rvs) \<or>
+          (\<exists>n rvs. res' = RBreak (Suc n) rvs \<and> res = RBreak n rvs) \<or>
+          (\<exists>rvs. res' = RBreak 0 rvs \<and> res = RValue (vcs@rvs)))"
+  using reduce_to_n_label_emp[OF assms]
+  by auto
 
 lemma callcl_native_imp_local_length:
   assumes "(s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
