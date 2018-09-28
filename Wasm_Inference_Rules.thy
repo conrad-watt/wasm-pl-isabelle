@@ -1073,6 +1073,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Load:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (t_length t) lv off } [$(Load t None a off)] {[is_lvs lvs t] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (t_length t) lv off }"
 | Load_packed:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off} [$(Load t (Some (tp,sx)) a off)] {[is_lvs_packed lvs t sx (t_length t)] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off }"
 | Store:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. (\<exists>bs. is_n_locs_from_lvar32_off bs (t_length t) lv32 off h st)) } [$(Store t None a off)] {[] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (t_length t) lv32 off }"
+| Store_packed:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. (\<exists>bs. is_n_locs_from_lvar32_off bs (tp_length tp) lv32 off h st)) } [$(Store t (Some tp) a off)] {[] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (tp_length tp) lv32 off }"
 | Br:"\<lbrakk>j < length ls\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {ls ! j} [$Br j] { Q }"
 | Br_if:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$Br j] { Q }\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_if j] { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) }"
 | Br_table:"\<lbrakk>\<forall>jn < (length js). (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_eq_n lv jn) } [$Br (js!jn)] { Q }); (\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_geq_n lv (length js)) } [$Br j] { Q })\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H } [$Br_table js j] { Q }"
@@ -2910,6 +2911,98 @@ next
       unfolding reifies_s_def
       by (auto simp add: reifies_heap_def Let_def smem_ind_def)
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (t_length t) lv32 off)"
+      using 2(1) local_assms(1) res_is res_wf_intro_value[OF ass_sat_is _ h'_is(1) _ reifies_s_is ass_is(4,7)]
+      by simp
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply (cases \<Gamma>)
+    apply auto
+    done
+next
+  case (Store_packed \<Gamma> assms lv32 lv tp off t a)
+  {
+    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. \<exists>bs. is_n_locs_from_lvar32_off bs (tp_length tp) lv32 off h st))::('a ass))"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Store t (Some tp) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat ([is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. \<exists>bs. is_n_locs_from_lvar32_off bs (tp_length tp) lv32 off h st)) vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    obtain c v where vcs_is:"vcs = [ConstInt32 c, v]"
+                            "lvar_st lv32 = Some (V_p (ConstInt32 c))"
+                            "lvar_st lv = Some (V_p v)"
+      using ass_is(1,7) typeof_i32
+      by (fastforce simp add: list_all2_Cons1 stack_ass_sat_def is_lvar_def is_lvar32_def var_st_get_lvar_def)
+    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c,$C v, $Store t (Some tp) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      using local_assms(4) vcs_is
+      by auto
+    obtain j m where  2:"locs = locs'"
+                        "types_agree t v"
+                        "smem_ind s i = Some j"
+                        "s.mem s ! j = m"
+                                 "(s = s' \<and>
+                                  store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and>
+                                  res = RTrap \<or>
+                                  (\<exists>mem'.
+                                      store (s.mem s ! j)
+                                       (Wasm_Base_Defs.nat_of_int c) off
+                                       (bits v) (tp_length tp) =
+                                      Some mem' \<and>
+                                      s' = s\<lparr>s.mem := s.mem s[j := mem']\<rparr> \<and>
+                                      res = RValue vcsf))"
+      using reduce_to_n_store_packed[OF 1]
+      by blast
+    have 6:"(tp_length tp) \<ge> 1"
+      by (simp add: tp_length_def split: tp.splits)
+    obtain bs where bs_is:"h = (make_bs_t ((Wasm_Base_Defs.nat_of_int c) + off) (tp_length tp) bs, None)"
+                          "tp_length tp = length bs"
+      using ass_is(1,7) vcs_is(2)
+      apply (cases h)
+      apply (auto simp add: is_n_locs_from_lvar32_off_def var_st_get_lvar_def)
+      done
+    obtain h' m' where m'_def:"m' =
+                          write_bytes m
+                           (Wasm_Base_Defs.nat_of_int c + off)
+                           (bytes_takefill 0 (tp_length tp) (bits v))"
+                        "h' =
+                            ((make_bs_t (Wasm_Base_Defs.nat_of_int c + off)
+                              (tp_length tp)
+                              (bytes_takefill 0 (tp_length tp) (bits v))), None::(nat option))"
+                      
+      by blast
+    have 7:"mem_length m \<ge> ((Wasm_Base_Defs.nat_of_int c) + off) + (tp_length tp)"
+      using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is
+      unfolding reifies_s_def reifies_heap_def
+      by (metis 2(3,4) option.sel smem_ind_def)
+    have res_is:"store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some m'"
+         "s' = s\<lparr>s.mem := s.mem s[j := m']\<rparr>"
+         "res = RValue vcsf"
+      using 2(4,5) 7 m'_def(1)
+      unfolding store_def
+      by (simp_all split: if_splits)
+    have h'_is:"heap_disj h' hf"
+         "reifies_heap_contents m' (fst (heap_merge h' hf))"
+         "reifies_heap_length m' (snd (heap_merge h' hf))"
+      using make_bs_t_store_reifies[OF bs_is(1,2) ass_is(2) _ _ 7 m'_def(1,2)] ass_is(3) 2(2,3,4)
+      unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
+      by simp_all
+    have ass_sat_is:"ass_sat ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (tp_length tp) lv32 off) [] h' st"
+      using vcs_is(2,3) ass_is(7) m'_def(2)
+      by (simp add: bytes_takefill_def stack_ass_sat_def is_n_locs_from_lvar32_off_lvar_def is_n_locs_from_lvar32_off_def var_st_get_lvar_def split: prod.splits)
+    have reifies_s_is:"reifies_s s' i (heap_merge h' hf) st fs"
+      using ass_is(3) res_is(1,2) 2(3,4) local_assms(1) h'_is
+      unfolding reifies_s_def
+      by (auto simp add: reifies_heap_def Let_def smem_ind_def)
+    have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (tp_length tp) lv32 off)"
       using 2(1) local_assms(1) res_is res_wf_intro_value[OF ass_sat_is _ h'_is(1) _ reifies_s_is ass_is(4,7)]
       by simp
   }
