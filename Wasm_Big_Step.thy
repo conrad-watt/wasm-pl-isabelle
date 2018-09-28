@@ -1832,6 +1832,113 @@ lemma calln: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)
   using calln_imp reduce_to_n.call
   by (metis is_const_list)
 
+lemma reduce_to_n_block_imp_length:
+  assumes "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "length ($$*vcs) \<ge> length t1s"
+  using assms
+proof (induction "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  thus ?case
+    using consts_app_snoc[OF const_value(4)] consts_cons_last[of _ _ ves] is_const_def
+    by fastforce
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(7)]
+    by (metis is_const_list)
+next
+  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue1(7)]
+    by force
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)]
+    by (metis reduce_to_n_consts)
+qed auto
+
+lemma reduce_to_n_block:
+  assumes "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+          "length ($$*vcs) = n"
+          "length t1s = n"
+          "length t2s = m"
+  shows "(s,vs,[Label m [] (($$*vcs) @ ($* es))]) \<Down>k{\<Gamma>} (s',vs',res)"
+  using assms
+proof (induction "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (const_value s vs es' k \<Gamma> s' vs' res ves)
+  consider (1) "($$* ves) = ($$* vcs) @ [$(Block (t1s _> t2s) es)]" "es' = []"
+         | (2) "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es' = ($$* ves'') @ [$(Block (t1s _> t2s) es)] \<and> vcs = ves' @ ves'')"
+    using consts_app_snoc[OF const_value(4)] inj_basic_econst
+    by auto
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using consts_cons_last[OF 1(1)[symmetric]] is_const_def
+      by simp
+  next
+    case 2
+    then obtain ves' ves'' where ves'_def:"($$* ves) = $$* ves'"
+                                           "es' = ($$* ves'') @ [$(Block (t1s _> t2s) es)]"
+                                           "vcs = ves' @ ves''"
+      by blast
+    show ?thesis
+    proof (cases "length ves'' \<ge> length t1s")
+      case True
+      hence "ves'' = vcs"
+        using ves'_def const_value(5,6)
+        by auto
+      thus ?thesis
+        using const_value
+              ves'_def inj_basic_econst
+        by simp
+    next
+      case False
+      thus ?thesis
+        using reduce_to_n_block_imp_length const_value(1,5) ves'_def(2)
+        by fastforce
+    qed
+  qed
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(7)]
+    apply simp
+    apply (metis reduce_to_n_consts res_b.inject(1))
+    done
+next
+  case (seq_nonvalue1 ves s vs es' k \<Gamma> s' vs' res)
+  obtain ves' ves'' where ves'_def:"ves = $$* ves'"
+                                   "es' = ($$* ves'') @ [$Block (t1s _> t2s) es]"
+                                   "vcs = ves' @ ves''"
+    using consts_app_snoc[OF seq_nonvalue1(7)] seq_nonvalue1(6)
+    by blast
+  show ?case
+  proof (cases "length ves'' \<ge> length t1s")
+    case True
+    hence "ves'' = vcs"
+      using ves'_def seq_nonvalue1
+      by auto
+    thus ?thesis
+      using seq_nonvalue1
+            ves'_def inj_basic_econst
+      by simp
+  next
+    case False
+    thus ?thesis
+      using reduce_to_n_block_imp_length seq_nonvalue1.hyps(2) ves'_def(2)
+      by auto
+  qed
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)] reduce_to_n_consts
+    apply simp
+    apply blast
+    done
+qed auto
+
 lemma callcl_native_imp_local_length:
   assumes "(s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
           "cl = Func_native j (t1s _> t2s) ts es"
