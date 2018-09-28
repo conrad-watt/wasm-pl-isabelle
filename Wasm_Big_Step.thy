@@ -1939,6 +1939,82 @@ next
     done
 qed auto
 
+lemma
+  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  shows "(((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
+         (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
+         (\<exists>n rvs s'' vs''. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
+                           ((s'',vs'',($$*vcs)@($$*rvs)@les) \<Down>k{(ls,r,i)} (s',vs',res)))"
+  using assms
+proof (induction "(s,vs,($$*vcs)@[Label m les es])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (const_value s vs es' k s' vs' res ves)
+  consider (1) "($$* ves) = ($$* vcs) @ [Label m les es]" "es' = []"
+         | (2) ves' ves'' where "($$* ves) = ($$* ves')" "es' = ($$* ves'') @ [Label m les es]" "vcs = ves' @ ves''"
+    using consts_app_snoc[OF const_value(4)] inj_basic_econst
+    by auto
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      apply simp
+      apply (metis const_list_cons_last(2) e.distinct(5) e_type_const_unwrap is_const_list)
+      done
+  next
+    case 2
+    thus ?thesis
+      using const_value(2)[OF 2(2)] const_value.hyps(3) inj_basic_econst reduce_to_n.const_value
+      by fastforce
+  qed
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(7)] is_const_list
+    by auto
+next
+  case (seq_nonvalue1 ves s vs es' k s' vs' res)
+  obtain ves' ves'' where ves'_def:"ves = $$* ves'"
+                                   "es' = ($$* ves'') @ [Label m les es]"
+                                   "vcs = ves' @ ves''"
+    using consts_app_snoc[OF seq_nonvalue1(7)] seq_nonvalue1(6)
+    by blast
+  consider (1) "((s, vs, es) \<Down>k{(m # ls, r, i)} (s', vs', res))"
+               "res = RTrap \<or> (\<exists>rvs. res = RReturn rvs) \<or> (\<exists>rvs. res = RValue rvs)"
+         | (2) bn brvs where "((s, vs, es) \<Down>k{(m # ls, r, i)} (s', vs', RBreak (Suc bn) brvs))"
+                             "res = RBreak bn brvs"
+         | (3) rvs s'' vs'' where"((s, vs, es) \<Down>k{(m # ls, r, i)} (s'', vs'', RBreak 0 rvs))"
+                                 "((s'', vs'', ($$* ves'') @ ($$* rvs) @ les) \<Down>k{(ls, r, i)} (s', vs', res))"
+    using seq_nonvalue1(3)[OF ves'_def(2)] seq_nonvalue1(4)
+    by auto
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using seq_nonvalue1.hyps(4)
+      by auto
+  next
+    case 2
+    thus ?thesis
+      using seq_nonvalue1.hyps(4)
+      by auto
+  next
+    case 3
+    thus ?thesis
+      using ves'_def
+      apply simp
+      apply (metis append_is_Nil_conv reduce_to_consts reduce_to_n.seq_nonvalue1 reduce_to_n_imp_reduce_to seq_nonvalue1.hyps(1) seq_nonvalue1.hyps(4) seq_nonvalue1.hyps(5))
+      done
+  qed
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)] reduce_to_n_consts
+    apply simp
+    apply blast
+    done
+qed auto
+
 lemma callcl_native_imp_local_length:
   assumes "(s,vs,($$* vcs) @ [Callcl cl]) \<Down>k{(ls,r,i)} (s',vs',res)"
           "cl = Func_native j (t1s _> t2s) ts es"
