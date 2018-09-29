@@ -1082,6 +1082,18 @@ lemma consts_app_app_consts1:
   apply (metis inj_basic_econst map_injective)
   done
 
+lemma consts_app_snoc_0_const_list:
+  assumes "es @ es' = ($$* ves') @ [e]"
+          "\<not>is_const e"
+          "\<not> const_list es"
+  shows "es' = []"
+  using consts_app_snoc[of es es' "ves'" e] assms is_const_list
+  apply simp
+  apply safe
+   apply blast
+  apply blast
+  done
+
 lemma consts_app_snoc_1_const_list:
   assumes "es @ es' = ($$* ves') @ [$C v, e]"
           "\<not>is_const e"

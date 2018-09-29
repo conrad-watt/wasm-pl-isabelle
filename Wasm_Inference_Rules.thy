@@ -2025,7 +2025,19 @@ next
     by simp
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
-  then show ?case sorry
+  have 0:"\<not>is_const ($Loop (t1s _> t2s) b_es)"
+         "\<not>is_const (Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es)))"
+      unfolding is_const_def
+      by simp_all
+  consider (loop) "es @ es' = ($$* vcsf) @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es @ es' = ($$* vcsf) @ [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using seq_value(7)
+    by blast
+  thus ?case
+    using consts_app_snoc_0_const_list[of es es'] seq_value(5,6) 0
+    apply cases
+    apply (auto simp flip: map_append)
+    done
 next
   case (seq_nonvalue1 ves s vs es k s' vs' res)
   then show ?case sorry
