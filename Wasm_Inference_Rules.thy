@@ -2040,7 +2040,32 @@ next
     done
 next
   case (seq_nonvalue1 ves s vs es k s' vs' res)
-  then show ?case sorry
+  have 0:"\<not>const_list es"
+    using seq_nonvalue1(2,4) reduce_to_n_consts e_type_const_conv_vs
+    by simp blast
+  consider (loop) "ves @ es = ($$* vcsf) @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "ves @ es = ($$* vcsf) @ [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using seq_nonvalue1(7)
+    by blast
+  thus ?case
+  proof cases
+    case loop
+    then show ?thesis sorry
+  next
+    case label
+    obtain ves' ves'' where ves'_def:"ves = ($$* ves')"
+                                     "es = ($$* ves'') @ [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+                                     " vcsf = ves' @ ves''"
+      using consts_app_snoc[OF label] seq_nonvalue1(6)
+      by blast
+    hence "res_wf lvar_st (fs, ls, r) res vs' s' hf ves'' Q"
+      using seq_nonvalue1
+      by auto
+    thus ?thesis
+      using ves'_def seq_nonvalue1(4)
+      unfolding res_wf_def
+      by (auto split: res_b.splits)
+  qed
 next
   case (seq_nonvalue2 s vs es k s' vs' res es')
   obtain vconst where "es = $$* vconst"
