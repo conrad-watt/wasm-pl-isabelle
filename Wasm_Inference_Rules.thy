@@ -1971,7 +1971,14 @@ next
   then show ?case sorry
 next
   case (seq_nonvalue2 s vs es k s' vs' res es')
-  then show ?case sorry
+  obtain vconst where "es = $$* vconst"
+    using seq_nonvalue2(4,5) consts_app_snoc
+    apply simp
+    apply (metis append_assoc map_append seq_nonvalue2.hyps(4))
+    done
+  thus ?case
+    using seq_nonvalue2(1,3) reduce_to_n_consts
+    by blast
 next
   case (label_trap s vs es k n' labs s' vs' les)
   have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
