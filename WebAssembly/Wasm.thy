@@ -157,7 +157,7 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | br_table:"\<lbrakk>length is > (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br (is!(nat_of_int c)))]\<rparr>"
 | br_table_length:"\<lbrakk>length is \<le> (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
   \<comment> \<open>\<open>local\<close>\<close>
-| local_const:"\<lbrakk>const_list es; length es = n\<rbrakk> \<Longrightarrow> \<lparr>[Local n i vs es]\<rparr> \<leadsto> \<lparr>es\<rparr>"
+| local_const:"\<lbrakk>const_list es\<rbrakk> \<Longrightarrow> \<lparr>[Local n i vs es]\<rparr> \<leadsto> \<lparr>es\<rparr>"
 | local_trap:"\<lparr>[Local n i vs [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>return\<close>\<close>
 | return:"\<lbrakk>const_list vs; length vs = n; Lfilled j lholed (vs @ [$Return]) es\<rbrakk>  \<Longrightarrow> \<lparr>[Local n i vls es]\<rparr> \<leadsto> \<lparr>vs\<rparr>"

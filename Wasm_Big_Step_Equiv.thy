@@ -62,6 +62,69 @@ next
     by auto
 qed
 
+lemma reduce_trans_label:
+  assumes "reduce_trans i (s,vs,es) (s',vs',es')"
+  shows "reduce_trans i (s,vs,[Label n les es]) (s',vs',[Label n les es'])"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' rule: rtranclp_induct)
+  case base
+  thus ?case
+    by auto
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  hence "reduce_trans i (s,vs,[Label n les es]) (s'',vs'',[Label n les es''])"
+    using step(3)
+    unfolding reduce_trans_def
+    by simp
+  moreover
+  have 1:"\<lparr>s'';vs'';es''\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  have "\<lparr>s'';vs'';[Label n les es'']\<rparr> \<leadsto>_i \<lparr>s';vs';[Label n les es']\<rparr>"
+    using reduce.label[OF 1] Lfilled.intros(2)[of "[]" _ n les "LBase [] []" "[]" 0]
+    apply simp
+    apply (meson Lfilled_exact.L0 Lfilled_exact_imp_Lfilled const_list_def list_all_simps(2))
+    done
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+
+lemma reduce_trans_local:
+  assumes "reduce_trans j (s,vs,es) (s',vs',es')"
+  shows "reduce_trans i (s,v0s,[Local n j vs es]) (s',v0s,[Local n j vs' es'])"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' rule: rtranclp_induct)
+  case base
+  thus ?case
+    by auto
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  hence "reduce_trans i (s,v0s,[Local n j vs es]) (s'',v0s,[Local n j vs'' es''])"
+    using step(3)
+    unfolding reduce_trans_def
+    by simp
+  moreover
+  have 1:"\<lparr>s'';vs'';es''\<rparr> \<leadsto>_j \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  have "\<lparr>s'';v0s;[Local n j vs'' es'']\<rparr> \<leadsto>_i \<lparr>s';v0s;[Local n j vs' es']\<rparr>"
+    using reduce.local[OF 1]
+    by blast
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+ 
+
 lemma reduce_trans_compose:
   assumes "reduce_trans i (s,vs,es) (s'',vs'',es'')"
           "reduce_trans i (s'',vs'',es'') (s',vs',es')"
@@ -76,7 +139,7 @@ lemma Wasm_Big_Step_Sound:
   shows "(res = RTrap \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',[Trap])) \<and>
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',$$*rvs)))"
   using assms
-proof (induction "(s,vs,es)" "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' es res rule: reduce_to.induct)
+proof (induction "(s,vs,es)" "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' es res ls r i rule: reduce_to.induct)
   case (emp s vs)
   thus ?case
     unfolding reduce_trans_def
@@ -344,11 +407,30 @@ next
     using reduce_trans_L0[OF 1, of ves "[]"]
     by simp
 next
-  case (label_value s vs es n s' vs' res les)
-  then show ?case sorry
+  case (label_value s vs es n ls r i s' vs' res les)
+  hence 1:"reduce_trans i (s, vs, es)  (s', vs',$$* res)"
+    by fastforce
+  have "\<lparr>s'; vs'; [Label n les ($$* res)]\<rparr> \<leadsto>_i \<lparr>s'; vs'; $$* res \<rparr>"
+    using reduce.basic[OF reduce_simple.label_const] is_const_list
+    by fastforce
+  thus ?case
+    using reduce_trans_label[OF 1, of n les] reduce_trans_app_end
+    by blast
 next
   case (local_value s lls es n j s' lls' res vs)
-  then show ?case sorry
+  hence 1:"reduce_trans j (s, lls, es) (s', lls', $$* res)"
+    by simp
+  have "reduce_trans i (s, vs, [Local n j lls es]) (s', vs, [Local n j lls' ($$* res)])"
+    using reduce_trans_local[OF 1]
+    by blast
+  moreover
+  have "\<lparr>s'; vs; [Local n j lls' ($$* res)]\<rparr> \<leadsto>_i \<lparr>s'; vs; ($$* res)\<rparr>"
+    using reduce.basic[OF reduce_simple.local_const] is_const_list
+    by fastforce
+  ultimately
+  show ?case
+    using reduce_trans_app_end
+    by blast
 next
   case (seq_value s vs es s'' vs'' res'' es' s' vs' res')
   hence 1:"reduce_trans i (s, vs, es) (s'', vs'', $$* res'')"
@@ -427,25 +509,49 @@ next
       by auto
   qed auto
 next
-  case (label_trap s vs es n s' vs' les)
-  then show ?case sorry
+  case (label_trap s vs es n ls r i s' vs' les)
+  hence 1:"reduce_trans i (s, vs, es) (s', vs', [Trap])"
+    by simp
+  have "reduce_trans i (s, vs, [Label n les es]) (s', vs', [Label n les [Trap]])"
+    using reduce_trans_label[OF 1]
+    by blast
+  moreover
+  have "\<lparr>s'; vs'; [Label n les [Trap]]\<rparr> \<leadsto>_i \<lparr>s'; vs'; [Trap]\<rparr>"
+    using reduce.basic[OF reduce_simple.label_trap]
+    by blast
+  ultimately
+  show ?case
+    using reduce_trans_app_end
+    by blast
 next
   case (local_trap s lls es n j s' lls' vs)
-  then show ?case sorry
+  hence 1:"reduce_trans j (s, lls, es) (s', lls', [Trap])"
+    by simp
+  have "reduce_trans i (s, vs, [Local n j lls es]) (s', vs, [Local n j lls' [Trap]])"
+    using reduce_trans_local[OF 1]
+    by blast
+  moreover
+  have "\<lparr>s'; vs; [Local n j lls' [Trap]]\<rparr> \<leadsto>_i \<lparr>s'; vs; [Trap]\<rparr>"
+    using reduce.basic[OF reduce_simple.local_trap] is_const_list
+    by fastforce
+  ultimately
+  show ?case
+    using reduce_trans_app_end
+    by blast
 next
   case (label_break_suc s vs es n s' vs' bn bvs les)
   thus ?case
     by auto
 next
-  case (label_break_nil s vs es n s'' vs'' bvs les s' vs')
-  then show ?case sorry
+  case (label_break_nil s vs es n ls r s'' vs'' bvs les s' vs' res)
+  thus ?case sorry
 next
   case (label_return s vs es n s' vs' rvs les)
   thus ?case
     by auto
 next
   case (local_return s lls es n j s' lls' rvs vs)
-  then show ?case sorry
+  thus ?case sorry
 qed
 
 end
