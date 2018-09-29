@@ -1938,7 +1938,7 @@ definition P_reduce where
 lemma reduce_to_n_loop:
   assumes "(s,locs,es) \<Down>k{(labs, ret, i)} (s',locs',res)"
           "es = ($$*vcsf) @ ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
-           es = ($$*vcsf) @ [(Label m [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
+           es = ($$*vcsf) @ [(Label n [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
           "length ($$*vcs) = n"
           "length t1s = n"
           "length t2s = m"
@@ -1948,15 +1948,21 @@ lemma reduce_to_n_loop:
           "(fs,P#ls,r) \<Turnstile>_k {P} ($*b_es) {Q}"
   shows "res_wf lvar_st (fs,ls,r) res locs' s' hf vcsf Q"
   using assms
-proof (induction "(s,locs,es)" k "(labs, ret, i)" "(s',locs',res)" arbitrary: s locs s' locs' res vcs vcsf es rule: reduce_to_n.induct)
-  case (loop ves n t1s t2s m s vs es k s' vs' res)
-  then show ?case sorry
-next
+proof (induction "(s,locs,es)" k "(labs, ret, i)" "(s',locs',res)" arbitrary: s locs s' locs' res vcs vcsf es labs ls st h rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
   then show ?case sorry
 next
-  case (label_value s vs es k n s' vs' res les)
-  then show ?case sorry
+  case (label_value s vs es k n' labs s' vs' res les)
+  have les_is:"vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
+    using label_value(3)
+    by auto
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RValue res)"
+    using label_value(1)
+    by auto
+  show ?case
+    using res_wf_valid_triple_n_intro[OF label_value(10,9) 1] les_is(1)
+    unfolding res_wf_def
+    by simp
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
   then show ?case sorry
@@ -1967,17 +1973,70 @@ next
   case (seq_nonvalue2 s vs es k s' vs' res es')
   then show ?case sorry
 next
-  case (label_trap s vs es k n s' vs' les)
-  then show ?case sorry
+  case (label_trap s vs es k n' labs s' vs' les)
+  have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
+    using label_trap(3)
+    by auto
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RTrap)"
+    using label_trap(1)
+    by auto
+  show ?case
+    using res_wf_valid_triple_n_intro[OF label_trap(10,9) 1]
+    unfolding res_wf_def
+    by simp
 next
-  case (label_break_suc s vs es k n s' vs' bn bvs les)
-  then show ?case sorry
+  case (label_break_suc s vs es k n' labs s' vs' bn bvs les)
+  have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
+    using label_break_suc(3)
+    by auto
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RBreak (Suc bn) bvs)"
+    using label_break_suc(1)
+    by auto
+  show ?case
+    using res_wf_valid_triple_n_intro[OF label_break_suc(10,9) 1]
+    unfolding res_wf_def
+    by simp
 next
-  case (label_break_nil s vs es k n s'' vs'' bvs les s' vs' res)
-  then show ?case sorry
+  case (label_break_nil s vs es k n' labs s'' vs'' bvs les s' vs' res)
+  have 0:"reifies_lab (n # labs) (fs, P # ls, r)"
+         "reifies_ret ret (fs, P # ls, r)"
+    using label_break_nil(11)
+    unfolding ass_wf_def
+    by simp_all
+  have les_is:"vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
+    using label_break_nil(5)
+    by auto
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s'', vs'', RBreak 0 bvs)"
+    using label_break_nil(1)
+    by auto
+  have res_wf_bvs:"res_wf lvar_st (fs, P # ls, r) (RBreak 0 bvs) vs'' s'' hf [] Q"
+    using res_wf_valid_triple_n_intro[OF label_break_nil(12,11) 1]
+    by -
+  hence 2:"length ($$*bvs) = n"
+    using label_break_nil(9) stack_ass_sat_len
+    unfolding res_wf_def
+    by fastforce
+  obtain st'' h'' where st''_def:"ass_wf lvar_st ret (fs, P # ls, r) (n # labs) vs'' s'' hf st'' h'' bvs P"
+                                 "snd (snd st'') = lvar_st"
+    using 0 res_wf_bvs
+    unfolding res_wf_def ass_wf_def
+    by fastforce
+  thus ?case
+    using label_break_nil(4)[OF _ 2 label_break_nil(7,8,9,10) st''_def(1) label_break_nil(12)]
+          les_is
+    by blast
 next
-  case (label_return s vs es k n s' vs' rvs les)
-  then show ?case sorry
+  case (label_return s vs es k n' labs s' vs' rvs les)
+  have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
+    using label_return(3)
+    by auto
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RReturn rvs)"
+    using label_return(1)
+    by auto
+  show ?case
+    using res_wf_valid_triple_n_intro[OF label_return(10,9) 1]
+    unfolding res_wf_def
+    by simp
 qed auto
 
 theorem
