@@ -1950,7 +1950,67 @@ lemma reduce_to_n_loop:
   using assms
 proof (induction "(s,locs,es)" k "(labs, ret, i)" "(s',locs',res)" arbitrary: s locs s' locs' res vcs vcsf es labs ls st h rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
-  then show ?case sorry
+  consider (loop) "($$* ves) @ es = ($$* vcsf) @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "($$* ves) @ es = ($$* vcsf) @ [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using const_value(4)
+    by blast
+  thus ?case
+  proof cases
+    case loop
+    consider (a) ves_p1 ves_p2 where "es = ($$* ves_p2) @ [$Loop (t1s _> t2s) b_es]" "vcs = ves_p1 @ ves_p2" "ves = vcsf @ ves_p1"
+           | (b) ves_p1' ves_p2' where "es = ($$* ves_p2') @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]" "vcsf = ves_p1' @ ves_p2'" "ves = ves_p1'"
+      using consts_app_app_consts1[OF loop]
+      by (fastforce simp add: is_const_def)
+    thus ?thesis
+    proof cases
+      case a
+      show ?thesis
+      proof (cases "length ves_p2 \<ge> n")
+        case True
+        hence vcsf_is:"ves_p2 = vcs" "ves = vcsf"
+          using a const_value(5)
+          by auto
+        hence "res_wf lvar_st (fs, ls, r) (RValue (res)) vs' s' hf [] Q"
+          using const_value a loop True
+          by simp
+        thus ?thesis
+          using vcsf_is
+          unfolding res_wf_def
+          by simp
+      next
+        case False
+        thus ?thesis
+          using const_value reduce_to_n_loop_imp_length
+          by simp (metis a(1))
+      qed
+    next
+      case b
+      hence "res_wf lvar_st (fs, ls, r) (RValue res) vs' s' hf ves_p2' Q"
+        using const_value
+        by simp
+      thus ?thesis
+        using b
+        unfolding res_wf_def
+        by simp
+    qed
+  next
+    case label
+    have 0:"\<not>is_const (Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es)))"
+      unfolding is_const_def
+      by simp
+    obtain ves' ves'' where ves'_def:"($$* ves) = ($$* ves')"
+                                     "es = ($$* ves'') @ [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+                                     "vcsf = ves' @ ves''"
+      using consts_app_snoc[OF label] consts_cons_last(2) 0
+      by metis
+    hence "res_wf lvar_st (fs, ls, r) (RValue (res)) vs' s' hf (ves'') Q"
+      using const_value
+      by simp
+    thus ?thesis
+      using inj_basic_econst ves'_def
+      unfolding res_wf_def
+      by simp
+  qed
 next
   case (label_value s vs es k n' labs s' vs' res les)
   have les_is:"vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
