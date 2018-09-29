@@ -1066,6 +1066,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Drop:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Drop] {[] \<^sub>s|\<^sub>h emp }"
 | Select:"\<lbrakk>lv_arb \<noteq> lv1; lv_arb \<noteq> lv2; lv_arb \<noteq> lv32\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp } [$Select] {Ex_ass lv_arb ([is_lvar lv_arb] \<^sub>s|\<^sub>h (\<lambda>h st. lvar_is_lvar_and_lvar32_0 lv_arb lv2 lv32 h st \<or> lvar_is_lvar_and_lvar32_n lv_arb lv1 lv32 h st)) }"
 | Block:"\<lbrakk>(fs,Q#ls,r)\<bullet>assms \<turnstile> {P} ($*es) {Q}; length tn = n; length tm = m; ass_stack_len P = n; ass_stack_len Q = m\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {P} [$(Block (tn _> tm) es)] {Q}"
+| Loop:"\<lbrakk>(fs,P#ls,r)\<bullet>assms \<turnstile> {P} ($*es) {Q}; length tn = n; length tm = m; ass_stack_len P = n; ass_stack_len Q = m\<rbrakk> \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {P} [$(Loop (tn _> tm) es)] {Q}"
 | If:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv) } [$(Block tf es1)] {Q}; \<Gamma>\<bullet>assms \<turnstile> { St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv) } [$(Block tf es2)] {Q}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> { St@[is_lvar32 lv] \<^sub>s|\<^sub>h H } [$(If tf es1 es2)] {Q}"
 | Get_local:"\<Gamma>\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h local_is_lvar j lv } [$Get_local j] {[is_lvar lv] \<^sub>s|\<^sub>h local_is_lvar j lv }"
 | Set_local:"\<Gamma>\<bullet>assms \<turnstile> {[is_lvar lv] \<^sub>s|\<^sub>h emp } [$Set_local j] {[] \<^sub>s|\<^sub>h local_is_lvar j lv }"
@@ -1908,6 +1909,29 @@ proof -
     by (simp add: stack_ass_sat_def)
 qed
 
+definition ass_wf_P where
+  "ass_wf_P lvar_st ret \<Gamma> labs hf P s locs vcs \<equiv> \<exists>st h. ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
+ (*
+res_wf lvar_st' \<Gamma> res locs' s' hf vcsf Q 
+*)
+definition res_wf_Q where
+  "res_wf_Q lvar_st' \<Gamma> hf Q s' locs' vcsf res \<equiv> res_wf lvar_st' \<Gamma> res locs' s' hf vcsf Q"
+
+lemma res_wf_Q_value_ext:
+  assumes "res_wf_Q lvar_st' \<Gamma> hf Q s' locs' vcsf (RValue rvs)"
+  shows "res_wf_Q lvar_st' \<Gamma> hf Q s' locs' (vcsf'@vcsf) (RValue (vcsf'@rvs))"
+  using assms
+  unfolding res_wf_Q_def res_wf_def
+  by simp
+
+lemma res_wf_Q_nonvalue_ext:
+  assumes "res_wf_Q lvar_st' \<Gamma> hf Q s' locs' vcsf res"
+          "\<And>rvs. res \<noteq> RValue rvs"
+  shows "res_wf_Q lvar_st' \<Gamma> hf Q s' locs' (vcsf'@vcsf) res"
+  using assms
+  unfolding res_wf_Q_def res_wf_def
+  by (fastforce split: res_b.splits prod.splits)
+
 theorem
   assumes "\<Gamma>\<bullet>assms \<tturnstile> specs"
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
@@ -2477,6 +2501,67 @@ next
     unfolding valid_triple_defs
     apply auto
     done
+next
+  case (Loop fs P ls r assms es Q tn n tm m n')
+  {
+    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    assume local_assms:"\<Gamma> = (fs,ls,r)"
+                       "(fs,[],None) \<TTurnstile>_n' assms"
+                       "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Loop (tn _> tm) es]) \<Down>n'{(labs, ret, i)} (s', locs', res)"
+    have ass_is:"ass_sat P vcs h st"
+                "heap_disj h hf"
+                "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
+                "reifies_loc locs st"
+                "reifies_lab labs \<Gamma>"
+                "reifies_ret ret \<Gamma>"
+                "snd (snd st) = lvar_st"
+      using local_assms(3)
+      unfolding ass_wf_def
+      by blast+
+    have vcs_is:"length ($$*vcs) = n"
+      using Loop(4) stack_ass_sat_len[OF ass_is(1)]
+      by simp
+    have 3:"(fs, P # ls, r) \<Turnstile>_n' {P} $* es {Q}"
+      using Loop(6) local_assms(2)
+      unfolding valid_triple_defs
+      by auto
+    hence 4:"P_reduce (ass_wf_P lvar_st ret \<Gamma> labs hf P) (res_wf_Q lvar_st \<Gamma> hf Q) es n' (labs, ret, i)"
+      unfolding P_reduce_def valid_triple_n_def ass_wf_P_def res_wf_Q_def res_wf_def ass_wf_def
+      apply (simp split: res_b.splits)
+      sorry
+    have "res_wf_Q lvar_st \<Gamma> hf Q s' locs' vcsf res"
+      using reduce_to_n_loop[OF local_assms(4) _ vcs_is Loop(2,3) _ _ _ 4]
+    obtain res' where res'_def:"(s, locs, ($$* []) @ ($$* vcs) @ ($* es)) \<Down>n'{(m # labs, ret, i)} (s', locs', res')"
+                      "(res' = RTrap \<and> res = RTrap \<or>
+                            (\<exists>rvs. res' = RValue rvs \<and>
+                                   res = RValue (vcsf @ rvs)) \<or>
+                            (\<exists>rvs. res' = RReturn rvs \<and>
+                                   res = RReturn rvs) \<or>
+                            (\<exists>n rvs.
+                                res' = RBreak (Suc n) rvs \<and>
+                                res = RBreak n rvs) \<or>
+                            (\<exists>rvs. res' = RBreak 0 rvs \<and>
+               res = RValue (vcsf @ rvs)))"
+      using reduce_to_n_label_emp1[OF 2]
+      by fastforce
+    have r_lab':"reifies_lab (m#labs) (fs, Q # ls, r)"
+      using local_assms(1) ass_is(5) Block(5)
+      unfolding reifies_lab_def
+      by auto
+
+    hence res_wf':"res_wf lvar_st (fs, Q # ls, r) res' locs' s' hf [] Q"
+      using res_wf_valid_triple_n_intro[OF 3 _ res'_def(1)] ass_is r_lab' local_assms(1)
+      unfolding ass_wf_def reifies_ret_def
+      by auto
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+      sorry
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    apply auto
+    done
+
 next
   case (If \<Gamma> assms St H lv tf es1 Q es2)
   {

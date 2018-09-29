@@ -2037,8 +2037,11 @@ next
     done
 qed auto
 
+definition P_reduce where
+  "P_reduce P Q b_es k \<Gamma> \<equiv> \<forall>s vs vcs s' vs' res. (P s vs vcs \<longrightarrow> ((s,vs,($$*vcs) @ ($*b_es)) \<Down>k{\<Gamma>} (s',vs',res)) \<longrightarrow> ((\<forall>rvs. ((res = RBreak 0 rvs) \<longrightarrow> P s' vs' rvs)) \<and> ((\<nexists>rvs. res = RBreak 0 rvs) \<longrightarrow> Q s' vs' [] res)))"
+
 lemma reduce_to_n_loop:
-  assumes "(s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)"
+  assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',res)"
           "es = ($$*vcsf) @ ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
            es = ($$*vcsf) @ [(Label m [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
           "length ($$*vcs) = n"
@@ -2047,40 +2050,185 @@ lemma reduce_to_n_loop:
           "P s vs vcs"
           "\<And>s' vs' vcsf vcsf' rvs. Q s' vs' vcsf (RValue rvs) \<Longrightarrow> Q s' vs' (vcsf'@vcsf) (RValue (vcsf'@rvs))"
           "\<And>s' vs' vcsf vcsf'. (\<And>rvs. res \<noteq> RValue rvs) \<Longrightarrow> Q s' vs' vcsf res \<Longrightarrow> Q s' vs' (vcsf'@vcsf) res"
-          "\<And>s vs vcs s' vs' res. (P s vs vcs \<Longrightarrow> ((s,vs,($$*vcs) @ ($*b_es)) \<Down>k{\<Gamma>} (s',vs',res)) \<Longrightarrow> (((\<exists>rvs. res = RBreak 0 rvs) \<longrightarrow> P s' vs' rvs) \<and> ((\<nexists>rvs. res = RBreak 0 rvs) \<longrightarrow> Q s' vs' [] res)))"
+          "P_reduce P Q b_es k (n#ls,r,i)"
   shows "Q s' vs' vcsf res"
   using assms
-proof (induction "(s,vs,es)" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf es rule: reduce_to_n.induct)
-  case (loop ves n t1s t2s m s vs es k \<Gamma> s' vs' res)
+proof (induction "(s,vs,es)" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf es rule: reduce_to_n.induct)
+case (emp s vs k)
+then show ?case sorry
+next
+  case (unop s vs v t op k)
   then show ?case sorry
 next
-  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  case (binop_Some op v1 v2 v s vs t k)
   then show ?case sorry
 next
-  case (label_value s vs es k n ls r i s' vs' res les)
+  case (binop_None op v1 v2 s vs t k)
   then show ?case sorry
 next
-  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  case (testop s vs v t op k)
   then show ?case sorry
 next
-  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  case (relop s vs v1 v2 t op k)
   then show ?case sorry
 next
-  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  case (convert_Some t1 v t2 sx v' s vs k)
   then show ?case sorry
 next
-  case (label_trap s vs es k n ls r i s' vs' les)
+  case (convert_None t1 v t2 sx s vs k)
   then show ?case sorry
 next
-  case (label_break_suc s vs es k n ls r i s' vs' bn bvs les)
+  case (reinterpret t1 v s vs t2 k)
   then show ?case sorry
 next
-  case (label_break_nil s vs es k n ls r i s'' vs'' bvs les s' vs' res)
+  case (unreachable s vs k)
   then show ?case sorry
 next
-  case (label_return s vs es k n ls r i s' vs' rvs les)
+  case (nop s vs k)
   then show ?case sorry
-qed auto
+next
+  case (drop s vs v k)
+  then show ?case sorry
+next
+  case (select_false n s vs v1 v2 k)
+  then show ?case sorry
+next
+  case (select_true n s vs v1 v2 k)
+  then show ?case sorry
+next
+  case (block ves n t1s t2s m s vs es k s' vs' res)
+  then show ?case sorry
+next
+  case (loop ves n t1s t2s m s vs es k s' vs' res)
+  then show ?case sorry
+next
+  case (if_false n ves s vs tf e2s k s' vs' res e1s)
+  then show ?case sorry
+next
+  case (if_true n ves s vs tf e1s k s' vs' res e2s)
+  then show ?case sorry
+next
+  case (br vcs n j s vs k)
+  then show ?case sorry
+next
+  case (br_if_false n s vs j k)
+  then show ?case sorry
+next
+  case (br_if_true n ves s vs j k s' vs' res)
+  then show ?case sorry
+next
+  case (br_table js c ves s vs k s' vs' res j)
+  then show ?case sorry
+next
+  case (br_table_length js c ves s vs j k s' vs' res)
+  then show ?case sorry
+next
+  case (return vcs r s vs k)
+  then show ?case sorry
+next
+  case (get_local vi j s v vs k)
+  then show ?case sorry
+next
+  case (set_local vi j s v vs v' k)
+  then show ?case sorry
+next
+  case (tee_local v s vs i k s' vs' res)
+  then show ?case sorry
+next
+  case (get_global s vs j k)
+  then show ?case sorry
+next
+  case (set_global s j v s' vs k)
+  then show ?case sorry
+next
+  case (load_Some s j m n off t bs vs a k)
+  then show ?case sorry
+next
+  case (load_None s j m n off t vs a k)
+then show ?case sorry
+next
+  case (load_packed_Some s j m sx n off tp t bs vs a k)
+  then show ?case sorry
+next
+  case (load_packed_None s j m sx n off tp t vs a k)
+  then show ?case sorry
+next
+  case (store_Some t v s j m n off mem' vs a k)
+  then show ?case sorry
+next
+case (store_None t v s j m n off vs a k)
+  then show ?case sorry
+next
+  case (store_packed_Some t v s j m n off tp mem' vs a k)
+  then show ?case sorry
+next
+  case (store_packed_None t v s j m n off tp vs a k)
+  then show ?case sorry
+next
+  case (current_memory s j m n vs k)
+  then show ?case sorry
+next
+  case (grow_memory s j m n c mem' vs k)
+  then show ?case sorry
+next
+  case (grow_memory_fail s j m n vs c k)
+  then show ?case sorry
+next
+  case (call ves s vs j k s' vs' res)
+  then show ?case sorry
+next
+  case (call_indirect_Some s c cl j tf ves vs k s' vs' res)
+  then show ?case sorry
+next
+  case (call_indirect_None s c cl j vs k)
+  then show ?case sorry
+next
+  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k s' vs' res)
+  then show ?case sorry
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k)
+  then show ?case sorry
+next
+  case (callcl_host_None cl t1s t2s f ves vcs n m s vs k)
+  then show ?case sorry
+next
+  case (const_value s vs es k s' vs' res ves)
+  then show ?case sorry
+next
+  case (label_value s vs es k n s' vs' res les)
+  then show ?case sorry
+next
+  case (local_value s lls es k n j s' lls' res vs)
+  then show ?case sorry
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue1 ves s vs es k s' vs' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  then show ?case sorry
+next
+  case (label_trap s vs es k n s' vs' les)
+  then show ?case sorry
+next
+  case (local_trap s lls es k n j s' lls' vs)
+  then show ?case sorry
+next
+  case (label_break_suc s vs es k n s' vs' bn bvs les)
+  then show ?case sorry
+next
+  case (label_break_nil s vs es k n s'' vs'' bvs les s' vs' res)
+  then show ?case sorry
+next
+  case (label_return s vs es k n s' vs' rvs les)
+  then show ?case sorry
+next
+  case (local_return s lls es k n j s' lls' rvs vs)
+  then show ?case sorry
+qed
+
 
 lemma reduce_to_n_label:
   assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
