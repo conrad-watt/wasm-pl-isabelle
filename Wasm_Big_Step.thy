@@ -238,6 +238,10 @@ lemma reduce_to_n_imp_reduce_to:
                       apply (fastforce intro: reduce_to.intros)+
   done
 
+lemma reduce_to_iff_reduce_to_n: "(c1 \<Down>{\<Gamma>} c2) = (\<exists>k. (c1 \<Down>k{\<Gamma>} c2))"
+  using reduce_to_imp_reduce_to_n reduce_to_n_imp_reduce_to
+  by blast
+
 lemma reduce_to_n_emp:
   assumes "(s,vs,[]) \<Down>k{\<Gamma>} (s',vs',res)"
   shows "res = RValue []"
@@ -245,11 +249,6 @@ lemma reduce_to_n_emp:
   apply (induction "(s,vs,[]::e list)" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
                   apply auto
   done
-
-lemma reduce_to_iff_reduce_to_n:
-  shows "(c1 \<Down>{\<Gamma>} c2) = (\<exists>k. (c1 \<Down>k{\<Gamma>} c2))"
-  using reduce_to_imp_reduce_to_n reduce_to_n_imp_reduce_to
-  by blast
 
 lemma reduce_to_n_consts1: "((s,vs,($$*ves)) \<Down>k{\<Gamma>} (s,vs,RValue ves))"
   using reduce_to_n.emp reduce_to_n.const_value reduce_to_n.emp

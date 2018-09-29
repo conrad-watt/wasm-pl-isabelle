@@ -2050,7 +2050,49 @@ next
   thus ?case
   proof cases
     case loop
-    then show ?thesis sorry
+    then obtain vcs' where vcs'_def:"($$*vcs') @ es = ($$* vcsf) @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+      using seq_nonvalue1(1) e_type_const_conv_vs
+      by blast
+    consider (a) ves_p1 ves_p2 where "es = ($$* ves_p2) @ [$Loop (t1s _> t2s) b_es]"
+                                     "vcs = ves_p1 @ ves_p2"
+                                     "vcs' = vcsf @ ves_p1"
+           | (b) ves_p1' ves_p2' where "es = ($$* ves_p2') @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+                                       "vcsf = ves_p1' @ ves_p2'"
+                                       "vcs' = ves_p1'"
+      using consts_app_app_consts1[OF vcs'_def]
+      by (fastforce simp add: is_const_def)
+    thus ?thesis
+    proof cases
+      case a
+      show ?thesis
+      proof (cases "length ves_p2 \<ge> n")
+        case True
+        hence vcsf_is:"ves_p2 = vcs" "vcs' = vcsf"
+          using a seq_nonvalue1(8)
+          by auto
+        hence "res_wf lvar_st (fs, ls, r) res vs' s' hf [] Q"
+          using seq_nonvalue1 a loop True
+          by simp
+        thus ?thesis
+          using vcsf_is seq_nonvalue1(4)
+          unfolding res_wf_def
+          by (simp split: res_b.splits)
+      next
+        case False
+        thus ?thesis
+          using seq_nonvalue1 reduce_to_n_loop_imp_length
+          by simp (metis a(1))
+      qed
+    next
+      case b
+      hence "res_wf lvar_st (fs, ls, r) res vs' s' hf ves_p2' Q"
+        using seq_nonvalue1
+        by simp
+      thus ?thesis
+        using b seq_nonvalue1(4)
+        unfolding res_wf_def
+        by (simp split: res_b.splits)
+    qed
   next
     case label
     obtain ves' ves'' where ves'_def:"ves = ($$* ves')"
@@ -2143,7 +2185,7 @@ next
     by simp
 qed auto
 
-theorem
+lemma inf_triples_imp_valid_triples_assms_n:
   assumes "\<Gamma>\<bullet>assms \<tturnstile> specs"
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
   using assms
@@ -4290,5 +4332,17 @@ case (ConjE \<Gamma> assms specs P es Q)
     by (metis valid_triple_defs(5,6) singletonD)
 qed
 
+lemma valid_triples_assms_n_imp_valid_triples_assms:
+  assumes "\<And>n. (\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
+  shows "(\<Gamma>\<bullet>assms \<TTurnstile> specs)"
+  using assms
+  unfolding valid_triple_defs reduce_to_iff_reduce_to_n
+  by fast
+
+theorem inference_rules_sound:
+  assumes "\<Gamma>\<bullet>assms \<tturnstile> specs"
+  shows "\<Gamma>\<bullet>assms \<TTurnstile> specs"
+  using assms inf_triples_imp_valid_triples_assms_n valid_triples_assms_n_imp_valid_triples_assms
+  by blast
 end
 end
