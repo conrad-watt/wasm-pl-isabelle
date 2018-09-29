@@ -1932,6 +1932,54 @@ lemma res_wf_Q_nonvalue_ext:
   unfolding res_wf_Q_def res_wf_def
   by (fastforce split: res_b.splits prod.splits)
 
+definition P_reduce where
+  "P_reduce P Q b_es k \<Gamma> \<equiv> \<forall>s vs vcs s' vs' res. (P s vs vcs \<longrightarrow> ((s,vs,($$*vcs) @ ($*b_es)) \<Down>k{\<Gamma>} (s',vs',res)) \<longrightarrow> ((\<forall>rvs. ((res = RBreak 0 rvs) \<longrightarrow> P s' vs' rvs)) \<and> ((\<nexists>rvs. res = RBreak 0 rvs) \<longrightarrow> Q s' vs' [] res)))"
+
+lemma reduce_to_n_loop:
+  assumes "(s,locs,es) \<Down>k{(labs, ret, i)} (s',locs',res)"
+          "es = ($$*vcsf) @ ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
+           es = ($$*vcsf) @ [(Label m [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
+          "length ($$*vcs) = n"
+          "length t1s = n"
+          "length t2s = m"
+          "ass_stack_len P = n"
+          "ass_stack_len Q = m"
+          "ass_wf lvar_st ret (fs,P#ls,r) (n#labs) locs s hf st h vcs P"
+          "(fs,P#ls,r) \<Turnstile>_k {P} ($*b_es) {Q}"
+  shows "res_wf lvar_st (fs,ls,r) res locs' s' hf vcsf Q"
+  using assms
+proof (induction "(s,locs,es)" k "(labs, ret, i)" "(s',locs',res)" arbitrary: s locs s' locs' res vcs vcsf es rule: reduce_to_n.induct)
+  case (loop ves n t1s t2s m s vs es k s' vs' res)
+  then show ?case sorry
+next
+  case (const_value s vs es k s' vs' res ves)
+  then show ?case sorry
+next
+  case (label_value s vs es k n s' vs' res les)
+  then show ?case sorry
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue1 ves s vs es k s' vs' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue2 s vs es k s' vs' res es')
+  then show ?case sorry
+next
+  case (label_trap s vs es k n s' vs' les)
+  then show ?case sorry
+next
+  case (label_break_suc s vs es k n s' vs' bn bvs les)
+  then show ?case sorry
+next
+  case (label_break_nil s vs es k n s'' vs'' bvs les s' vs' res)
+  then show ?case sorry
+next
+  case (label_return s vs es k n s' vs' rvs les)
+  then show ?case sorry
+qed auto
+
 theorem
   assumes "\<Gamma>\<bullet>assms \<tturnstile> specs"
   shows "(\<Gamma>\<bullet>assms \<TTurnstile>_n specs)"
@@ -2526,36 +2574,13 @@ next
       using Loop(6) local_assms(2)
       unfolding valid_triple_defs
       by auto
-    hence 4:"P_reduce (ass_wf_P lvar_st ret \<Gamma> labs hf P) (res_wf_Q lvar_st \<Gamma> hf Q) es n' (labs, ret, i)"
-      unfolding P_reduce_def valid_triple_n_def ass_wf_P_def res_wf_Q_def res_wf_def ass_wf_def
-      apply (simp split: res_b.splits)
-      sorry
-    have "res_wf_Q lvar_st \<Gamma> hf Q s' locs' vcsf res"
-      using reduce_to_n_loop[OF local_assms(4) _ vcs_is Loop(2,3) _ _ _ 4]
-    obtain res' where res'_def:"(s, locs, ($$* []) @ ($$* vcs) @ ($* es)) \<Down>n'{(m # labs, ret, i)} (s', locs', res')"
-                      "(res' = RTrap \<and> res = RTrap \<or>
-                            (\<exists>rvs. res' = RValue rvs \<and>
-                                   res = RValue (vcsf @ rvs)) \<or>
-                            (\<exists>rvs. res' = RReturn rvs \<and>
-                                   res = RReturn rvs) \<or>
-                            (\<exists>n rvs.
-                                res' = RBreak (Suc n) rvs \<and>
-                                res = RBreak n rvs) \<or>
-                            (\<exists>rvs. res' = RBreak 0 rvs \<and>
-               res = RValue (vcsf @ rvs)))"
-      using reduce_to_n_label_emp1[OF 2]
-      by fastforce
-    have r_lab':"reifies_lab (m#labs) (fs, Q # ls, r)"
-      using local_assms(1) ass_is(5) Block(5)
-      unfolding reifies_lab_def
-      by auto
-
-    hence res_wf':"res_wf lvar_st (fs, Q # ls, r) res' locs' s' hf [] Q"
-      using res_wf_valid_triple_n_intro[OF 3 _ res'_def(1)] ass_is r_lab' local_assms(1)
-      unfolding ass_wf_def reifies_ret_def
-      by auto
+    have 4:"ass_wf lvar_st ret (fs, P # ls, r) (n # labs)  locs s hf st h vcs P"
+      using ass_is local_assms(1) Loop(4)
+      unfolding ass_wf_def reifies_lab_def reifies_ret_def
+      by simp
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
-      sorry
+      using reduce_to_n_loop[OF local_assms(4) _ vcs_is Loop(2,3,4,5) 4 3] local_assms(1)
+      by fastforce
   }
   thus ?case
     unfolding valid_triple_defs
