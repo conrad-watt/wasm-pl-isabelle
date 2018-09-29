@@ -1859,6 +1859,32 @@ next
     by (metis reduce_to_n_consts)
 qed auto
 
+lemma reduce_to_n_loop_imp_length:
+  assumes "(s,vs,($$*vcs) @ [$(Loop (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "length ($$*vcs) \<ge> length t1s"
+  using assms
+proof (induction "(s,vs,($$*vcs) @ [$(Loop (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  thus ?case
+    using consts_app_snoc[OF const_value(4)] consts_cons_last[of _ _ ves] is_const_def
+    by fastforce
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_value(7)]
+    by (metis is_const_list)
+next
+  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue1(7)]
+    by force
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  thus ?case
+    using consts_app_snoc[OF seq_nonvalue2(5)]
+    by (metis reduce_to_n_consts)
+qed auto
+
 lemma reduce_to_n_if:
   assumes "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
   shows "(((s,vs,($$*vcs) @ [$(Block tf es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or>
@@ -2009,6 +2035,51 @@ next
     apply (metis reduce_to_n_consts)
     apply (metis reduce_to_n_consts)
     done
+qed auto
+
+lemma reduce_to_n_loop:
+  assumes "(s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)"
+          "es = ($$*vcsf) @ ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
+           es = ($$*vcsf) @ [(Label m [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
+          "length ($$*vcs) = n"
+          "length t1s = n"
+          "length t2s = m"
+          "P s vs vcs"
+          "\<And>s' vs' vcsf vcsf' rvs. Q s' vs' vcsf (RValue rvs) \<Longrightarrow> Q s' vs' (vcsf'@vcsf) (RValue (vcsf'@rvs))"
+          "\<And>s' vs' vcsf vcsf'. (\<And>rvs. res \<noteq> RValue rvs) \<Longrightarrow> Q s' vs' vcsf res \<Longrightarrow> Q s' vs' (vcsf'@vcsf) res"
+          "\<And>s vs vcs s' vs' res. (P s vs vcs \<Longrightarrow> ((s,vs,($$*vcs) @ ($*b_es)) \<Down>k{\<Gamma>} (s',vs',res)) \<Longrightarrow> (((\<exists>rvs. res = RBreak 0 rvs) \<longrightarrow> P s' vs' rvs) \<and> ((\<nexists>rvs. res = RBreak 0 rvs) \<longrightarrow> Q s' vs' [] res)))"
+  shows "Q s' vs' vcsf res"
+  using assms
+proof (induction "(s,vs,es)" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf es rule: reduce_to_n.induct)
+  case (loop ves n t1s t2s m s vs es k \<Gamma> s' vs' res)
+  then show ?case sorry
+next
+  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  then show ?case sorry
+next
+  case (label_value s vs es k n ls r i s' vs' res les)
+  then show ?case sorry
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
+  then show ?case sorry
+next
+  case (seq_nonvalue2 s vs es k \<Gamma> s' vs' res es')
+  then show ?case sorry
+next
+  case (label_trap s vs es k n ls r i s' vs' les)
+  then show ?case sorry
+next
+  case (label_break_suc s vs es k n ls r i s' vs' bn bvs les)
+  then show ?case sorry
+next
+  case (label_break_nil s vs es k n ls r i s'' vs'' bvs les s' vs' res)
+  then show ?case sorry
+next
+  case (label_return s vs es k n ls r i s' vs' rvs les)
+  then show ?case sorry
 qed auto
 
 lemma reduce_to_n_label:
