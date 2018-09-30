@@ -62,6 +62,40 @@ next
     by auto
 qed
 
+lemma reduce_trans_lfilled:
+  assumes "reduce_trans i (s,vs,es) (s',vs',es')"
+          "Lfilled n lfilled es lfes"
+          "Lfilled n lfilled es' lfes'"
+  shows "reduce_trans i (s,vs,lfes) (s',vs',lfes')"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' lfes' rule: rtranclp_induct)
+  case base
+  thus ?case
+    using lfilled_deterministic
+    by blast
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  then obtain lfes'' where lfes'':"Lfilled n lfilled es'' lfes''"
+                                  "reduce_trans i (s,vs,lfes) (s'',vs'',lfes'')"
+    using step(3,4) progress_LN2
+    unfolding reduce_trans_def
+    by simp metis
+  moreover
+  have 1:"\<lparr>s'';vs'';es''\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  hence "\<lparr>s'';vs'';lfes''\<rparr> \<leadsto>_i \<lparr>s';vs';lfes'\<rparr>"
+    using step(5) lfes''(1) reduce.label
+    by blast
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+
 lemma reduce_trans_label:
   assumes "reduce_trans i (s,vs,es) (s',vs',es')"
   shows "reduce_trans i (s,vs,[Label n les es]) (s',vs',[Label n les es'])"
@@ -123,7 +157,6 @@ next
     using y_is reduce_trans_app_end reduce_trans_def
     by auto
 qed
- 
 
 lemma reduce_trans_compose:
   assumes "reduce_trans i (s,vs,es) (s'',vs'',es'')"
@@ -133,11 +166,51 @@ lemma reduce_trans_compose:
   unfolding reduce_trans_def
   by auto
 
+lemma lfilled_label_forward_helper:
+  assumes "Lfilled na lholed es lfes"
+          "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+  shows "\<exists>lfes'. Lfilled na lholed es' lfes' \<and> \<lparr>s;vs;[Label n les lfes]\<rparr> \<leadsto>_i \<lparr>s';vs';[Label n les lfes']\<rparr>"
+proof -
+  obtain lfes' where "Lfilled na lholed es' lfes'"
+    using assms(1) progress_LN2
+    by blast
+  thus ?thesis
+    using reduce.label assms(1,2) progress_label
+    by metis
+qed
+
+lemma lfilled_label_forward_helper_trans:
+  assumes "Lfilled na lholed es lfes"
+          "reduce_trans i (s,vs,es) (s',vs',es')"
+  shows "\<exists>lfes'. Lfilled na lholed es' lfes' \<and> reduce_trans i (s,vs,lfes) (s',vs',lfes')"
+proof -
+  obtain lfes' where "Lfilled na lholed es' lfes'"
+    using assms(1) progress_LN2
+    by blast
+  thus ?thesis
+    using assms(1,2) reduce_trans_lfilled
+    by blast
+qed
+
+lemma lfilled_local_forward_helper:
+  assumes "Lfilled na lholed es lfes"
+          "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+  shows "\<exists>lfes'. Lfilled na lholed es' lfes' \<and> \<lparr>s;v0s;[Local n i vs lfes]\<rparr> \<leadsto>_j \<lparr>s';v0s;[Local n i vs' lfes']\<rparr>"
+proof -
+  obtain lfes' where "Lfilled na lholed es' lfes'"
+    using assms(1) progress_LN2
+    by blast
+  thus ?thesis
+    using reduce.label assms(1,2) reduce.local
+    by metis
+qed
 
 lemma Wasm_Big_Step_Sound:
   assumes "((s,vs,es) \<Down>{(ls,r,i)} (s',vs',res))"
   shows "(res = RTrap \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',[Trap])) \<and>
-         (\<forall>rvs. (res = RValue rvs \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',$$*rvs)))"
+         (\<forall>rvs. (res = RValue rvs \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',$$*rvs))) \<and>
+         (\<forall>n rvs lholed lfes les. (res = RBreak n rvs \<longrightarrow> (Lfilled n lholed es lfes \<longrightarrow> (ls!n = length rvs \<and> reduce_trans i (s,vs,[Label (ls!n) les lfes]) (s',vs',($$*rvs)@les))))) \<and>
+         (\<forall>n rvs lholed lfes j v0s. (res = RReturn rvs \<longrightarrow> (Lfilled n lholed es lfes \<longrightarrow> (r = Some (length rvs) \<and> reduce_trans j (s,v0s,[Local (length rvs) i vs lfes]) (s',v0s,$$*rvs)))))"
   using assms
 proof (induction "(s,vs,es)" "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' es res ls r i rule: reduce_to.induct)
   case (emp s vs)
@@ -223,29 +296,118 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (block ves n t1s t2s m s vs es s' vs')
-  thus ?case
-    using reduce.basic[OF reduce_simple.block] reduce_trans_app
-    by metis
+  case (block ves n t1s t2s m s vs es s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [$Block (t1s _> t2s) es]\<rparr> \<leadsto>_ i \<lparr>s;vs;[Label m [] (ves @ ($* es))]\<rparr>"
+    using reduce.basic[OF reduce_simple.block[OF block(1,2,3,4)]]
+    by blast
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app block(6)
+      by simp
+  next
+    case (RBreak k rvs)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app block(6)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app block(6)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app block(6)
+      by simp
+  qed
 next
-  case (loop ves n t1s t2s m s vs es s' vs')
-  thus ?case
-    using reduce.basic[OF reduce_simple.loop] reduce_trans_app
-    by metis
+  case (loop ves n t1s t2s m s vs es s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [$Loop (t1s _> t2s) es]\<rparr> \<leadsto>_ i \<lparr>s;vs;[Label n [$Loop (t1s _> t2s) es] (ves @ ($* es))]\<rparr>"
+    using reduce.basic[OF reduce_simple.loop[OF loop(1,2,3,4)]]
+    by blast
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app loop(6)
+      by simp
+  next
+    case (RBreak k rvs)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app loop(6)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app loop(6)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app loop(6)
+      by simp
+  qed
 next
-  case (if_false n ves s vs tf e2s s' vs' e1s)
-  thus ?case
-    using progress_L0_left[OF reduce.basic[OF reduce_simple.if_false]] reduce_trans_app
-    by metis
+  case (if_false n ves s vs tf e2s s' vs' res e1s)
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 n, $If tf e1s e2s]\<rparr> \<leadsto>_ i \<lparr>s;vs;ves @ [$Block tf e2s]\<rparr>"
+    using progress_L0_left[OF reduce.basic[OF reduce_simple.if_false[OF if_false(1)]]] if_false(2)
+    by blast
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app if_false(4)
+      by simp
+  next
+    case (RBreak k rvs)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app if_false(4)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app if_false(4)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app if_false(4)
+      by simp
+  qed
 next
-  case (if_true n ves s vs tf e1s s' vs' e2s)
-  thus ?case
-    using progress_L0_left[OF reduce.basic[OF reduce_simple.if_true]] reduce_trans_app
-    by metis
+  case (if_true n ves s vs tf e1s s' vs' res e2s)
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 n, $If tf e1s e2s]\<rparr> \<leadsto>_ i \<lparr>s;vs;ves @ [$Block tf e1s]\<rparr>"
+    using progress_L0_left[OF reduce.basic[OF reduce_simple.if_true[OF if_true(1)]]] if_true(2)
+    by blast
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app if_true(4)
+      by simp
+  next
+    case (RBreak k rvs)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app if_true(4)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app if_true(4)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app if_true(4)
+      by simp
+  qed
 next
-  case (br vcs n k s vs)
+  case (br vcs n ls k s vs r i)
   thus ?case
-    by auto
+    using reduce.basic[OF reduce_simple.br, of "($$* vcs)" n] is_const_list
+    by (fastforce simp add: reduce_trans_def)
 next
   case (br_if_false n s vs k)
   thus ?case
@@ -253,24 +415,91 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (br_if_true n ves s vs k s' vs')
-  thus ?case
-    using progress_L0_left[OF reduce.basic[OF reduce_simple.br_if_true]] reduce_trans_app
-    by metis
+  case (br_if_true n ves s vs k s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 n, $Br_if k]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [$Br k]\<rparr>"
+    using progress_L0_left[OF reduce.basic[OF reduce_simple.br_if_true]] br_if_true(1,2)
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app br_if_true
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app br_if_true(4)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app br_if_true(4)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app br_if_true
+      by simp
+  qed
 next
-  case (br_table ks c ves s vs s' vs' k)
-  thus ?case
-    using progress_L0_left[OF reduce.basic[OF reduce_simple.br_table]] reduce_trans_app
-    by metis
+  case (br_table ks c ves s vs s' vs' res k)
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 c, $Br_table ks k]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [$Br (ks ! Wasm_Base_Defs.nat_of_int c)]\<rparr>"
+    using progress_L0_left[OF reduce.basic[OF reduce_simple.br_table]] br_table(1,2)
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app br_table
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app br_table(4)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app br_table(4)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app br_table
+      by simp
+  qed
 next
-  case (br_table_length ks c ves s vs k s' vs')
-  thus ?case
-    using progress_L0_left[OF reduce.basic[OF reduce_simple.br_table_length]] reduce_trans_app
-    by metis
+  case (br_table_length ks c ves s vs k s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 c, $Br_table ks k]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [$Br k]\<rparr>"
+    using progress_L0_left[OF reduce.basic[OF reduce_simple.br_table_length]] br_table_length(1,2)
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app br_table_length
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app br_table_length(4)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app br_table_length(4)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app br_table_length
+      by simp
+  qed
 next
   case (return vcs r s vs)
   thus ?case
-    by auto
+    using reduce.basic[OF reduce_simple.return, of "($$* vcs)"] is_const_list
+    by (fastforce simp add: reduce_trans_def)
 next
   case (get_local vi j s v vs)
   thus ?case
@@ -284,10 +513,32 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (tee_local v s vs i s' vs')
-  thus ?case
-    using reduce.basic[OF reduce_simple.tee_local] reduce_trans_app
-    by metis
+  case (tee_local v s vs j s' vs' res)
+  have 1:"\<lparr>s;vs;[v, $Tee_local j]\<rparr> \<leadsto>_i \<lparr>s;vs;[v, v, $Set_local j]\<rparr>"
+    using reduce.basic[OF reduce_simple.tee_local] tee_local(1,2)
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app tee_local
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app tee_local(3)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app tee_local(3)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app tee_local(3)
+      by simp
+  qed
 next
   case (get_global s vs j)
   thus ?case
@@ -367,15 +618,59 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (call ves s vs j s' vs')
-  thus ?case
-    using progress_L0_left[OF reduce.call] reduce_trans_app
-    by metis
+  case (call ves s vs i j ls r s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [$Call j]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [Callcl (sfunc s i j)]\<rparr>"
+    using progress_L0_left[OF reduce.call] call(1)
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app call(3)
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app call(3)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app call(3)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app call(3)
+      by simp
+  qed
 next
-  case (call_indirect_Some s c cl j tf ves vs s' vs')
-  thus ?case
-    using progress_L0_left[OF reduce.call_indirect_Some] reduce_trans_app
-    by metis
+  case (call_indirect_Some s i c cl j tf ves vs ls r s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 c, $Call_indirect j]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [Callcl cl]\<rparr>"
+    using progress_L0_left[OF reduce.call_indirect_Some] call_indirect_Some
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app call_indirect_Some(6)
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app call_indirect_Some(6)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app call_indirect_Some(6)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app call_indirect_Some(6)
+      by simp
+  qed
 next
   case (call_indirect_None s c cl j vs)
   thus ?case
@@ -383,10 +678,32 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs s' vs')
-  thus ?case
-    using reduce.callcl_native reduce_trans_app
-    by metis
+  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs ls r i s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [Callcl cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Local m j (vcs @ zs) [$Block ([] _> t2s) es]]\<rparr>"
+    using reduce.callcl_native[OF callcl_native(1,2,3,4,5,6,7)]
+    by fastforce
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    thus ?thesis
+      using 1 reduce_trans_app callcl_native(9)
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app callcl_native(9)
+      by simp metis
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app callcl_native(9)
+      by simp metis
+  next
+    case RTrap
+    thus ?thesis
+      using 1 reduce_trans_app callcl_native(9)
+      by simp
+  qed
 next
   case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs)
   thus ?case
@@ -433,40 +750,67 @@ next
     by blast
 next
   case (seq_value s vs es s'' vs'' res'' es' s' vs' res')
-  hence 1:"reduce_trans i (s, vs, es) (s'', vs'', $$* res'')"
+  hence 0:"reduce_trans i (s, vs, es) (s'', vs'', $$* res'')"
     by simp
+  have 1:"reduce_trans i (s, vs, es@es') (s'', vs'', ($$* res'')@es')"
+    using reduce_trans_L0[OF 0, of "[]"]
+    by fastforce
   show ?case
   proof (cases res')
     case (RValue x1)
     hence "reduce_trans i (s'', vs'', ($$* res'') @ es') (s', vs', $$* x1)"
       using seq_value
       by simp
-    moreover
-    have "reduce_trans i (s, vs, es@es') (s'', vs'', ($$* res'')@es')"
-      using reduce_trans_L0[OF 1, of "[]"]
-      by fastforce
-    ultimately
-    show ?thesis
-      using RValue reduce_trans_compose
+    thus ?thesis
+      using RValue reduce_trans_compose 1
       by blast
+  next
+    case (RBreak j vcs)
+    thus ?thesis
+      using 1 seq_value(4) lfilled_label_forward_helper_trans[OF _ 1]
+      by simp (meson reduce_trans_compose reduce_trans_label)
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using 1 seq_value(4) lfilled_label_forward_helper_trans[OF _ 1]
+      by simp (meson reduce_trans_compose reduce_trans_local)
   next
     case RTrap
     hence "reduce_trans i (s'', vs'', ($$* res'') @ es') (s', vs', [Trap])"
       using seq_value
       by simp
-    moreover
-    have "reduce_trans i (s, vs, es@es') (s'', vs'', ($$* res'')@es')"
-      using reduce_trans_L0[OF 1, of "[]"]
-      by fastforce
-    ultimately
-    show ?thesis
-      using RTrap reduce_trans_compose
+    thus ?thesis
+      using RTrap reduce_trans_compose 1
       by blast
-  qed auto
+  qed
 next
   case (seq_nonvalue1 ves s vs es s' vs' res')
   thus ?case
   proof (cases res')
+    case (RBreak j rvs)
+    {
+      fix lholed lfes
+      assume "Lfilled j lholed (ves @ es) lfes"
+      hence "\<exists>lholed'. Lfilled j lholed' es lfes"
+        using lfilled_collapse1[OF _ seq_nonvalue1(1), of _ _ _ _ "0"]
+        by simp
+    }
+    thus ?thesis
+      using RBreak seq_nonvalue1(3)
+      by simp blast
+  next
+    case (RReturn x3)
+    {
+      fix j lholed lfes
+      assume "Lfilled j lholed (ves @ es) lfes"
+      hence "\<exists>lholed'. Lfilled j lholed' es lfes"
+        using lfilled_collapse1[OF _ seq_nonvalue1(1), of _ _ _ _ "0"]
+        by simp
+    }
+    thus ?thesis
+      using RReturn seq_nonvalue1(3)
+      by simp blast
+  next
     case RTrap
     hence 1:"reduce_trans i (s, vs, es) (s', vs', [Trap])"
       using seq_nonvalue1
@@ -489,6 +833,30 @@ next
   case (seq_nonvalue2 s vs es s' vs' res es')
   thus ?case
   proof (cases res)
+    case (RBreak j rvs)
+    {
+      fix lholed lfes
+      assume "Lfilled j lholed (es @ es') lfes"
+      hence "\<exists>lholed'. Lfilled j lholed' es lfes"
+        using lfilled_collapse2
+        by simp
+    }
+    thus ?thesis
+      using RBreak seq_nonvalue2(2)
+      by simp blast
+  next
+    case (RReturn x3)
+    {
+      fix j lholed lfes
+      assume "Lfilled j lholed (es @ es') lfes"
+      hence "\<exists>lholed'. Lfilled j lholed' es lfes"
+        using lfilled_collapse2
+        by simp
+    }
+    thus ?thesis
+      using RReturn seq_nonvalue2(2)
+      by simp blast
+  next
     case RTrap
     hence 1:"reduce_trans i (s, vs, es) (s', vs', [Trap])"
       using seq_nonvalue2
@@ -539,19 +907,52 @@ next
     using reduce_trans_app_end
     by blast
 next
-  case (label_break_suc s vs es n s' vs' bn bvs les)
+  case (label_break_suc s vs es n ls r i s' vs' bn bvs les)
   thus ?case
-    by auto
+    using lfilled_collapse3
+    by simp blast
 next
-  case (label_break_nil s vs es n ls r s'' vs'' bvs les s' vs' res)
-  thus ?case sorry
+  case (label_break_nil s vs es n ls r i s'' vs'' bvs les s' vs' res)
+  have 1:"reduce_trans i (s, vs, [Label n les es]) (s'', vs'', ($$* bvs) @ les)"
+    using label_break_nil(2) Lfilled_exact.L0 Lfilled_exact_imp_Lfilled
+    by simp blast
+  show ?case
+  proof (cases res)
+    case (RValue x1)
+    hence "reduce_trans i (s'', vs'', ($$* bvs) @ les) (s', vs', $$* x1)"
+      using label_break_nil
+      by simp
+    thus ?thesis
+      using RValue reduce_trans_compose 1
+      by blast
+  next
+    case (RBreak j vcs)
+    thus ?thesis
+      using 1 label_break_nil(4) lfilled_label_forward_helper_trans[OF _ 1]
+      by simp (meson reduce_trans_compose reduce_trans_label)
+  next
+    case (RReturn x3)
+    thus ?thesis
+      using 1 label_break_nil(4) lfilled_label_forward_helper_trans[OF _ 1]
+      by simp (meson reduce_trans_compose reduce_trans_local)
+  next
+    case RTrap
+    hence "reduce_trans i (s'', vs'', ($$* bvs) @ les) (s', vs', [Trap])"
+      using label_break_nil
+      by simp
+    thus ?thesis
+      using RTrap reduce_trans_compose 1
+      by blast
+  qed
 next
-  case (label_return s vs es n s' vs' rvs les)
+  case (label_return s vs es n ls r i s' vs' rvs les)
   thus ?case
-    by auto
+    using lfilled_collapse3
+    by simp blast
 next
   case (local_return s lls es n j s' lls' rvs vs)
-  thus ?case sorry
+  thus ?case
+    apply simp apply fastforce
 qed
 
 end

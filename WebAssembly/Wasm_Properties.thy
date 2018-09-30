@@ -1872,6 +1872,25 @@ next
     by fastforce
 qed
 
+lemma progress_label:
+  assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';vs';es'\<rparr>"
+  shows "\<lparr>s;vs;[Label n les es]\<rparr> \<leadsto>_ i \<lparr>s';vs';[Label n les es']\<rparr>"
+proof -
+  have "Lfilled 1 (LRec [] n les (LBase [] []) []) es [Label n les es]"
+    using Lfilled.intros(2)[OF _ _ Lfilled.intros(1)[of "[]" "(LBase [] [])"], of "[]" _ n les "[]"]
+    unfolding const_list_def
+    by simp
+  moreover
+  have "Lfilled 1 (LRec [] n les (LBase [] []) []) es' [Label n les es']"
+    using Lfilled.intros(2)[OF _ _ Lfilled.intros(1)[of "[]" "(LBase [] [])"], of "[]" _ n les "[]"]
+    unfolding const_list_def
+    by simp
+  ultimately
+  show ?thesis
+    using reduce.label[OF assms]
+    by blast
+qed
+
 lemma const_of_const_list:
   assumes "length cs = 1"
           "const_list cs"
