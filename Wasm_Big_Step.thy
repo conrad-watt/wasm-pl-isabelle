@@ -356,6 +356,47 @@ next
     by meson
 qed auto
 
+lemma reduce_to_single_helper1:
+  assumes "($$*ves)@es = [e]"
+          "\<not>is_const e"
+  shows "ves = []"
+  using assms
+  by (metis Nil_is_append_conv Nil_is_map_conv append_self_conv butlast.simps(2) butlast_append consts_cons(2))
+  
+lemma reduce_to_trap:
+  assumes "((s,vs,[Trap]) \<Down>{\<Gamma>} (s',vs',res))"
+  shows "s = s' \<and> vs = vs' \<and> res = RTrap"
+  using assms
+proof (induction "(s,vs,[Trap])" "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to.induct)
+  case (const_value s vs es \<Gamma> s' vs' res ves)
+  thus ?case
+    using reduce_to_single_helper1
+    by (simp add: is_const_def)
+next
+  case (seq_value s vs es \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    apply simp
+    apply (metis consts_app_snoc is_const_list list.simps(8) self_append_conv2)
+    done
+next
+  case (seq_nonvalue1 ves s vs es \<Gamma> s' vs' res)
+  thus ?case
+    by (simp add: append_eq_Cons_conv)
+next
+  case (seq_nonvalue2 s vs es \<Gamma> s' vs' res es')
+  thus ?case
+    apply simp
+    apply (metis (no_types, hide_lams) Cons_eq_append_conv Nil_is_append_conv reduce_to_imp_reduce_to_n reduce_to_n_emp)
+    done
+qed auto
+
+lemma reduce_to_consts1: "((s,vs,($$*ves)) \<Down>{\<Gamma>} (s,vs,RValue ves))"
+  using reduce_to.emp reduce_to.const_value reduce_to.emp
+  apply (cases "ves = []")
+  apply simp_all
+  apply (metis append.right_neutral)
+  done
+
 lemma reduce_to_n_consts:
   assumes "((s,vs,($$*ves)) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue ves"

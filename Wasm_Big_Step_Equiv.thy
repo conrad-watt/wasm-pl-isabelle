@@ -954,6 +954,302 @@ next
   thus ?case
     using Lfilled_exact.L0 Lfilled_exact_imp_Lfilled
     by simp blast
+next
+  case (trap s vs)
+  thus ?case
+    unfolding reduce_trans_def
+    by simp
+qed
+
+lemma reduce_to_app_reduce_simple:
+  assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
+          "((s,vs,es') \<Down>{(ls,r,i)} (s',vs',res))"
+  shows "((s,vs,es) \<Down>{(ls,r,i)} (s',vs',res))"
+  using assms
+proof (induction arbitrary: ls r res vs' s' rule: reduce_simple.induct)
+  case (unop v t op)
+  thus ?case
+    using reduce_to.unop reduce_to_consts[of _ _ "[app_unop op v]"]
+    by simp metis
+next
+  case (binop_Some op v1 v2 v t)
+  thus ?case
+    using reduce_to.binop_Some reduce_to_consts[of _ _ "[v]"]
+    by simp metis
+next
+  case (binop_None op v1 v2 t)
+  thus ?case
+    using reduce_to.binop_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (testop v t op)
+  thus ?case
+    using reduce_to.testop reduce_to_consts[of _ _ "[app_testop op v]"]
+    by simp metis
+next
+  case (relop v1 v2 t op)
+  thus ?case
+    using reduce_to.relop reduce_to_consts[of _ _ "[app_relop op v1 v2]"]
+    by simp metis
+next
+  case (convert_Some t1 v t2 sx v')
+  thus ?case
+    using reduce_to.convert_Some reduce_to_consts[of _ _ "[v']"]
+    by simp metis
+next
+  case (convert_None t1 v t2 sx)
+  thus ?case
+    using reduce_to.convert_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (reinterpret t1 v t2)
+  thus ?case
+    using reduce_to.reinterpret reduce_to_consts[of _ _ "[wasm_deserialise (bits v) t2]"]
+    by simp metis
+next
+  case unreachable
+  thus ?case
+    using reduce_to.unreachable reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case nop
+  thus ?case
+    using reduce_to.nop reduce_to_consts[of _ _ "[]"]
+    by simp metis
+next
+  case (drop v)
+  thus ?case
+    using reduce_to.drop reduce_to_consts[of _ _ "[]"]
+    by simp metis
+next
+  case (select_false n v1 v2)
+  thus ?case
+    using reduce_to.select_false reduce_to_consts[of _ _ "[v2]"]
+    by simp metis
+next
+  case (select_true n v1 v2)
+  thus ?case
+    using reduce_to.select_true reduce_to_consts[of _ _ "[v1]"]
+    by simp metis
+next
+  case (block vs n t1s t2s m es)
+  thus ?case
+    using reduce_to.block
+    by simp
+next
+  case (loop vs n t1s t2s m es)
+  thus ?case
+    using reduce_to.loop
+    by simp
+next
+  case (if_false n tf e1s e2s)
+  thus ?case
+    using reduce_to.if_false[of _ "[]"]
+    by (simp add: const_list_def)
+next
+  case (if_true n tf e1s e2s)
+  thus ?case
+    using reduce_to.if_true[of _ "[]"]
+    by (simp add: const_list_def)
+next
+  case (label_const vs n es)
+  then show ?case sorry
+next
+  case (label_trap n es)
+  then show ?case sorry
+next
+  case (br vs n i lholed LI es)
+  then show ?case sorry
+next
+  case (br_if_false n i)
+  thus ?case
+    using reduce_to.br_if_false reduce_to_consts[of _ _ "[]"]
+    by simp metis
+next
+  case (br_if_true n i)
+  thus ?case
+    using reduce_to.br_if_true[of _ "[]"]
+    by (simp add: const_list_def)
+next
+  case (br_table "is" c i)
+  thus ?case
+    using reduce_to.br_table[of _ _ "[]"]
+    by (simp add: const_list_def)
+next
+  case (br_table_length "is" c i)
+  thus ?case
+    using reduce_to.br_table_length[of _ _ "[]"]
+    by (simp add: const_list_def)
+next
+  case (local_const es n i vs)
+  then show ?case sorry
+next
+  case (local_trap n i vs)
+  then show ?case sorry
+next
+  case (return vs n j lholed es i vls)
+  then show ?case sorry
+next
+  case (tee_local v i)
+  thus ?case
+    using reduce_to.tee_local
+    by (simp add: const_list_def)
+next
+  case (trap es lholed)
+  then show ?case sorry
+qed
+
+lemma reduce_to_app_reduce:
+  assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';vs';es'\<rparr>"
+          "((s',vs',es') \<Down>{(ls,r,i)} (s'',vs'',res))"
+  shows "((s,vs,es) \<Down>{(ls,r,i)} (s'',vs'',res))"
+  using assms
+proof (induction arbitrary: ls r res vs'' s'' rule: reduce.induct)
+  case (basic e e' s vs i)
+  thus ?case sorry
+next
+  case (call s vs j i)
+  thus ?case
+    using reduce_to_call[of _ _ "[]"]
+    by fastforce
+next
+  case (call_indirect_Some s i c cl j tf vs)
+  thus ?case
+    using reduce_to.call_indirect_Some[OF call_indirect_Some(1,2,3), of "[]"]
+    by (fastforce simp add: const_list_def)
+next
+  case (call_indirect_None s i c cl j vs)
+  thus ?case
+    using reduce_to.call_indirect_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
+  thus ?case
+    using reduce_to.callcl_native
+    by fastforce
+next
+  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+  thus ?case
+    using reduce_to.callcl_host_Some reduce_to_consts[of s' "vs" "vcs'"]
+    by fastforce
+next
+  case (callcl_host_None cl t1s t2s f ves vcs n m s vs i)
+  thus ?case
+    using reduce_to.callcl_host_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (get_local vi j s v vs i)
+  thus ?case
+    using reduce_to.get_local reduce_to_consts[of s "(vi @ [v] @ vs)" "[v]"]
+    by fastforce
+next
+  case (set_local vi j s v vs v' i)
+  thus ?case
+    using reduce_to.set_local reduce_to_consts[of s "(vi @ [v'] @ vs)" "[]"]
+    by fastforce
+next
+  case (get_global s vs j i)
+  thus ?case
+    using reduce_to.get_global reduce_to_consts[of s "vs" "[sglob_val s i j]"]
+    by fastforce
+next
+  case (set_global s i j v s' vs)
+  thus ?case
+    using reduce_to.set_global reduce_to_consts[of s' "vs" "[]"]
+    by fastforce
+next
+  case (load_Some s i j m k off t bs vs a)
+  thus ?case
+    using reduce_to.load_Some reduce_to_consts[of s "vs" "[wasm_deserialise bs t]"]
+    by fastforce
+next
+  case (load_None s i j m k off t vs a)
+  thus ?case
+    using reduce_to.load_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (load_packed_Some s i j m sx k off tp t bs vs a)
+  thus ?case
+    using reduce_to.load_packed_Some reduce_to_consts[of s "vs" "[wasm_deserialise bs t]"]
+    by fastforce
+next
+  case (load_packed_None s i j m sx k off tp t vs a)
+  thus ?case
+    using reduce_to.load_packed_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (store_Some t v s i j m k off mem' vs a)
+  thus ?case
+    using reduce_to.store_Some reduce_to_consts[of _ _ "[]"]
+    by fastforce
+next
+  case (store_None t v s i j m k off vs a)
+  thus ?case
+    using reduce_to.store_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (store_packed_Some t v s i j m k off tp mem' vs a)
+  thus ?case
+    using reduce_to.store_packed_Some reduce_to_consts[of _ _ "[]"]
+    by fastforce
+next
+  case (store_packed_None t v s i j m k off tp vs a)
+  thus ?case
+    using reduce_to.store_packed_None reduce_to_trap[of s vs "(ls, r, i)"]
+    by metis
+next
+  case (current_memory s i j m n vs)
+  thus ?case
+    using reduce_to.current_memory reduce_to_consts[of _ _ "[ConstInt32 (Wasm_Base_Defs.int_of_nat n)]"]
+    by fastforce
+next
+  case (grow_memory s i j m n c mem' vs)
+  thus ?case
+    using reduce_to.grow_memory reduce_to_consts[of _ _ "[ConstInt32 (Wasm_Base_Defs.int_of_nat n)]"]
+    by fastforce
+next
+  case (grow_memory_fail s i j m n vs c)
+  thus ?case
+    using reduce_to.grow_memory_fail reduce_to_consts[of s "vs" "[ConstInt32 int32_minus_one]"]
+    by fastforce
+next
+  case (label s vs es i s' vs' es' k lholed les les')
+  then show ?case sorry
+next
+  case (local s vs es i s_l lvs es' v0s n j)
+  obtain k where res_b_def:"((s_l, v0s, ($$* []) @ [Local n i lvs es']) \<Down>k{(ls, r, j)} (s'', vs'', res))"
+    using local(3) reduce_to_imp_reduce_to_n
+    by simp metis
+  then obtain lvs' lres where lres_def:"(s_l, lvs, es') \<Down>{([], Some n, i)} (s'', lvs', lres)"
+                                       "v0s = vs''"
+                                       "(lres = RTrap \<and> res = RTrap \<or>
+                                        (\<exists>rvs. (lres = RValue rvs \<or>
+                                                lres = RReturn rvs) \<and>
+                                               res = RValue ([] @ rvs)))"
+    using local_imp_body[OF res_b_def(1)] reduce_to_n_imp_reduce_to
+    by blast
+  show ?case
+  proof (cases lres)
+    case (RValue x1)
+    thus ?thesis
+      using local(2)[OF lres_def(1)] lres_def(2,3) reduce_to.local_value
+      by simp
+  next
+    case (RBreak x21 x22)
+    thus ?thesis
+      using lres_def(3)
+      by simp
+  next
+  case (RReturn x3)
+    thus ?thesis
+      using local(2)[OF lres_def(1)] lres_def(2,3) reduce_to.local_return
+      by simp
+  next
+    case RTrap
+    thus ?thesis
+      using local(2)[OF lres_def(1)] lres_def(2,3) reduce_to.local_trap
+      by simp
+  qed
 qed
 
 definition res_agree :: "e list \<Rightarrow> res_b \<Rightarrow> bool" where
@@ -963,7 +1259,7 @@ definition res_agree :: "e list \<Rightarrow> res_b \<Rightarrow> bool" where
 lemma reduce_trans_imp_reduce_to:
   assumes "reduce_trans i (s,vs,es) (s',vs',res)"
           "(res = [Trap] \<or> (\<exists>rvs. res = $$* rvs))"
-  shows "\<exists>res_b. ((s,vs,es) \<Down>{([],None,i)} (s',vs',res_b)) \<and> res_agree res res_b"
+  shows "\<exists>res_b. ((s,vs,es) \<Down>{(ls,r,i)} (s',vs',res_b)) \<and> res_agree res res_b"
   using assms
   unfolding reduce_trans_def
 proof (induction "(s,vs,es)" arbitrary: s vs es rule: converse_rtranclp_induct)
@@ -986,86 +1282,13 @@ next
   have "(\<lambda>(s, vs, es) (s', x, y). \<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';x;y\<rparr>)\<^sup>*\<^sup>* (s'',vs'',es'') (s', vs', res)"
     using step(2) z_def
     by simp
-  have "\<exists>res_b. ((s'',vs'',es'') \<Down>{([], None, i)} (s', vs', res_b)) \<and> res_agree res res_b"
+  have "\<exists>res_b. ((s'',vs'',es'') \<Down>{(ls, r, i)} (s', vs', res_b)) \<and> res_agree res res_b"
     using step(3,4) z_def
     by simp
   ultimately
   show ?case
-  proof (induction arbitrary: res rule: reduce.induct)
-    case (basic e e' s vs i)
-    then show ?case sorry
-  next
-    case (call s vs j i)
-    thus ?case
-      using reduce_to_call[of _ _ "[]"]
-      by fastforce
-  next
-    case (call_indirect_Some s i c cl j tf vs)
-    then show ?case sorry
-  next
-    case (call_indirect_None s i c cl j vs)
-    then show ?case sorry
-  next
-    case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
-    then show ?case sorry
-  next
-    case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
-    then show ?case sorry
-  next
-    case (callcl_host_None cl t1s t2s f ves vcs n m s vs i)
-    then show ?case sorry
-  next
-    case (get_local vi j s v vs i)
-    then show ?case sorry
-  next
-    case (set_local vi j s v vs v' i)
-    then show ?case sorry
-  next
-    case (get_global s vs j i)
-    then show ?case sorry
-  next
-    case (set_global s i j v s' vs)
-    then show ?case sorry
-  next
-    case (load_Some s i j m k off t bs vs a)
-    then show ?case sorry
-  next
-    case (load_None s i j m k off t vs a)
-    then show ?case sorry
-  next
-    case (load_packed_Some s i j m sx k off tp t bs vs a)
-    then show ?case sorry
-  next
-    case (load_packed_None s i j m sx k off tp t vs a)
-    then show ?case sorry
-  next
-    case (store_Some t v s i j m k off mem' vs a)
-    then show ?case sorry
-  next
-    case (store_None t v s i j m k off vs a)
-    then show ?case sorry
-  next
-    case (store_packed_Some t v s i j m k off tp mem' vs a)
-    then show ?case sorry
-  next
-    case (store_packed_None t v s i j m k off tp vs a)
-    then show ?case sorry
-  next
-    case (current_memory s i j m n vs)
-    then show ?case sorry
-  next
-    case (grow_memory s i j m n c mem' vs)
-    then show ?case sorry
-  next
-    case (grow_memory_fail s i j m n vs c)
-    then show ?case sorry
-  next
-    case (label s vs es i s' vs' es' k lholed les les')
-    then show ?case sorry
-  next
-    case (local s vs es i s' vs' es' v0s n j)
-    then show ?case sorry
-  qed
+    using reduce_to_app_reduce
+    by blast
 qed
 
 end
