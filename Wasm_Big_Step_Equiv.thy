@@ -1053,10 +1053,14 @@ next
     by (simp add: const_list_def)
 next
   case (label_const vs n es)
-  then show ?case sorry
+  thus ?case
+    using reduce_to.label_value e_type_const_conv_vs
+    by (metis reduce_to_consts1 reduce_to_consts)
 next
   case (label_trap n es)
-  then show ?case sorry
+  thus ?case
+    using reduce_to.label_trap reduce_to.trap reduce_to_trap
+    by metis
 next
   case (br vs n i lholed LI es)
   then show ?case sorry
@@ -1082,10 +1086,14 @@ next
     by (simp add: const_list_def)
 next
   case (local_const es n i vs)
-  then show ?case sorry
+  thus ?case
+    using reduce_to.local_value e_type_const_conv_vs
+    by (metis reduce_to_consts1 reduce_to_consts)
 next
-  case (local_trap n i vs)
-  then show ?case sorry
+  case (local_trap n i vls)
+  thus ?case
+    using reduce_to.local_trap
+    by (metis reduce_to.trap reduce_to_trap)
 next
   case (return vs n j lholed es i vls)
   then show ?case sorry
@@ -1096,7 +1104,22 @@ next
     by (simp add: const_list_def)
 next
   case (trap es lholed)
-  then show ?case sorry
+  then obtain ves es_c where es_is:"es = ves @ [Trap] @ es_c"
+                                   "const_list ves"
+                                   "lholed = LBase ves es_c"
+    using Lfilled.simps[of 0 lholed "[Trap]" es]
+    by simp blast
+  have s_is:"s = s'" "vs = vs'" "res = RTrap"
+    using trap(3) reduce_to_trap[of s vs "(ls, r, i)" s' vs' res]
+    by auto
+  have "ves \<noteq> [] \<or> es_c \<noteq> []"
+    using trap(1) es_is
+    by auto
+  thus ?case
+    using s_is es_is
+    apply simp
+    apply (metis es_is(1,2) append_self_conv2 not_Cons_self2 reduce_to.seq_nonvalue1 reduce_to.seq_nonvalue2 res_b.distinct(5) trap.prems)
+    done
 qed
 
 lemma reduce_to_app_reduce:
@@ -1106,7 +1129,9 @@ lemma reduce_to_app_reduce:
   using assms
 proof (induction arbitrary: ls r res vs'' s'' rule: reduce.induct)
   case (basic e e' s vs i)
-  thus ?case sorry
+  thus ?case
+    using reduce_to_app_reduce_simple
+    by auto
 next
   case (call s vs j i)
   thus ?case
@@ -1291,4 +1316,35 @@ next
     by blast
 qed
 
+lemma reduce_trans_equiv_reduce_to_trap:
+  shows "reduce_trans i (s,vs,es) (s',vs',[Trap]) = ((s,vs,es) \<Down>{([],None,i)} (s',vs',RTrap))"
+  using reduce_trans_imp_reduce_to reduce_to_imp_reduce_trans
+  unfolding res_agree_def
+  apply simp
+  apply safe
+  apply blast
+  apply blast
+  done
+
+lemma reduce_trans_equiv_reduce_to_consts:
+  shows "reduce_trans i (s,vs,es) (s',vs',$$* vcs) = ((s,vs,es) \<Down>{([],None,i)} (s',vs',RValue vcs))"
+proof -
+  {
+    assume local_assms:"(s, vs, es) \<Down>{([], None, i)} (s', vs', RValue vcs)"
+    have "reduce_trans i (s, vs, es) (s', vs', $$* vcs)"
+      using reduce_to_imp_reduce_trans[OF local_assms]
+      by fastforce
+  }
+  thus ?thesis
+  using reduce_trans_imp_reduce_to inj_basic_econst
+  unfolding res_agree_def
+  by fastforce
+qed
+
+theorem reduce_trans_equiv_reduce_to:
+  assumes "res_agree res res_b"
+  shows "reduce_trans i (s,vs,es) (s',vs',res) = ((s,vs,es) \<Down>{([],None,i)} (s',vs',res_b))"
+  using assms reduce_trans_equiv_reduce_to_trap reduce_trans_equiv_reduce_to_consts
+  unfolding res_agree_def
+  by metis
 end
