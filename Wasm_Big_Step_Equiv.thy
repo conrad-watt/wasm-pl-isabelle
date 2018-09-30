@@ -205,7 +205,7 @@ proof -
     by metis
 qed
 
-lemma Wasm_Big_Step_Sound:
+lemma reduce_to_imp_reduce_trans:
   assumes "((s,vs,es) \<Down>{(ls,r,i)} (s',vs',res))"
   shows "(res = RTrap \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',[Trap])) \<and>
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> reduce_trans i (s,vs,es) (s',vs',$$*rvs))) \<and>
@@ -952,7 +952,8 @@ next
 next
   case (local_return s lls es n j s' lls' rvs vs)
   thus ?case
-    apply simp apply fastforce
+    using Lfilled_exact.L0 Lfilled_exact_imp_Lfilled
+    by simp blast
 qed
 
 end
