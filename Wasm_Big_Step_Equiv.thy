@@ -956,4 +956,116 @@ next
     by simp blast
 qed
 
+definition res_agree :: "e list \<Rightarrow> res_b \<Rightarrow> bool" where
+  "res_agree res res_b \<equiv> (\<exists>rvs. (res = ($$* rvs) \<and> res_b = RValue rvs)) \<or>
+                         (res = [Trap] \<and> res_b = RTrap)"
+
+lemma reduce_trans_imp_reduce_to:
+  assumes "reduce_trans i (s,vs,es) (s',vs',res)"
+          "(res = [Trap] \<or> (\<exists>rvs. res = $$* rvs))"
+  shows "\<exists>res_b. ((s,vs,es) \<Down>{([],None,i)} (s',vs',res_b)) \<and> res_agree res res_b"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s,vs,es)" arbitrary: s vs es rule: converse_rtranclp_induct)
+case base
+  thus ?case
+    apply safe
+    apply (fastforce intro: reduce_to.trap simp add: res_agree_def)
+    apply (fastforce intro: reduce_to_n_imp_reduce_to[OF reduce_to_n_consts1] simp add: res_agree_def)
+    done
+next
+  case (step z)
+  obtain s'' vs'' es'' where z_def:"z = (s'',vs'',es'')"
+    apply (cases z)
+    apply blast
+    done
+  have "\<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s'';vs'';es''\<rparr>"
+    using step(1) z_def
+    by simp
+  moreover
+  have "(\<lambda>(s, vs, es) (s', x, y). \<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';x;y\<rparr>)\<^sup>*\<^sup>* (s'',vs'',es'') (s', vs', res)"
+    using step(2) z_def
+    by simp
+  have "\<exists>res_b. ((s'',vs'',es'') \<Down>{([], None, i)} (s', vs', res_b)) \<and> res_agree res res_b"
+    using step(3,4) z_def
+    by simp
+  ultimately
+  show ?case
+  proof (induction arbitrary: res rule: reduce.induct)
+    case (basic e e' s vs i)
+    then show ?case sorry
+  next
+    case (call s vs j i)
+    thus ?case
+      using reduce_to_call[of _ _ "[]"]
+      by fastforce
+  next
+    case (call_indirect_Some s i c cl j tf vs)
+    then show ?case sorry
+  next
+    case (call_indirect_None s i c cl j vs)
+    then show ?case sorry
+  next
+    case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
+    then show ?case sorry
+  next
+    case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+    then show ?case sorry
+  next
+    case (callcl_host_None cl t1s t2s f ves vcs n m s vs i)
+    then show ?case sorry
+  next
+    case (get_local vi j s v vs i)
+    then show ?case sorry
+  next
+    case (set_local vi j s v vs v' i)
+    then show ?case sorry
+  next
+    case (get_global s vs j i)
+    then show ?case sorry
+  next
+    case (set_global s i j v s' vs)
+    then show ?case sorry
+  next
+    case (load_Some s i j m k off t bs vs a)
+    then show ?case sorry
+  next
+    case (load_None s i j m k off t vs a)
+    then show ?case sorry
+  next
+    case (load_packed_Some s i j m sx k off tp t bs vs a)
+    then show ?case sorry
+  next
+    case (load_packed_None s i j m sx k off tp t vs a)
+    then show ?case sorry
+  next
+    case (store_Some t v s i j m k off mem' vs a)
+    then show ?case sorry
+  next
+    case (store_None t v s i j m k off vs a)
+    then show ?case sorry
+  next
+    case (store_packed_Some t v s i j m k off tp mem' vs a)
+    then show ?case sorry
+  next
+    case (store_packed_None t v s i j m k off tp vs a)
+    then show ?case sorry
+  next
+    case (current_memory s i j m n vs)
+    then show ?case sorry
+  next
+    case (grow_memory s i j m n c mem' vs)
+    then show ?case sorry
+  next
+    case (grow_memory_fail s i j m n vs c)
+    then show ?case sorry
+  next
+    case (label s vs es i s' vs' es' k lholed les les')
+    then show ?case sorry
+  next
+    case (local s vs es i s' vs' es' v0s n j)
+    then show ?case sorry
+  qed
+qed
+
 end

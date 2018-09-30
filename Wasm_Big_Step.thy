@@ -103,6 +103,8 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>{(ls,r,i)} (s',vs',RReturn rvs)"
 | local_return:"\<lbrakk>(s,lls,es) \<Down>{([],Some n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>{\<Gamma>} (s',vs,RValue rvs)"
+  \<comment> \<open>\<open>trap\<close>\<close>
+| trap:"(s,vs,[Trap]) \<Down>{\<Gamma>} (s,vs,RTrap)"
 
 inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \<times> nat option \<times> inst), (s \<times> v list \<times> res_b)] \<Rightarrow> bool" ("_ \<Down>_{_} _" 60) where
   \<comment> \<open>\<open>constant values\<close>\<close>
@@ -201,6 +203,8 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,vs,es) \<Down>k{(n#ls,r,i)} (s',vs',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Label n les es]) \<Down>k{(ls,r,i)} (s',vs',RReturn rvs)"
 | local_return:"\<lbrakk>(s,lls,es) \<Down>k{([],Some n,j)} (s',lls',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,vs,[Local n j lls es]) \<Down>k{\<Gamma>} (s',vs,RValue rvs)"
+  \<comment> \<open>\<open>trap\<close>\<close>
+| trap:"(s,vs,[Trap]) \<Down>k{\<Gamma>} (s,vs,RTrap)"
 
 lemma reduce_to_n_mono:
   assumes "(c1 \<Down>k{\<Gamma>} c2)"
@@ -3100,5 +3104,18 @@ next
 next
 qed (insert reduce_to_app_disj, (fast+))
 (* terminal method long-running *)
+
+lemma reduce_to_call: "((s,vs,($$*ves)@[$(Call j)]) \<Down>{(ls,r,i)} (s',vs',res)) = ((s,vs,($$*ves)@[(Callcl (sfunc s i j))]) \<Down>{(ls,r,i)} (s',vs',res))"
+proof -
+  {
+    assume local_assms:"((s,vs,($$*ves)@[$(Call j)]) \<Down>{(ls,r,i)} (s',vs',res))"
+    have "\<exists>k. ((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res))"
+      using call0 reduce_to_imp_reduce_to_n[OF local_assms]
+      by (metis not0_implies_Suc)
+  }
+  thus ?thesis
+    using calln reduce_to.call is_const_list reduce_to_n_imp_reduce_to
+    by auto
+qed
 
 end
