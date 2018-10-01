@@ -2087,10 +2087,15 @@ lemma reduce_to_n_label:
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
-         (\<exists>rvs s'' vs''. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
-                         ((s'',vs'',($$*vcs)@($$*rvs)@les) \<Down>k{(ls,r,i)} (s',vs',res)))"
+         (\<exists>rvs s'' vs'' res'. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
+                         ((s'',vs'',($$*rvs)@les) \<Down>k{(ls,r,i)} (s',vs',res')) \<and>
+                         ((\<exists>rvs'. res' = RValue rvs' \<and> res = RValue (vcs@rvs')) \<or> (\<nexists>rvs'. res' = RValue rvs' \<and> res = res')))"
   using assms
 proof (induction "(s,vs,($$*vcs)@[Label m les es])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+  case (label_break_nil s vs es k n s'' vs'' bvs les s' vs' res)
+  thus ?case
+    by simp blast
+next
   case (const_value s vs es' k s' vs' res ves)
   consider (1) "($$* ves) = ($$* vcs) @ [Label m les es]" "es' = []"
          | (2) ves' ves'' where "($$* ves) = ($$* ves')" "es' = ($$* ves'') @ [Label m les es]" "vcs = ves' @ ves''"
@@ -2107,7 +2112,10 @@ proof (induction "(s,vs,($$*vcs)@[Label m les es])" k "(ls,r,i)" "(s',vs',res)" 
     case 2
     thus ?thesis
       using const_value(2)[OF 2(2)] const_value.hyps(3) inj_basic_econst reduce_to_n.const_value
-      by fastforce
+      apply safe
+      apply simp_all
+      apply blast
+      apply blast sorry
   qed
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
@@ -2125,8 +2133,10 @@ next
                "res = RTrap \<or> (\<exists>rvs. res = RReturn rvs) \<or> (\<exists>rvs. res = RValue rvs)"
          | (2) bn brvs where "((s, vs, es) \<Down>k{(m # ls, r, i)} (s', vs', RBreak (Suc bn) brvs))"
                              "res = RBreak bn brvs"
-         | (3) rvs s'' vs'' where"((s, vs, es) \<Down>k{(m # ls, r, i)} (s'', vs'', RBreak 0 rvs))"
-                                 "((s'', vs'', ($$* ves'') @ ($$* rvs) @ les) \<Down>k{(ls, r, i)} (s', vs', res))"
+         | (3) rvs s'' vs'' res' where"((s, vs, es) \<Down>k{(m # ls, r, i)} (s'', vs'', RBreak 0 rvs))"
+                                 "((s'', vs'',($$* rvs) @ les) \<Down>k{(ls, r, i)} (s', vs', res'))"
+                                 "(\<exists>rvs'. res' = RValue rvs' \<and> res = RValue (ves''@rvs')) \<or>
+                                  (\<nexists>rvs'. res' = RValue rvs' \<and> res = res')"
     using seq_nonvalue1(3)[OF ves'_def(2)] seq_nonvalue1(4)
     by auto
   thus ?case
@@ -2145,7 +2155,7 @@ next
     thus ?thesis
       using ves'_def
       apply simp
-      apply (metis append_is_Nil_conv reduce_to_consts reduce_to_n.seq_nonvalue1 reduce_to_n_imp_reduce_to seq_nonvalue1.hyps(1) seq_nonvalue1.hyps(4) seq_nonvalue1.hyps(5))
+      apply (metis seq_nonvalue1.hyps(4))
       done
   qed
 next
@@ -2157,6 +2167,19 @@ next
     done
 qed auto
 
+lemma reduce_to_n_label_old:
+  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  shows "(((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
+         (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
+         (\<exists>rvs s'' vs'' res'. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
+                         ((s'',vs'',($$*vcs)@($$*rvs)@les) \<Down>k{(ls,r,i)} (s',vs',res)))"
+  using reduce_to_n_label[OF assms]
+  apply safe
+  apply simp_all
+  apply (metis list.simps(8) reduce_to_n.const_value self_append_conv2)
+  apply (metis list.simps(8) reduce_to_n.const_value self_append_conv2)
 lemma reduce_to_n_label_emp:
   assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>k{(ls,r,i)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
@@ -2164,11 +2187,12 @@ lemma reduce_to_n_label_emp:
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
-  using reduce_to_n_label[OF assms]
+  using reduce_to_n_label[OF assms] reduce_to_n_consts
   apply safe
   apply simp_all
-  apply (metis map_append reduce_to_consts reduce_to_n_imp_reduce_to)
-  apply (metis map_append reduce_to_consts reduce_to_n_imp_reduce_to)
+     apply blast
+    apply blast
+  apply blast
   done
 
 lemma reduce_to_n_label_emp1:
@@ -3159,4 +3183,141 @@ proof -
     by auto
 qed
 
+lemma reduce_to_L0:
+  assumes "const_list ves"
+          "(s,vs,es) \<Down>{\<Gamma>} (s',vs',res)"
+          "\<nexists>rvs. res = RValue rvs"
+  shows "(s,vs,ves @ es@ es') \<Down>{\<Gamma>} (s',vs',res)"
+proof -
+  have 1:"(s,vs,ves@es) \<Down>{\<Gamma>} (s',vs',res)"
+    using reduce_to.seq_nonvalue1[OF assms(1,2,3)] assms(2)
+    apply (cases ves)
+    apply simp_all
+    apply (metis append.left_neutral assms(3) reduce_to.seq_nonvalue2)
+    done
+  show ?thesis
+    using reduce_to.seq_nonvalue2[OF 1 assms(3)] 1
+    apply (cases es')
+    apply simp_all
+    done
+qed
+
+lemma reduce_to_L0_consts_left:
+  assumes "(s,vs,es) \<Down>{\<Gamma>} (s',vs',RValue rvs)"
+  shows "(s,vs,($$*vcs)@es) \<Down>{\<Gamma>} (s',vs',RValue (vcs@rvs))"
+proof -
+  show ?thesis
+  proof (cases "vcs = []")
+    case False
+    thus ?thesis
+      using reduce_to.const_value assms
+      by auto
+  qed (auto simp add: assms)
+qed
+
+lemma reduce_to_L0_consts_left_trap:
+  assumes "(s,vs,es) \<Down>{\<Gamma>} (s',vs',RTrap)"
+  shows "(s,vs,($$*vcs)@es) \<Down>{\<Gamma>} (s',vs',RTrap)"
+proof -
+  show ?thesis
+  proof (cases "vcs = []")
+    case False
+    thus ?thesis
+      using reduce_to.seq_nonvalue1 assms
+      by (metis is_const_list reduce_to_iff_reduce_to_n reduce_to_n_emp res_b.distinct(5) self_append_conv2)
+  qed (auto simp add: assms)
+qed
+
+lemma reduce_to_trap_L0_left:
+  assumes "((s, vs, ($$* vcsf) @ [Trap]) \<Down>{\<Gamma>} (s', vs', res))"
+  shows "((s, vs, [Trap]) \<Down>{\<Gamma>} (s', vs', res))"
+  using assms
+proof (induction "(s, vs, ($$* vcsf) @ [Trap])" \<Gamma> "(s', vs', res)" arbitrary: s vs s' vs' res vcsf rule: reduce_to.induct)
+  case (const_value s vs es \<Gamma> s' vs' res ves)
+  thus ?case
+    by (metis (no_types, lifting) const_list_cons_last(2) consts_app_snoc e.distinct(1) e_type_const_unwrap is_const_list reduce_to_trap res_b.distinct(5))
+next
+  case (seq_value s vs es \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    by (metis consts_app_snoc is_const_list)
+next
+  case (seq_nonvalue1 ves s vs es \<Gamma> s' vs' res)
+  thus ?case
+    using consts_app_snoc
+    by blast
+next
+  case (seq_nonvalue2 s vs es \<Gamma> s' vs' res es')
+  thus ?case
+    apply simp
+    apply (metis consts_app_snoc reduce_to_consts)
+    done
+next
+  case (trap s vs \<Gamma>)
+  thus ?case
+    using reduce_to.trap
+    by blast
+qed auto
+
+lemma reduce_to_label_label:
+  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res))) \<and>
+         (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcs@rvs' \<and> ((s,vs,[Label m les es]) \<Down>{(ls,r,i)} (s',vs',RValue rvs')))))"
+proof -
+  obtain k where k_is:"(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+    using reduce_to_imp_reduce_to_n assms
+    by fastforce
+  consider (1) "(s, vs, es) \<Down>k{(m # ls, r, i)} (s', vs', RTrap) \<and> res = RTrap"
+    | (2)
+    "(\<exists>rvs. (s, vs,
+            es) \<Down>k{(m # ls, r,
+                     i)} (s', vs', RReturn rvs) \<and>
+           res = RReturn rvs)"
+  | (3) "(\<exists>rvs. (s, vs,
+            es) \<Down>k{(m # ls, r,
+                     i)} (s', vs', RValue rvs) \<and>
+           res = RValue (vcs @ rvs))"
+  | (4) "(\<exists>n rvs.
+        (s, vs,
+         es) \<Down>k{(m # ls, r,
+                  i)} (s', vs',
+                       RBreak (Suc n) rvs) \<and>
+        res = RBreak n rvs)"
+  | (5) "(\<exists>rvs s'' vs''.
+        (s, vs,
+         es) \<Down>k{(m # ls, r,
+                  i)} (s'', vs'', RBreak 0 rvs) \<and>
+        (s'', vs'',
+         ($$* vcs) @
+         ($$* rvs) @
+         les) \<Down>k{(ls, r, i)} (s', vs', res))"
+    using reduce_to_n_label[OF k_is]
+    by fastforce
+  thus ?thesis
+  proof cases
+    case 1
+    thus ?thesis
+      using reduce_to.label_trap reduce_to_n_imp_reduce_to
+      by blast
+  next
+    case 2
+    thus ?thesis
+      using reduce_to.label_return reduce_to_n_imp_reduce_to
+      by blast
+  next
+    case 3
+    thus ?thesis
+      using reduce_to.label_value reduce_to_n_imp_reduce_to
+      by auto
+  next
+    case 4
+    thus ?thesis
+      using reduce_to.label_break_suc reduce_to_n_imp_reduce_to
+      by blast
+  next
+    case 5
+    thus ?thesis
+      apply (cases res)
+      apply simp_all
+  qed
+qed
 end

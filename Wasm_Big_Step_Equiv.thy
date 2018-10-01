@@ -961,76 +961,139 @@ next
     by simp
 qed
 
+lemma reduce_to_n_return_lfilled:
+  assumes "Lfilled j lholed (($$*vcs) @ [$Return]) es"
+          "length vcs = n"
+  shows "((s,vs,es) \<Down>{(ls,Some n,i)} (s,vs,RReturn vcs))"
+  using assms
+proof (induction j lholed "(($$*vcs) @ [$Return])" es arbitrary: ls rule: Lfilled.induct)
+  case (L0 vls lholed es')
+  have "(s, vs, ($$* vcs) @ [$Return]) \<Down>{(ls, Some n, i)} (s, vs, RReturn vcs)"
+    using reduce_to.return[OF L0(3)]
+    by fastforce
+  thus ?case
+    using reduce_to_L0 L0
+    by fastforce
+next
+  case (LN vls lholed nl es' l es'' k lfilledk)
+  have 1:"(s, vs, [Label nl es' lfilledk]) \<Down>{(ls, Some n, i)} (s, vs, RReturn vcs)"
+    using reduce_to.label_return[OF LN(4)] LN(5)
+    by fastforce
+  show ?case
+    using reduce_to_L0[OF LN(1) 1]
+    by fastforce
+qed
+
+lemma reduce_to_n_br_lfilled:
+  assumes "Lfilled j lholed (($$*vcs) @ [$Br (k+j)]) es"
+          "length vcs = n"
+          "ls!k = n"
+  shows "((s,vs,es) \<Down>{(ls,r,i)} (s,vs,RBreak k vcs))"
+  using assms
+proof (induction j lholed "(($$*vcs) @ [$Br (k+j)])" es arbitrary: ls k rule: Lfilled.induct)
+  case (L0 vls lholed es')
+  have "(s, vs, ($$* vcs) @ [$Br (k)]) \<Down>{(ls, r, i)} (s, vs, RBreak k vcs)"
+    using reduce_to.br[OF L0(3,4)]
+    by fastforce
+  thus ?case
+    using reduce_to_L0 L0
+    by fastforce
+next
+  case (LN vls lholed nl es' l es'' j lfilledk)
+  have 0:"(s, vs, lfilledk) \<Down>{(nl#ls, r, i)} (s, vs, RBreak (Suc k) vcs)"
+    using LN
+    by fastforce
+  have 1:"(s, vs, [Label nl es' lfilledk]) \<Down>{(ls, r, i)} (s, vs, RBreak k vcs)"
+    using reduce_to.label_break_suc[OF 0]
+    by fastforce
+  show ?case
+    using reduce_to_L0[OF LN(1) 1]
+    by fastforce
+qed
+
 lemma reduce_to_app_reduce_simple:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
-          "((s,vs,es') \<Down>{(ls,r,i)} (s',vs',res))"
-  shows "((s,vs,es) \<Down>{(ls,r,i)} (s',vs',res))"
+          "((s,vs,($$*vcsf)@es') \<Down>{(ls,r,i)} (s',vs',res))"
+  shows "((s,vs,($$*vcsf)@es) \<Down>{(ls,r,i)} (s',vs',res))"
   using assms
-proof (induction arbitrary: ls r res vs' s' rule: reduce_simple.induct)
+proof (induction arbitrary: ls r res vs' s' vcsf rule: reduce_simple.induct)
   case (unop v t op)
   thus ?case
-    using reduce_to.unop reduce_to_consts[of _ _ "[app_unop op v]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.unop]
+          reduce_to_consts[of _ _ "vcsf@[app_unop op v]"]
+    by fastforce
 next
   case (binop_Some op v1 v2 v t)
   thus ?case
-    using reduce_to.binop_Some reduce_to_consts[of _ _ "[v]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.binop_Some]
+          reduce_to_consts[of _ _ "vcsf@[v]"]
+    by fastforce
 next
   case (binop_None op v1 v2 t)
   thus ?case
-    using reduce_to.binop_None reduce_to_trap[of s vs "(ls, r, i)"]
+    using reduce_to_L0_consts_left_trap[OF reduce_to.binop_None]
+          reduce_to_trap[of s vs "(ls, r, i)"] reduce_to_trap_L0_left
     by metis
 next
   case (testop v t op)
   thus ?case
-    using reduce_to.testop reduce_to_consts[of _ _ "[app_testop op v]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.testop]
+          reduce_to_consts[of _ _ "vcsf@[app_testop op v]"]
+    by fastforce
 next
   case (relop v1 v2 t op)
   thus ?case
-    using reduce_to.relop reduce_to_consts[of _ _ "[app_relop op v1 v2]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.relop]
+          reduce_to_consts[of _ _ "vcsf@[app_relop op v1 v2]"]
+    by fastforce
 next
   case (convert_Some t1 v t2 sx v')
   thus ?case
-    using reduce_to.convert_Some reduce_to_consts[of _ _ "[v']"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.convert_Some]
+          reduce_to_consts[of _ _ "vcsf@[v']"]
+    by fastforce
 next
   case (convert_None t1 v t2 sx)
   thus ?case
-    using reduce_to.convert_None reduce_to_trap[of s vs "(ls, r, i)"]
+    using reduce_to_L0_consts_left_trap[OF reduce_to.convert_None]
+          reduce_to_trap[of s vs "(ls, r, i)"] reduce_to_trap_L0_left
     by metis
 next
   case (reinterpret t1 v t2)
   thus ?case
-    using reduce_to.reinterpret reduce_to_consts[of _ _ "[wasm_deserialise (bits v) t2]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.reinterpret]
+          reduce_to_consts[of _ _ "vcsf@[wasm_deserialise (bits v) t2]"]
+    by fastforce
 next
   case unreachable
   thus ?case
-    using reduce_to.unreachable reduce_to_trap[of s vs "(ls, r, i)"]
+    using reduce_to_L0_consts_left_trap[OF reduce_to.unreachable]
+          reduce_to_trap[of s vs "(ls, r, i)"] reduce_to_trap_L0_left
     by metis
 next
   case nop
   thus ?case
-    using reduce_to.nop reduce_to_consts[of _ _ "[]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.nop]
+          reduce_to_consts[of _ _ "vcsf@[]"]
+    by fastforce
 next
   case (drop v)
   thus ?case
-    using reduce_to.drop reduce_to_consts[of _ _ "[]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.drop]
+          reduce_to_consts[of _ _ "vcsf@[]"]
+    by fastforce
 next
   case (select_false n v1 v2)
   thus ?case
-    using reduce_to.select_false reduce_to_consts[of _ _ "[v2]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.select_false]
+          reduce_to_consts[of _ _ "vcsf@[v2]"]
+    by fastforce
 next
   case (select_true n v1 v2)
   thus ?case
-    using reduce_to.select_true reduce_to_consts[of _ _ "[v1]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.select_true]
+          reduce_to_consts[of _ _ "vcsf@[v1]"]
+    by fastforce
 next
   case (block vs n t1s t2s m es)
   thus ?case
@@ -1044,59 +1107,102 @@ next
 next
   case (if_false n tf e1s e2s)
   thus ?case
-    using reduce_to.if_false[of _ "[]"]
-    by (simp add: const_list_def)
+    using reduce_to.if_false[OF if_false(1)_ if_false(2)]
+    by (fastforce simp add: is_const_list)
 next
   case (if_true n tf e1s e2s)
   thus ?case
-    using reduce_to.if_true[of _ "[]"]
-    by (simp add: const_list_def)
+    using reduce_to.if_true[OF if_true(1)_ if_true(2)]
+    by (fastforce simp add: is_const_list)
 next
-  case (label_const vs n es)
-  thus ?case
-    using reduce_to.label_value e_type_const_conv_vs
-    by (metis reduce_to_consts1 reduce_to_consts)
+  case (label_const ves n es)
+  obtain vcs where vcs_def:"ves = $$*vcs"
+    using label_const(1) e_type_const_conv_vs
+    by auto
+  hence 0:"res = RValue (vcsf@vcs)"
+    using label_const(2)
+    apply simp
+    apply (metis map_append reduce_to_imp_reduce_to_n reduce_to_n_consts)
+    done
+  have 1:"(s, vs, ves) \<Down>{(n#ls, r, i)} (s', vs', RValue vcs)"
+    using vcs_def
+    by (metis label_const.prems map_append reduce_to_consts1 reduce_to_imp_reduce_to_n reduce_to_n_consts)
+  show ?case
+    using reduce_to_L0_consts_left[OF reduce_to.label_value[OF 1]] 0
+    by simp
 next
   case (label_trap n es)
   thus ?case
-    using reduce_to.label_trap reduce_to.trap reduce_to_trap
-    by metis
+    using reduce_to_L0_consts_left_trap[OF reduce_to.label_trap]
+          reduce_to_trap[of s vs "(ls, r, i)"] reduce_to_trap_L0_left
+    by (metis reduce_to.trap)
 next
   case (br vs n i lholed LI es)
-  then show ?case sorry
+  obtain vcs where vcs_def:"Lfilled i lholed (($$*vcs) @ [$Br (0 + i)]) LI"
+                           "vs = $$*vcs"
+                           "length vcs = n"
+    using br(1,2,3) e_type_const_conv_vs
+    by fastforce
+  thus ?case
+    using reduce_to.label_break_nil[OF reduce_to_n_br_lfilled[OF vcs_def(1,3)]] br.prems
+    by auto
 next
   case (br_if_false n i)
   thus ?case
-    using reduce_to.br_if_false reduce_to_consts[of _ _ "[]"]
-    by simp metis
+    using reduce_to_L0_consts_left[OF reduce_to.br_if_false]
+          reduce_to_consts[of _ _ "vcsf@[]"]
+    by fastforce
 next
   case (br_if_true n i)
   thus ?case
-    using reduce_to.br_if_true[of _ "[]"]
-    by (simp add: const_list_def)
+    using reduce_to.br_if_true[OF br_if_true(1)_ br_if_true(2)]
+    by (fastforce simp add: is_const_list)
 next
   case (br_table "is" c i)
   thus ?case
-    using reduce_to.br_table[of _ _ "[]"]
-    by (simp add: const_list_def)
+    using reduce_to.br_table[OF br_table(1)_ br_table(2)]
+    by (fastforce simp add: is_const_list)
 next
   case (br_table_length "is" c i)
   thus ?case
-    using reduce_to.br_table_length[of _ _ "[]"]
-    by (simp add: const_list_def)
+    using reduce_to.br_table_length[OF br_table_length(1)_ br_table_length(2)]
+    by (fastforce simp add: is_const_list)
 next
-  case (local_const es n i vs)
-  thus ?case
-    using reduce_to.local_value e_type_const_conv_vs
-    by (metis reduce_to_consts1 reduce_to_consts)
+  case (local_const es n i vls)
+  obtain vcs where vcs_def:"es = $$*vcs"
+    using local_const(1) e_type_const_conv_vs
+    by fastforce
+  hence 0:"res = RValue (vcsf@vcs) \<and> s = s' \<and> vs = vs'"
+    using local_const(2)
+    apply simp
+    apply (metis map_append reduce_to_imp_reduce_to_n reduce_to_n_consts)
+    done
+  have 1:"(s, vls, es) \<Down>{([], Some n, i)} (s', vls, RValue vcs)"
+    using vcs_def 0
+    by (simp add: reduce_to_consts1)
+  show ?case
+    using reduce_to_L0_consts_left[OF reduce_to.local_value[OF 1]] 0
+    by simp
 next
   case (local_trap n i vls)
   thus ?case
-    using reduce_to.local_trap
+    using reduce_to_L0_consts_left_trap[OF reduce_to.local_trap]
+          reduce_to_trap[of s vs "(ls, r, i)"] reduce_to_trap_L0_left
     by (metis reduce_to.trap reduce_to_trap)
 next
-  case (return vs n j lholed es i vls)
-  then show ?case sorry
+  case (return ves j n lholed es i' vls)
+  obtain vcs where vcs_def:"($$* vcs) = ves"
+    using return(1) e_type_const_conv_vs
+    by blast
+  hence 1:"vs = vs'" "s = s'" "res = RValue (vcsf@vcs)" 
+    using return reduce_to_consts
+    by (metis map_append)+
+  have "(s, vls, es) \<Down>{([], Some j, i')} (s, vls, RReturn vcs)"
+    using reduce_to_n_return_lfilled vcs_def return
+    by fastforce
+  thus ?case
+    using 1 reduce_to.local_return
+    by (simp add: reduce_to_L0_consts_left)
 next
   case (tee_local v i)
   thus ?case
@@ -1110,7 +1216,7 @@ next
     using Lfilled.simps[of 0 lholed "[Trap]" es]
     by simp blast
   have s_is:"s = s'" "vs = vs'" "res = RTrap"
-    using trap(3) reduce_to_trap[of s vs "(ls, r, i)" s' vs' res]
+    using trap(3) reduce_to_trap[of s vs "(ls, r, i)" s' vs' res] reduce_to_trap_L0_left
     by auto
   have "ves \<noteq> [] \<or> es_c \<noteq> []"
     using trap(1) es_is
@@ -1118,14 +1224,14 @@ next
   thus ?case
     using s_is es_is
     apply simp
-    apply (metis es_is(1,2) append_self_conv2 not_Cons_self2 reduce_to.seq_nonvalue1 reduce_to.seq_nonvalue2 res_b.distinct(5) trap.prems)
+    apply (metis es_is(1,2) e_type_const_conv_vs reduce_to.seq_nonvalue2 reduce_to_L0_consts_left_trap reduce_to_trap_L0_left res_b.distinct(5) trap.prems)
     done
 qed
 
 lemma reduce_to_app_reduce:
   assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_ i \<lparr>s';vs';es'\<rparr>"
-          "((s',vs',es') \<Down>{(ls,r,i)} (s'',vs'',res))"
-  shows "((s,vs,es) \<Down>{(ls,r,i)} (s'',vs'',res))"
+          "((s',vs',($$*vcsf)@es') \<Down>{(ls,r,i)} (s'',vs'',res))"
+  shows "((s,vs,($$*vcsf)@es) \<Down>{(ls,r,i)} (s'',vs'',res))"
   using assms
 proof (induction arbitrary: ls r res vs'' s'' rule: reduce.induct)
   case (basic e e' s vs i)
@@ -1135,116 +1241,130 @@ proof (induction arbitrary: ls r res vs'' s'' rule: reduce.induct)
 next
   case (call s vs j i)
   thus ?case
-    using reduce_to_call[of _ _ "[]"]
+    using reduce_to_call
     by fastforce
 next
   case (call_indirect_Some s i c cl j tf vs)
   thus ?case
-    using reduce_to.call_indirect_Some[OF call_indirect_Some(1,2,3), of "[]"]
-    by (fastforce simp add: const_list_def)
+    using reduce_to.call_indirect_Some[OF call_indirect_Some(1,2,3), of "$$*vcsf"]
+    by (fastforce simp add: is_const_list)
 next
   case (call_indirect_None s i c cl j vs)
   thus ?case
     using reduce_to.call_indirect_None reduce_to_trap[of s vs "(ls, r, i)"]
-    by metis
+    by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
   thus ?case
     using reduce_to.callcl_native
-    by fastforce
+    sorry
 next
   case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
   thus ?case
-    using reduce_to.callcl_host_Some reduce_to_consts[of s' "vs" "vcs'"]
-    by fastforce
+    using reduce_to.callcl_host_Some reduce_to_consts[of s' "vs" "vcsf@vcs'"]
+    apply simp
+    apply (metis reduce_to_L0_consts_left)
+    done
 next
   case (callcl_host_None cl t1s t2s f ves vcs n m s vs i)
   thus ?case
     using reduce_to.callcl_host_None reduce_to_trap[of s vs "(ls, r, i)"]
-    by metis
+    by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (get_local vi j s v vs i)
   thus ?case
-    using reduce_to.get_local reduce_to_consts[of s "(vi @ [v] @ vs)" "[v]"]
+    using reduce_to_L0_consts_left[OF reduce_to.get_local]
+          reduce_to_consts[of _ "(vi @ [v] @ vs)" "vcsf@[v]"]
     by fastforce
 next
   case (set_local vi j s v vs v' i)
   thus ?case
-    using reduce_to.set_local reduce_to_consts[of s "(vi @ [v'] @ vs)" "[]"]
+    using reduce_to_L0_consts_left[OF reduce_to.set_local]
+          reduce_to_consts[of _ "(vi @ [v'] @ vs)" "vcsf@[]"]
     by fastforce
 next
   case (get_global s vs j i)
   thus ?case
-    using reduce_to.get_global reduce_to_consts[of s "vs" "[sglob_val s i j]"]
+    using reduce_to_L0_consts_left[OF reduce_to.get_global]
+          reduce_to_consts[of _ vs "vcsf@[sglob_val s i j]"]
     by fastforce
 next
   case (set_global s i j v s' vs)
   thus ?case
-    using reduce_to.set_global reduce_to_consts[of s' "vs" "[]"]
+    using reduce_to_L0_consts_left[OF reduce_to.set_global]
+          reduce_to_consts[of _ vs "vcsf@[]"]
     by fastforce
 next
   case (load_Some s i j m k off t bs vs a)
   thus ?case
-    using reduce_to.load_Some reduce_to_consts[of s "vs" "[wasm_deserialise bs t]"]
+    using reduce_to_L0_consts_left[OF reduce_to.load_Some]
+          reduce_to_consts[of _ vs "vcsf@[wasm_deserialise bs t]"]
     by fastforce
 next
   case (load_None s i j m k off t vs a)
   thus ?case
     using reduce_to.load_None reduce_to_trap[of s vs "(ls, r, i)"]
-    by metis
+    by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (load_packed_Some s i j m sx k off tp t bs vs a)
   thus ?case
-    using reduce_to.load_packed_Some reduce_to_consts[of s "vs" "[wasm_deserialise bs t]"]
+    using reduce_to_L0_consts_left[OF reduce_to.load_packed_Some]
+          reduce_to_consts[of _ vs "vcsf@[wasm_deserialise bs t]"]
     by fastforce
 next
   case (load_packed_None s i j m sx k off tp t vs a)
   thus ?case
     using reduce_to.load_packed_None reduce_to_trap[of s vs "(ls, r, i)"]
-    by metis
+    by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (store_Some t v s i j m k off mem' vs a)
   thus ?case
-    using reduce_to.store_Some reduce_to_consts[of _ _ "[]"]
+    using reduce_to_L0_consts_left[OF reduce_to.store_Some]
+          reduce_to_consts[of _ vs "vcsf@[]"]
     by fastforce
 next
   case (store_None t v s i j m k off vs a)
   thus ?case
     using reduce_to.store_None reduce_to_trap[of s vs "(ls, r, i)"]
-    by metis
+    by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (store_packed_Some t v s i j m k off tp mem' vs a)
   thus ?case
-    using reduce_to.store_packed_Some reduce_to_consts[of _ _ "[]"]
+    using reduce_to_L0_consts_left[OF reduce_to.store_packed_Some]
+          reduce_to_consts[of _ vs "vcsf@[]"]
     by fastforce
 next
   case (store_packed_None t v s i j m k off tp vs a)
   thus ?case
     using reduce_to.store_packed_None reduce_to_trap[of s vs "(ls, r, i)"]
-    by metis
+    by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (current_memory s i j m n vs)
   thus ?case
-    using reduce_to.current_memory reduce_to_consts[of _ _ "[ConstInt32 (Wasm_Base_Defs.int_of_nat n)]"]
+    using reduce_to_L0_consts_left[OF reduce_to.current_memory]
+          reduce_to_consts[of _ vs "vcsf@[ConstInt32 (Wasm_Base_Defs.int_of_nat n)]"]
     by fastforce
 next
   case (grow_memory s i j m n c mem' vs)
   thus ?case
-    using reduce_to.grow_memory reduce_to_consts[of _ _ "[ConstInt32 (Wasm_Base_Defs.int_of_nat n)]"]
+    using reduce_to_L0_consts_left[OF reduce_to.grow_memory]
+          reduce_to_consts[of _ vs "vcsf@[ConstInt32 (Wasm_Base_Defs.int_of_nat n)]"]
     by fastforce
 next
   case (grow_memory_fail s i j m n vs c)
   thus ?case
-    using reduce_to.grow_memory_fail reduce_to_consts[of s "vs" "[ConstInt32 int32_minus_one]"]
+    using reduce_to_L0_consts_left[OF reduce_to.grow_memory_fail]
+          reduce_to_consts[of _ vs "vcsf@[ConstInt32 int32_minus_one]"]
     by fastforce
 next
   case (label s vs es i s' vs' es' k lholed les les')
-  then show ?case sorry
+  thus ?case
+    sorry
 next
   case (local s vs es i s_l lvs es' v0s n j)
   obtain k where res_b_def:"((s_l, v0s, ($$* []) @ [Local n i lvs es']) \<Down>k{(ls, r, j)} (s'', vs'', res))"
     using local(3) reduce_to_imp_reduce_to_n
-    by simp metis
+    sorry
   then obtain lvs' lres where lres_def:"(s_l, lvs, es') \<Down>{([], Some n, i)} (s'', lvs', lres)"
                                        "v0s = vs''"
                                        "(lres = RTrap \<and> res = RTrap \<or>
@@ -1312,8 +1432,8 @@ next
     by simp
   ultimately
   show ?case
-    using reduce_to_app_reduce
-    by blast
+    using reduce_to_app_reduce[of _ _ _ _ _ _ _ "[]"]
+    by fastforce
 qed
 
 lemma reduce_trans_equiv_reduce_to_trap:
