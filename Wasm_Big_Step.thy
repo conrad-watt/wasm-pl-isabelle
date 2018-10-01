@@ -2337,12 +2337,27 @@ next
 next
 qed auto
 
-lemma reduce_to_local_nonvalue:
+lemma reduce_to_n_local:
   assumes "(s,vs,($$* vfs)@[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res)"
-          "\<nexists>rvs. res = RValue rvs"
-  shows "(s,vs,[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res))) \<and>
+         (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',RValue rvs1))))"
   using assms
 proof (induction "(s,vs,($$* vfs)@[Local m j vcs es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vfs rule: reduce_to_n.induct)
+  case (local_value s lls es k n j s' lls' res vs \<Gamma>)
+  thus ?case
+    using reduce_to_n.local_value
+    by simp
+next
+  case (const_value s vs es k \<Gamma> s' vs' res ves)
+  thus ?case
+    using consts_app_snoc[OF const_value(4)]
+    apply simp
+    apply safe
+    apply simp_all
+    apply (metis consts_cons_last(2) e.simps(12) e_type_const_unwrap)
+    apply (metis inj_basic_econst map_injective)
+    done
+next
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
   thus ?case
     using consts_app_snoc[OF seq_value(7)]
@@ -2363,7 +2378,29 @@ next
   thus ?case
     using reduce_to_n.local_trap
     by auto
+next
+  case (local_return s lls es k n j s' lls' rvs vs \<Gamma>)
+  thus ?case
+    apply simp
+    apply (metis reduce_to_n.local_return)
+    done
 qed auto
+
+lemma reduce_to_local:
+  assumes "(s,vs,($$* vfs)@[Local m j vcs es]) \<Down>{\<Gamma>} (s',vs',res)"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Local m j vcs es]) \<Down>{\<Gamma>} (s',vs',res))) \<and>
+         (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Local m j vcs es]) \<Down>{\<Gamma>} (s',vs',RValue rvs1))))"
+  using reduce_to_n_local assms reduce_to_imp_reduce_to_n[OF assms]
+  apply simp
+  apply (metis reduce_to_n_imp_reduce_to reduce_to_n_local)
+  done
+
+lemma reduce_to_local_nonvalue:
+  assumes "(s,vs,($$* vfs)@[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res)"
+          "(\<nexists>rvs. res = RValue rvs)"
+  shows "((s,vs,[Local m j vcs es]) \<Down>k{\<Gamma>} (s',vs',res))"
+  using reduce_to_n_local[OF assms(1)] assms(2)
+  by auto
 
 lemma local_imp_body:
   assumes "(s,vs,($$*vfs)@[Local m j lvs les]) \<Down>k{(ls,r,i)} (s',vs',res)"
@@ -3267,6 +3304,38 @@ next
     using reduce_to.trap
     by blast
 qed auto
+
+lemma reduce_to_label_emp:
+  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>{(ls,r,i)} (s',vs',res)"
+  shows "(((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
+         (\<exists>n rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
+  using reduce_to_n_label_emp reduce_to_imp_reduce_to_n[OF assms] reduce_to_n_imp_reduce_to
+  apply (cases res)
+  apply simp_all
+     apply blast+
+  done
+
+lemma reduce_to_label_emp1:
+  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>{(ls,r,i)} (s',vs',res)"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Label m [] es]) \<Down>{(ls,r,i)} (s',vs',res))) \<and>
+         (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcs@rvs' \<and> ((s,vs,[Label m [] es]) \<Down>{(ls,r,i)} (s',vs',RValue rvs')))))"
+  using reduce_to_label_emp[OF assms]
+  apply (cases res)
+  apply simp_all
+  apply safe
+  apply simp_all
+  apply (simp add: reduce_to.label_value)
+  apply (insert reduce_to.label_break_nil[of _ _ _ _ _ _ _ _ _ _ _"[]"])[1]
+  apply simp
+  apply (metis append_self_conv2 map_append reduce_to_consts1 self_append_conv)
+  apply (simp add: reduce_to.label_break_suc)
+  apply (simp add: reduce_to.label_return)
+  apply (simp add: reduce_to.label_trap)
+  done
+
 (*
 lemma reduce_to_label_label:
   assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"

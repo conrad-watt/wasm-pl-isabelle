@@ -1014,6 +1014,60 @@ next
     by fastforce
 qed
 
+lemma reduce_to_n_lfilled_context:
+  assumes "Lfilled k lholed es les"
+          "(s, vs, les) \<Down>{(ls,r,i)} (s', vs', res)"
+  shows "\<exists>ls' vcs s'' vs'' res' lholed. ((s, vs, (($$*vcs)@es)) \<Down>{(ls',r,i)} (s'', vs'', res')) \<and>
+                                     Lfilled k lholed (($$*vcs)@es) les"
+  using assms
+proof (induction arbitrary: s' vs' res ls rule: Lfilled.induct)
+  case (L0 ves lholed es' es)
+  obtain k where k_is:"(s, vs, (ves @ es) @ es') \<Down>k{(ls,r,i)} (s', vs', res)"
+    using reduce_to_imp_reduce_to_n[OF L0(3)]
+    by fastforce
+  have "\<exists>s'' vs'' res'. ((s, vs, ves @ es) \<Down>{(ls,r,i)} (s'', vs'', res'))"
+    using reduce_to_app[OF k_is]
+    by simp (metis reduce_to_n_imp_reduce_to)
+  thus ?case
+    using Lfilled.L0[of "[]" _ es' "ves @ es"] e_type_const_conv_vs[OF L0(1)]
+    by (fastforce simp add: const_list_def)
+next
+  case (LN ves lholed n es' l es'' k es lfilledk)
+  obtain k' where k_is:"((s, vs, (ves @  [Label n es' lfilledk]) @ es'') \<Down>k'{(ls,r,i)} (s', vs', res))"
+    using LN reduce_to_imp_reduce_to_n
+    by simp blast
+  obtain s'' vs'' res' vcs' ls where 1:"((s, vs, ($$*vcs') @ [Label n es' lfilledk]) \<Down>k'{(ls,r,i)} (s'', vs'', res'))"
+    using reduce_to_app[OF k_is] e_type_const_conv_vs[OF LN(1)]
+    by fastforce
+  hence "\<exists>ls' s'' vs'' res'. ((s, vs, lfilledk) \<Down>k'{(ls',r,i)} (s'', vs'', res'))"
+    using reduce_to_n_label[OF 1(1)]
+    by fastforce
+  hence "\<exists>ls' vcs s'' vs'' res' lholed.
+       ((s, vs, ($$* vcs) @ es) \<Down>{(ls', r, i)} (s'', vs'', res')) \<and>
+       Lfilled k lholed (($$* vcs) @ es) lfilledk"
+    using LN(4) reduce_to_n_imp_reduce_to
+    by fastforce
+  thus ?case
+    using Lfilled.LN[OF LN(1), of _ n es' _ es'']
+    by blast
+qed
+
+lemma reduce_to_n_lfilled_context_equiv:
+  assumes "Lfilled k lholed es les"
+          "Lfilled k lholed es' les'"
+          "(s, vs, les) \<Down>{(ls,r,i)} (s', vs', res)"
+          "\<And>s'' vs'' res' ls. ((s', vs', es') \<Down>{(ls,r,i)} (s'', vs'', res')) \<Longrightarrow> ((s, vs, es) \<Down>{(ls,r,i)} (s'', vs'', res'))"
+  shows "(s', vs', les') \<Down>{(ls,r,i)} (s', vs', res)"
+  using assms
+proof (induction arbitrary: s' vs' res ls  rule: Lfilled.induct)
+  case (L0 vs lholed es' es)
+  then show ?case sorry
+next
+  case (LN vs lholed n es' l es'' k es lfilledk)
+  thus ?case sorry
+qed
+
+
 lemma reduce_to_app_reduce_simple:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
           "((s,vs,($$*vcsf)@es') \<Down>{(ls,r,i)} (s',vs',res))"
@@ -1100,7 +1154,7 @@ next
 next
   case (block vls n t1s t2s m es)
   thus ?case
-    using reduce_to_label_label[OF block(5)]
+    using reduce_to_label_emp1[OF block(5)]
     apply (cases res)
     apply simp_all
     apply (metis reduce_to.block reduce_to_L0_consts_left)
@@ -1111,14 +1165,7 @@ next
 next
   case (loop vs n t1s t2s m es)
   thus ?case
-    using reduce_to_label_label[OF loop(5)]
-    apply (cases res)
-    apply simp_all
-    apply (metis reduce_to.loop reduce_to_L0_consts_left)
-    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.loop reduce_to.seq_nonvalue1 res_b.distinct(1) self_append_conv2)
-    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.loop reduce_to.seq_nonvalue1 res_b.distinct(3) self_append_conv2)
-    apply (metis reduce_to.loop reduce_to_L0_consts_left_trap)
-    done
+    sorry
 next
   case (if_false n tf e1s e2s)
   thus ?case
@@ -1219,10 +1266,27 @@ next
     using 1 reduce_to.local_return
     by (simp add: reduce_to_L0_consts_left)
 next
-  case (tee_local v i)
+  case (tee_local v j)
+  obtain k where k_is:"((s, vs, ($$* vcsf) @  [v, v, $Set_local j]) \<Down>k{(ls, r, i)} (s', vs', res))"
+    using tee_local(2) reduce_to_imp_reduce_to_n
+    by blast
+  obtain c where c_is:"v = $C c"
+    using tee_local(1)
+    by (metis e_type_const_unwrap)
+  hence 0:"((s, vs, ($$* vcsf@[c]) @  [$C c, $Set_local j]) \<Down>k{(ls, r, i)} (s', vs', res))"
+    using k_is c_is
+    by auto
+  have 1:"s = s'" "vs[j := c] = vs'" "j < length vs" "res = RValue (vcsf@[c])"
+    using reduce_to_n_set_local[OF 0]
+    by auto
+  hence "((s, vs, [v, v, $Set_local j]) \<Down>{(ls, r, i)} (s', vs', RValue [c]))"
+    using 
+          upd_conv_take_nth_drop[OF 1(3)] c_is id_take_nth_drop[OF 1(3)] c_is
+          reduce_to.const_value[OF reduce_to.set_local[of "take j vs" j s "vs!j" "drop (Suc j) vs" c "(ls, r, i)"], of "[c]"]
+    by simp
   thus ?case
-    using reduce_to.tee_local
-    by (simp add: is_const_list)
+    using reduce_to.tee_local k_is c_is reduce_to.const_value 1(4) reduce_to_L0_consts_left tee_local
+    by auto
 next
   case (trap es lholed)
   then obtain ves es_c where es_is:"es = ves @ [Trap] @ es_c"
@@ -1248,7 +1312,7 @@ lemma reduce_to_app_reduce:
           "((s',vs',($$*vcsf)@es') \<Down>{(ls,r,i)} (s'',vs'',res))"
   shows "((s,vs,($$*vcsf)@es) \<Down>{(ls,r,i)} (s'',vs'',res))"
   using assms
-proof (induction arbitrary: ls r res vs'' s'' rule: reduce.induct)
+proof (induction arbitrary: ls r res vs'' s'' vcsf rule: reduce.induct)
   case (basic e e' s vs i)
   thus ?case
     using reduce_to_app_reduce_simple
@@ -1271,8 +1335,40 @@ next
 next
   case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
   thus ?case
-    using reduce_to.callcl_native
-    sorry
+  proof (cases "\<exists>rvs. res = RValue rvs")
+    case True
+    obtain rvs' where rvs'_def:"res = RValue rvs'"
+      using True
+      by blast
+    hence 0:"(\<exists>rvs2.
+             rvs' = vcsf @ rvs2 \<and>
+             (s, vs,
+              [Local m j (vcs @ zs)
+                [$Block ([] _> t2s)
+                   es]]) \<Down>{(ls, r,
+   i)} (s'', vs'', RValue rvs2))"
+      using reduce_to_local[OF callcl_native(8)]
+            True
+      by fastforce
+    thus ?thesis
+      using rvs'_def reduce_to.callcl_native[OF callcl_native(1,2,3,4,5,6,7)]
+      apply simp
+      apply (metis reduce_to_L0_consts_left)
+      done
+  next
+    case False
+    have 0:"(s, vs, ves @ [Callcl cl]) \<Down>{(ls, r, i)} (s'', vs'', res)"
+      using reduce_to.callcl_native[OF callcl_native(1,2,3,4,5,6,7)] reduce_to_local[OF callcl_native(8)]
+            False
+      by blast
+    thus ?thesis
+      using reduce_to.seq_nonvalue1[OF _ 0 False] is_const_list const_list_def
+      apply (cases vcsf)
+      apply simp_all
+      apply fastforce
+      done
+  qed
+
 next
   case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
   thus ?case
@@ -1377,23 +1473,23 @@ next
     sorry
 next
   case (local s vs es i s_l lvs es' v0s n j)
-  obtain k where res_b_def:"((s_l, v0s, ($$* []) @ [Local n i lvs es']) \<Down>k{(ls, r, j)} (s'', vs'', res))"
+  obtain k where res_b_def:"((s_l, v0s, ($$* vcsf) @ [Local n i lvs es']) \<Down>k{(ls, r, j)} (s'', vs'', res))"
     using local(3) reduce_to_imp_reduce_to_n
-    sorry
-  then obtain lvs' lres where lres_def:"(s_l, lvs, es') \<Down>{([], Some n, i)} (s'', lvs', lres)"
+    by blast
+  then obtain lvs' lres where lres_def:"(s_l, lvs, ($$*[])@es') \<Down>{([], Some n, i)} (s'', lvs', lres)"
                                        "v0s = vs''"
                                        "(lres = RTrap \<and> res = RTrap \<or>
                                         (\<exists>rvs. (lres = RValue rvs \<or>
                                                 lres = RReturn rvs) \<and>
-                                               res = RValue ([] @ rvs)))"
+                                               res = RValue (vcsf @ rvs)))"
     using local_imp_body[OF res_b_def(1)] reduce_to_n_imp_reduce_to
-    by blast
+    by fastforce
   show ?case
   proof (cases lres)
     case (RValue x1)
     thus ?thesis
       using local(2)[OF lres_def(1)] lres_def(2,3) reduce_to.local_value
-      by simp
+      by (metis (no_types, lifting) map_append reduce_to_L0_consts_left res_b.distinct(3,5) self_append_conv2)
   next
     case (RBreak x21 x22)
     thus ?thesis
@@ -1403,12 +1499,12 @@ next
   case (RReturn x3)
     thus ?thesis
       using local(2)[OF lres_def(1)] lres_def(2,3) reduce_to.local_return
-      by simp
+      by (metis (no_types, lifting) map_append reduce_to_L0_consts_left res_b.distinct(11,3) self_append_conv2)
   next
     case RTrap
     thus ?thesis
       using local(2)[OF lres_def(1)] lres_def(2,3) reduce_to.local_trap
-      by simp
+      by (metis (no_types, lifting) map_append reduce_to_L0_consts_left_trap res_b.distinct(11,5) self_append_conv2)
   qed
 qed
 
