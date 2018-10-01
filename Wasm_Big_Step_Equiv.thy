@@ -912,14 +912,17 @@ next
     using lfilled_collapse3
     by simp blast
 next
-  case (label_break_nil s vs es n ls r i s'' vs'' bvs les s' vs' res)
-  have 1:"reduce_trans i (s, vs, [Label n les es]) (s'', vs'', ($$* bvs) @ les)"
+  case (label_break_nil s vs es n ls r i s'' vs'' bvs vcs les s' vs' res)
+  have 0:"reduce_trans i (s, vs, [Label n les es]) (s'', vs'', ($$* bvs) @ les)"
     using label_break_nil(2) Lfilled_exact.L0 Lfilled_exact_imp_Lfilled
     by simp blast
+  hence 1:"reduce_trans i (s, vs, ($$* vcs) @ [Label n les es]) (s'', vs'', ($$*vcs @ bvs) @ les)"
+    using reduce_trans_L0[OF 0, of vcs "[]"]
+    by fastforce
   show ?case
   proof (cases res)
     case (RValue x1)
-    hence "reduce_trans i (s'', vs'', ($$* bvs) @ les) (s', vs', $$* x1)"
+    hence "reduce_trans i (s'', vs'', ($$* vcs @ bvs) @ les) (s', vs', $$* x1)"
       using label_break_nil
       by simp
     thus ?thesis
@@ -937,7 +940,7 @@ next
       by simp (meson reduce_trans_compose reduce_trans_local)
   next
     case RTrap
-    hence "reduce_trans i (s'', vs'', ($$* bvs) @ les) (s', vs', [Trap])"
+    hence "reduce_trans i (s'', vs'', ($$* vcs @ bvs) @ les) (s', vs', [Trap])"
       using label_break_nil
       by simp
     thus ?thesis
@@ -1095,15 +1098,27 @@ next
           reduce_to_consts[of _ _ "vcsf@[v1]"]
     by fastforce
 next
-  case (block vs n t1s t2s m es)
+  case (block vls n t1s t2s m es)
   thus ?case
-    using reduce_to.block
-    by simp
+    using reduce_to_label_label[OF block(5)]
+    apply (cases res)
+    apply simp_all
+    apply (metis reduce_to.block reduce_to_L0_consts_left)
+    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.block reduce_to.seq_nonvalue1 res_b.distinct(1) self_append_conv2)
+    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.block reduce_to.seq_nonvalue1 res_b.distinct(3) self_append_conv2)
+    apply (metis reduce_to.block reduce_to_L0_consts_left_trap)
+    done
 next
   case (loop vs n t1s t2s m es)
   thus ?case
-    using reduce_to.loop
-    by simp
+    using reduce_to_label_label[OF loop(5)]
+    apply (cases res)
+    apply simp_all
+    apply (metis reduce_to.loop reduce_to_L0_consts_left)
+    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.loop reduce_to.seq_nonvalue1 res_b.distinct(1) self_append_conv2)
+    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.loop reduce_to.seq_nonvalue1 res_b.distinct(3) self_append_conv2)
+    apply (metis reduce_to.loop reduce_to_L0_consts_left_trap)
+    done
 next
   case (if_false n tf e1s e2s)
   thus ?case
@@ -1207,7 +1222,7 @@ next
   case (tee_local v i)
   thus ?case
     using reduce_to.tee_local
-    by (simp add: const_list_def)
+    by (simp add: is_const_list)
 next
   case (trap es lholed)
   then obtain ves es_c where es_is:"es = ves @ [Trap] @ es_c"

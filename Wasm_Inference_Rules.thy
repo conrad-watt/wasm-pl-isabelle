@@ -769,7 +769,7 @@ next
   thus ?case
     by (metis modset_intros(11) var_st_differ_on_def)
 next
-  case (label_break_nil s vs es k n ls r s'' vs'' bvs les s' vs' res)
+  case (label_break_nil s vs es k n ls r s'' vs'' bvs vcs les s' vs' res)
   have 1:"reifies_func (s.funcs s'') (inst.funcs i) fs"
     using reduce_to_funcs[OF label_break_nil(1)] label_break_nil(5)
     by simp
@@ -798,9 +798,11 @@ next
     using label_break_nil(4)[OF 1 var_st''_def]
     by (simp add: modset_consts_app_equiv label_break_nil.prems(5,6,7))
   ultimately
-  show ?case
+  have "var_st_differ_on var_st (modset fs ([Label n les es])) var_st'"
     using var_st_differ_on_app
     by (metis modset_arb_app1 modset_intros(11) var_st_differ_on_def)
+  thus ?case
+    by (simp add: modset_consts_app_equiv)
 next
   case (label_return s vs es k n s' vs' rvs les)
   thus ?case
@@ -2143,14 +2145,14 @@ next
     unfolding res_wf_def
     by simp
 next
-  case (label_break_nil s vs es k n' labs s'' vs'' bvs les s' vs' res)
+  case (label_break_nil s vs es k n' labs s'' vs'' bvs vcs' les s' vs' res vcs)
   have 0:"reifies_lab (n # labs) (fs, P # ls, r)"
          "reifies_ret ret (fs, P # ls, r)"
     using label_break_nil(11)
     unfolding ass_wf_def
     by simp_all
-  have les_is:"vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
-    using label_break_nil(5)
+  have les_is:"vcsf = vcs'" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
+    using label_break_nil(5) inj_basic_econst
     by auto
   hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s'', vs'', RBreak 0 bvs)"
     using label_break_nil(1)
@@ -2170,7 +2172,7 @@ next
   thus ?case
     using label_break_nil(4)[OF _ 2 label_break_nil(7,8,9,10) st''_def(1) label_break_nil(12)]
           les_is
-    by blast
+    by simp
 next
   case (label_return s vs es k n' labs s' vs' rvs les)
   have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
