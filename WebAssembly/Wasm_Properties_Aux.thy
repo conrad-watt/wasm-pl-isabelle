@@ -179,7 +179,6 @@ next
     by fastforce
 qed
 
-
 lemma unlift_b_e: assumes "\<S>\<bullet>\<C> \<turnstile> $*b_es : tf" shows "\<C> \<turnstile> b_es : tf"
 using assms proof (induction "\<S>" "\<C>" "($*b_es)" "tf" arbitrary: b_es)
   case (1 \<C> b_es tf \<S>)
@@ -1879,5 +1878,48 @@ proof -
     by (metis rev.simps(2) rev_rev_ident)
   thus ?thesis
     by (metis list_all2_Cons1 list_all2_rev1 rev_eq_Cons_iff)
+qed
+
+lemma lfilled_lfilled_app:
+  assumes "Lfilled k lholed es LI"
+          "Lfilled k lholed es' LI'"
+  shows "\<exists>lholed'. Lfilled k lholed' es (($$*vcs)@LI) \<and> Lfilled k lholed' es' (($$*vcs)@LI')"
+  using assms
+proof (induction k lholed es LI arbitrary: es' vcs LI' rule: Lfilled.induct)
+  case (L0 vs_l0 lholed es_l0 es)
+  obtain lholed' where lholed'_def:"lholed' = LBase (($$* vcs)@vs_l0) es_l0"
+    by blast
+  have 1:"LI' = vs_l0 @ es' @ es_l0"
+    using L0 Lfilled.simps
+    by blast
+  have 2:"const_list (($$* vcs) @ vs_l0)"
+    using L0(1) const_list_def is_const_list
+    by auto
+  have "Lfilled 0 (LBase (($$* vcs) @ vs_l0) es_l0) es (($$* vcs) @ vs_l0 @ es @ es_l0)"
+       "Lfilled 0 (LBase (($$* vcs) @ vs_l0) es_l0) es' (($$* vcs) @ vs_l0 @ es' @ es_l0)"
+    using Lfilled.intros(1)[OF 2]
+    by fastforce+
+  thus ?case
+    using 1
+    by blast
+next
+  case (LN vs lholed n es'_ln l es'' k es lfilledk)
+  obtain lholed' where lholed'_def:"lholed' = LRec (($$* vcs) @ vs) n es'_ln l es''"
+    by blast
+  obtain lfilledk' where lfilledk'_def:"LI' = vs @ [Label n es'_ln lfilledk'] @ es''"
+                                       "const_list vs"
+                                       "Lfilled k l es' lfilledk'"
+    using LN(2,5) Lfilled.simps[of "(k + 1)" lholed es' LI']
+    by fastforce
+  have 2:"const_list (($$* vcs) @ vs)"
+    using LN(1) const_list_def is_const_list
+    by auto
+  have "Lfilled (k + 1) lholed' es (($$* vcs) @ vs @ [Label n es'_ln lfilledk] @ es'')"
+       "Lfilled (k + 1) lholed' es' (($$* vcs) @ vs @ [Label n es'_ln lfilledk'] @ es'')"
+    using Lfilled.intros(2)[OF 2 lholed'_def] LN(3) lfilledk'_def(3)
+    by fastforce+
+  thus ?case
+    using lfilledk'_def(1)
+    by blast
 qed
 end

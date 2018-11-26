@@ -1026,7 +1026,7 @@ proof (induction arbitrary: s' vs' res ls rule: Lfilled.induct)
     using reduce_to_imp_reduce_to_n[OF L0(3)]
     by fastforce
   have "\<exists>s'' vs'' res'. ((s, vs, ves @ es) \<Down>{(ls,r,i)} (s'', vs'', res'))"
-    using reduce_to_app[OF k_is]
+    using reduce_to_n_app[OF k_is]
     by simp (metis reduce_to_n_imp_reduce_to)
   thus ?case
     using Lfilled.L0[of "[]" _ es' "ves @ es"] e_type_const_conv_vs[OF L0(1)]
@@ -1037,7 +1037,7 @@ next
     using LN reduce_to_imp_reduce_to_n
     by simp blast
   obtain s'' vs'' res' vcs' ls where 1:"((s, vs, ($$*vcs') @ [Label n es' lfilledk]) \<Down>k'{(ls,r,i)} (s'', vs'', res'))"
-    using reduce_to_app[OF k_is] e_type_const_conv_vs[OF LN(1)]
+    using reduce_to_n_app[OF k_is] e_type_const_conv_vs[OF LN(1)]
     by fastforce
   hence "\<exists>ls' s'' vs'' res'. ((s, vs, lfilledk) \<Down>k'{(ls',r,i)} (s'', vs'', res'))"
     using reduce_to_n_label[OF 1(1)]
@@ -1055,18 +1055,131 @@ qed
 lemma reduce_to_n_lfilled_context_equiv:
   assumes "Lfilled k lholed es les"
           "Lfilled k lholed es' les'"
-          "(s, vs, les) \<Down>{(ls,r,i)} (s', vs', res)"
-          "\<And>s'' vs'' res' ls. ((s', vs', es') \<Down>{(ls,r,i)} (s'', vs'', res')) \<Longrightarrow> ((s, vs, es) \<Down>{(ls,r,i)} (s'', vs'', res'))"
-  shows "(s', vs', les') \<Down>{(ls,r,i)} (s', vs', res)"
+          "(s', vs', les') \<Down>{(ls,r,i)} (s_r, vs_r, res)"
+          "\<And>s'' vs'' res' ls vcs. ((s', vs', ($$* vcs)@es') \<Down>{(ls,r,i)} (s'', vs'', res')) \<Longrightarrow> ((s, vs, ($$* vcs)@es) \<Down>{(ls,r,i)} (s'', vs'', res'))"
+  shows "(s, vs, les) \<Down>{(ls,r,i)} (s_r, vs_r, res)"
   using assms
-proof (induction arbitrary: s' vs' res ls  rule: Lfilled.induct)
-  case (L0 vs lholed es' es)
-  then show ?case sorry
+proof (induction arbitrary: s' vs' res ls es' les' s_r vs_r rule: Lfilled.induct)
+  case (L0 vs0 lholed es0 es)
+  have les'_is:"les' = vs0 @ es' @ es0"
+    using Lfilled.intros(1)[OF L0(1,2)] L0(3) lfilled_deterministic
+    by auto
+  consider
+    (1) s'' vs'' rvs where
+      "(s', vs', vs0 @ es') \<Down>{(ls, r, i)} (s'', vs'', RValue rvs)"
+      "(s'', vs'', ($$* rvs) @ es0) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+  | (2) "(s', vs', vs0 @ es') \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+        "(\<nexists>rvs. res = RValue rvs)"
+    using reduce_to_app L0(4) les'_is
+    by (metis append_assoc)
+  thus ?case
+  proof (cases)
+    case 1
+    show ?thesis
+      using reduce_to_seq_value_all[OF L0(5)[OF _] 1(2)] 1(1) L0(1) e_type_const_conv_vs
+      by auto
+  next
+    case 2
+    show ?thesis
+      using L0(5) 2(1,2) e_type_const_conv_vs
+      by (metis L0.hyps(1) append.assoc append_Nil2 reduce_to.seq_nonvalue2)
+  qed
 next
-  case (LN vs lholed n es' l es'' k es lfilledk)
-  thus ?case sorry
+  case (LN vs_ln lholed n esl_ln lholedk es_ln k es lfilledk)
+  obtain lfilledk' where lfilledk'_def:"(les' = vs_ln @ [Label n esl_ln lfilledk'] @ es_ln)"
+                                       "const_list vs_ln"
+                                       "Lfilled k lholedk es' lfilledk'"
+    using Lfilled.simps[of "k+1" lholed es' les'] LN(2,5)
+    by fastforce
+  have 1: "(s', vs', (vs_ln @ [Label n esl_ln lfilledk']) @ es_ln) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+    using lfilledk'_def(1) LN(6)
+    by simp
+  obtain vvs_ln where vvs_ln_def:"($$* vvs_ln) = vs_ln"
+    using lfilledk'_def(2) e_type_const_conv_vs
+    by blast
+  consider (a) s'' vs'' rvs where
+              "(s', vs', ($$* vvs_ln) @ [Label n esl_ln lfilledk']) \<Down>{(ls, r, i)} (s'', vs'',  RValue rvs)"
+              "(s'', vs'', ($$* rvs) @ es_ln) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+         | (b) "(s', vs', ($$* vvs_ln) @ [Label n esl_ln lfilledk']) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+               "(\<nexists>rvs. res = RValue rvs)"
+    using reduce_to_app[OF 1] vvs_ln_def
+    by blast
+  thus ?case
+  proof (cases)
+    case a
+    consider (aa) rvsaa where "(s', vs', lfilledk') \<Down>{(n # ls, r, i)} (s'', vs'', RValue rvsaa)"
+                              "RValue rvs = RValue (vvs_ln @ rvsaa)"
+      | (bb) rvsbb s''bb vs''bb res'bb vcs1bb vcs2bb where
+                    "vvs_ln = vcs1bb @ vcs2bb"
+                    "(s', vs', lfilledk') \<Down>{(n # ls, r, i)} (s''bb, vs''bb, RBreak 0 rvsbb)"
+                    "(s''bb, vs''bb, ($$* vcs2bb) @ ($$* rvsbb) @ esl_ln) \<Down>{(ls, r, i)} (s'', vs'', res'bb)"
+                    "(\<exists>rvs'. res'bb = RValue rvs' \<and>  RValue rvs = RValue (vcs1bb @ rvs'))"
+      using reduce_to_label[OF a(1)]
+      by fastforce
+    hence "(s, vs, ($$* vvs_ln) @ [Label n esl_ln lfilledk]) \<Down>{(ls, r, i)} (s'', vs'', RValue rvs)"
+    proof (cases)
+      case aa
+      show ?thesis
+        using LN(4)[OF lfilledk'_def(3) aa(1) LN(7)] aa(2)
+        by (simp add: reduce_to.label_value reduce_to_L0_consts_left)
+    next
+      case bb
+      show ?thesis
+        using LN(4)[OF lfilledk'_def(3) bb(2) LN(7)] bb(1,3,4)
+        by (auto simp add: reduce_to.label_break_nil reduce_to_L0_consts_left)
+    qed
+    thus ?thesis
+      using a(2) reduce_to_seq_value_all vvs_ln_def
+      by fastforce
+  next
+    case b
+    consider (aa) "(s', vs', lfilledk') \<Down>{(n # ls, r, i)} (s_r, vs_r, RTrap)"
+                  "res = RTrap"
+      | (bb) "(\<exists>rvs. ((s', vs', lfilledk') \<Down>{(n # ls, r, i)} (s_r, vs_r, RReturn rvs)) \<and>
+                      res = RReturn rvs)"
+      | (cc)
+        "(\<exists>na rvs. ((s', vs', lfilledk') \<Down>{(n # ls, r, i)} (s_r, vs_r, RBreak (Suc na) rvs)) \<and>
+            res = RBreak na rvs)"
+      | (dd) rvsdd s''dd vs''dd vcs1dd vcs2dd where
+            "vvs_ln = vcs1dd @ vcs2dd"
+            "(s', vs', lfilledk') \<Down>{(n # ls, r, i)} (s''dd, vs''dd, RBreak 0 rvsdd)"
+            "(s''dd, vs''dd, ($$* vcs2dd) @ ($$* rvsdd) @ esl_ln) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+      using reduce_to_label[OF b(1)] b(2)
+      by fastforce
+    hence "(s, vs, ($$* vvs_ln) @ [Label n esl_ln lfilledk]) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+    proof (cases)
+      case aa
+      show ?thesis
+        using LN(4)[OF lfilledk'_def(3) aa(1) LN(7)] aa(2)
+        by (simp add: reduce_to.label_trap reduce_to_L0_consts_left_trap)
+    next
+      case bb
+      show ?thesis
+        using LN(4)[OF lfilledk'_def(3) _ LN(7), of s' vs'] bb
+              lfilledk'_def(2) reduce_to.label_return reduce_to.seq_nonvalue1 vvs_ln_def
+        by fastforce
+    next
+      case cc
+      show ?thesis
+        using LN(4)[OF lfilledk'_def(3) _ LN(7), of s' vs'] cc
+              lfilledk'_def(2) reduce_to.label_break_suc reduce_to.seq_nonvalue1 vvs_ln_def
+        by fastforce
+    next
+      case dd
+      have 1:"(s''dd, vs''dd, ($$* vcs2dd @ rvsdd) @ esl_ln) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+        using dd(3)
+        by simp
+      have 2:"(s, vs, ($$* vcs2dd) @  [Label n esl_ln lfilledk]) \<Down>{(ls, r, i)} (s_r, vs_r, res)"
+        using reduce_to.label_break_nil[OF LN(4)[OF lfilledk'_def(3) dd(2) LN(7)] 1]
+        by simp
+      thus ?thesis
+        using reduce_to.seq_nonvalue1[OF _ 2 b(2), of "($$* vcs1dd)"] dd(1) vvs_ln_def is_const_list
+        by force
+    qed
+    thus ?thesis
+      by (metis append_Nil2 append_assoc b(2) reduce_to.seq_nonvalue2 vvs_ln_def)
+  qed
 qed
-
 
 lemma reduce_to_app_reduce_simple:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
@@ -1469,8 +1582,13 @@ next
     by fastforce
 next
   case (label s vs es i s' vs' es' k lholed les les')
+  obtain lholed' where lholed':"Lfilled k lholed' es (($$* vcsf)@les)"
+                               "Lfilled k lholed' es' (($$* vcsf) @ les')"
+    using lfilled_lfilled_app[OF label(2,3)]
+    by blast
   thus ?case
-    sorry
+    using reduce_to_n_lfilled_context_equiv[OF lholed' label(5,4)]
+    by blast
 next
   case (local s vs es i s_l lvs es' v0s n j)
   obtain k where res_b_def:"((s_l, v0s, ($$* vcsf) @ [Local n i lvs es']) \<Down>k{(ls, r, j)} (s'', vs'', res))"

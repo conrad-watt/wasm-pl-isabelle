@@ -2174,6 +2174,24 @@ next
     done
 qed auto
 
+lemma reduce_to_label:
+  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"
+  shows "(((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
+         (\<exists>n rvs. ((s,vs,es) \<Down>{(m#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
+         (\<exists>rvs s'' vs'' res' vcs1 vcs2. vcs = vcs1@vcs2 \<and> ((s,vs,es) \<Down>{(m#ls,r,i)} (s'',vs'',RBreak 0 rvs)) \<and>
+                         ((s'',vs'',($$*vcs2)@($$*rvs)@les) \<Down>{(ls,r,i)} (s',vs',res')) \<and>
+                         ((\<exists>rvs'. res' = RValue rvs' \<and> res = RValue (vcs1@rvs')) \<or> ((\<nexists>rvs'. res' = RValue rvs') \<and> res = res')))"
+proof -
+  obtain k where k_is:"(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+    using reduce_to_imp_reduce_to_n[OF assms]
+    by blast
+  show ?thesis
+    using reduce_to_n_label[OF k_is] reduce_to_iff_reduce_to_n
+    by simp blast
+qed
+
 lemma reduce_to_n_label_old:
   assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>k{(m#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
@@ -3041,7 +3059,7 @@ lemma reduce_to_app_disj:
   using reduce_to_apps_const_list_v apply (blast+)[2]
   done
 
-lemma reduce_to_app:
+lemma reduce_to_n_app:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
   shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
@@ -3229,6 +3247,51 @@ proof -
     using calln reduce_to.call is_const_list reduce_to_n_imp_reduce_to
     by auto
 qed
+
+lemma reduce_to_app:
+  assumes "(s,vs,es@es') \<Down>{\<Gamma>} (s',vs',res)"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>{\<Gamma>} (s',vs',res))) \<or>
+         (((s,vs,es) \<Down>{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
+proof -
+  obtain k where k_is:"(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
+    using assms reduce_to_iff_reduce_to_n
+    by blast
+  show ?thesis
+    using reduce_to_n_app[OF k_is] reduce_to_n_imp_reduce_to
+    by blast
+qed
+
+lemma reduce_to_n_seq_value_all:
+  assumes "(s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue res'')"
+          "(s'',vs'',($$* res'') @ es') \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "(s,vs,es @ es') \<Down>k{\<Gamma>} (s',vs',res)"
+proof (cases "es' = []")
+  case True
+  thus ?thesis
+    using assms
+    by (metis append_self_conv reduce_to_n_consts)
+next
+  case False
+  show ?thesis
+  proof (cases "const_list es")
+    case True
+    thus ?thesis
+      using assms(1,2) e_type_const_conv_vs reduce_to_consts reduce_to_iff_reduce_to_n
+      by blast
+  next
+    case False
+    thus ?thesis
+      by (metis append_Nil2 assms(1,2) reduce_to_n.seq_value reduce_to_n_consts)
+  qed
+qed
+
+lemma reduce_to_seq_value_all:
+  assumes "(s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue res'')"
+          "(s'',vs'',($$* res'') @ es') \<Down>{\<Gamma>} (s',vs',res)"
+  shows "(s,vs,es @ es') \<Down>{\<Gamma>} (s',vs',res)"
+  using assms reduce_to_n_seq_value_all
+  by (metis (no_types, lifting) append_Nil2 e_type_const_conv_vs reduce_to.seq_value
+                                reduce_to_iff_reduce_to_n reduce_to_n_consts res_b.inject(1))
 
 lemma reduce_to_L0:
   assumes "const_list ves"

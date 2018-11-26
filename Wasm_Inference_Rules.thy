@@ -4045,7 +4045,7 @@ next
                        "(s, locs, ($$* vcsf) @ ($$* vcs) @ es @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
     consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs, ret, i)} (s',locs',res)))"
       | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
-      using reduce_to_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]
+      using reduce_to_n_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]
             local_assms(4)
       by fastforce
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf R"
