@@ -361,6 +361,14 @@ next
     by (metis consts_cons_last(2) e.simps(10) e_type_const_unwrap)
 qed auto
 
+lemma reduce_to_break_n:
+  assumes "(s,vs,es) \<Down>{(ls,r,i)} (s',vs',RBreak n vbs)"
+  shows "ls!n = length vbs"
+  using assms
+  apply (induction "(s,vs,es)" "(ls,r,i)" "(s',vs',RBreak n vbs)" arbitrary: s vs es s' vs' ls n rule: reduce_to.induct)
+  apply auto
+  done
+
 lemma reduce_to_single_helper1:
   assumes "($$*ves)@es = [e]"
           "\<not>is_const e"
@@ -3398,7 +3406,195 @@ lemma reduce_to_label_emp1:
   apply (simp add: reduce_to.label_return)
   apply (simp add: reduce_to.label_trap)
   done
+(*
+lemma reduce_to_label_loop:
+  assumes "(s,locs,($$*vcsf) @ es) \<Down>{(ls, r, i)} (s',locs',res)"
+          "es = ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
+           es = [(Label n [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
+          "length ($$*vcs) = n"
+          "length t1s = n"
+  shows "(((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
+         (\<exists>n rvs. ((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
+         (\<exists>rvs. ((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
+*)
+lemma reduce_to_label_loop1:
+  assumes "(s,locs,($$*vcsf) @ es) \<Down>{(ls, r, i)} (s',locs',res)"
+          "es = ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
+           es = [(Label n [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
+          "length ($$*vcs) = n"
+          "length t1s = n"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,locs,es) \<Down>{(ls,r,i)} (s',locs',res))) \<and>
+         (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcsf@rvs' \<and> ((s,locs,es) \<Down>{(ls,r,i)} (s',locs',RValue rvs')))))"
+  using assms
+proof (induction "(s,locs,($$*vcsf) @ es)" "(ls, r, i)" "(s',locs',res)"  arbitrary: s locs s' locs' res vcs vcsf ls es rule: reduce_to.induct)
+  case (loop ves n t1s t2s m s vs es s' vs' res)
+  thus ?case
+    by (auto simp add: reduce_to.loop)
+next
+  case (const_value s vs es' s' vs' res ves)
+  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using const_value(5)
+    by blast
+  thus ?case
+  proof (cases)
+    case loop
+    thus ?thesis
+      using consts_app_app_consts1[of ves es' vcsf vcs "$Loop (t1s _> t2s) b_es"]
+            const_value(2,4) inj_basic_econst
+      unfolding is_const_def
+      apply simp
+      apply safe
+      apply simp_all
+      apply (metis const_value.hyps(1) reduce_to_L0_consts_left)
+      apply (metis const_value.hyps(2) const_value.prems(2) const_value.prems(3))
+      done
+  next
+    case label
+    thus ?thesis
+      using consts_app_snoc[of "($$* ves)" es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+            const_value(2,4) inj_basic_econst
+      apply simp
+      apply safe
+      apply simp_all
+      apply (metis (no_types, lifting) Cons_eq_map_D consts_app_ex(2) e.simps(10))
+      apply (metis (no_types, lifting) const_value.prems(2) const_value.prems(3) length_map)
+      done
+  qed
+next
+  case (label_value s vs es n ls s' vs' res les)
+  thus ?case
+    using reduce_to.label_value
+    by auto
+next
+  case (seq_value s vs es_e s'' vs'' res'' es' s' vs' res)
+  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using seq_value(8)
+    by blast
+  thus ?case
+  proof (cases)
+    case loop
+    thus ?thesis
+      using consts_app_app_consts[of es_e es' vcsf vcs "$Loop (t1s _> t2s) b_es"]
+            seq_value(2,4,5,6,7) inj_basic_econst
+      unfolding is_const_def
+      apply simp
+      apply (metis is_const_list map_append self_append_conv)
+      done
+  next
+    case label
+    thus ?thesis
+      using consts_app_snoc[of es_e es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+            seq_value(2,4,5,6,7) inj_basic_econst
+      apply simp
+      apply (metis is_const_list)
+      done
+  qed
+next
+  case (seq_nonvalue1 ves s vs es_e s' vs' res)
+  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using seq_nonvalue1(8)
+    by blast
+  thus ?case
+  proof (cases)
+    case loop
+    consider
+        (1) ves' ves'' where "ves = $$* ves'" "es_e = ($$* ves'') @ es" "vcsf = ves' @ ves''"
+      | (2) es_1 es_2 where "ves = ($$* vcsf) @ es_1" "es_e = es_2" "es = es_1 @ es_2"
+      using consts_app[OF seq_nonvalue1(7)]
+      by blast
+    thus ?thesis
+    proof cases
+      case 1
+      thus ?thesis
+        using seq_nonvalue1(3)[OF 1(2) seq_nonvalue1(8,9,10)] seq_nonvalue1(4)
+        by auto
+    next
+      case 2
+      thus ?thesis
+        by (metis append.left_neutral consts_app_ex(2) e_type_const_conv_vs is_const_list reduce_to.seq_nonvalue1 seq_nonvalue1.hyps(1,2,4,6))
+    qed
+  next
+    case label
+    thus ?thesis
+      using consts_app_snoc[of ves es_e vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+            seq_nonvalue1 inj_basic_econst
+      by auto
+  qed
+next
+  case (seq_nonvalue2 s vs es_e s' vs' res es')
+  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+    using seq_nonvalue2(6)
+    by blast
+  thus ?case
+  proof (cases)
+    case loop
+    thus ?thesis
+      using consts_app_app_consts[of es_e es' vcsf vcs "$Loop (t1s _> t2s) b_es"]
+            seq_nonvalue2 inj_basic_econst
+      unfolding is_const_def
+      apply simp
+      apply safe
+          apply (metis map_append reduce_to_consts)
+         apply (metis map_append reduce_to_consts)
+        apply (metis reduce_to_consts)+
+      done
+  next
+    case label
+    thus ?thesis
+      using consts_app_snoc[of es_e es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+            seq_nonvalue2 inj_basic_econst
+      apply simp
+      apply (metis reduce_to_consts)
+      done
+  qed
+next
+  case (label_trap s vs es_l n ls s' vs' les)
+  thus ?case
+    using reduce_to.label_trap
+    by auto
+next
+  case (label_break_suc s vs es n ls s' vs' bn bvs les)
+  thus ?case
+    using reduce_to.label_break_suc
+    by auto
+next
+  case (label_break_nil s vs es_e n' ls s'' vs'' bvs vcs_v les s' vs' res)
+  hence es_is:"n = n'"
+              "es = [Label (length vcs) [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+              "es_e = ($$* vcs) @ ($* b_es)"
+              "les = [$Loop (t1s _> t2s) b_es]"
+              "vcs_v = vcsf"
+    using consts_app_snoc[OF label_break_nil(5)[symmetric]] inj_basic_econst
+    by auto
+  have 1:"length bvs = n'"
+    using reduce_to_break_n[OF label_break_nil(1)]
+    by auto
+  thus ?case
+    using label_break_nil(4)[of vcs_v "($$*bvs) @ les" bvs] es_is label_break_nil(1,3,4,5,6,7,8) inj_basic_econst
+          reduce_to.label_break_nil[OF label_break_nil(1), of "[]"]
+    by simp fastforce
+next
+  case (label_return s vs es n ls s' vs' rvs les)
+  thus ?case
+    using reduce_to.label_return
+    by auto
+qed auto
 
+lemma reduce_to_label_loop2:
+  assumes "(s,locs,($$*vcsf) @ [(Label n [$(Loop (t1s _> t2s) b_es)] (vs @ ($*b_es)))]) \<Down>{(ls, r, i)} (s',locs',res)"
+          "length vs = n"
+          "length t1s = n"
+          "const_list vs"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,locs,[(Label n [$(Loop (t1s _> t2s) b_es)] (vs @ ($*b_es)))]) \<Down>{(ls,r,i)} (s',locs',res))) \<and>
+         (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcsf@rvs' \<and> ((s,locs,[(Label n [$(Loop (t1s _> t2s) b_es)] (vs @ ($*b_es)))]) \<Down>{(ls,r,i)} (s',locs',RValue rvs')))))"
+  using reduce_to_label_loop1[OF _ _ _ assms(3)] e_type_const_conv_vs[OF assms(4)] assms(1,2)
+  by blast
 (*
 lemma reduce_to_label_label:
   assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"

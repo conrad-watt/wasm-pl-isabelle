@@ -1278,7 +1278,14 @@ next
 next
   case (loop vs n t1s t2s m es)
   thus ?case
-    sorry
+    using reduce_to_label_loop2[OF loop(5)]
+    apply (cases res)
+       apply simp_all
+    apply (metis reduce_to.loop reduce_to_L0_consts_left)
+    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.loop reduce_to.seq_nonvalue1 res_b.distinct(1) self_append_conv2)
+    apply (metis append_is_Nil_conv is_const_list not_Cons_self2 reduce_to.loop reduce_to.seq_nonvalue1 res_b.distinct(3) self_append_conv2)
+    apply (metis reduce_to.loop reduce_to_L0_consts_left_trap)
+    done
 next
   case (if_false n tf e1s e2s)
   thus ?case
