@@ -40,7 +40,7 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
 | if_false:"\<lbrakk>int_eq n 0; const_list ves; (s,vs,ves@[$(Block tf e2s)]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>{\<Gamma>} (s',vs',res)"
 | if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Block tf e1s)]) \<Down>{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>length vcs = n; ls!k = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br k)])) \<Down>{(ls,r,i)} (s,vs,RBreak k vcs)"
+| br:"\<lbrakk>length vcs = n; k < length ls; ls!k = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br k)])) \<Down>{(ls,r,i)} (s,vs,RBreak k vcs)"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Br_if k)]) \<Down>{\<Gamma>} (s,vs,RValue [])"
 | br_if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Br k)]) \<Down>{\<Gamma>} (s',vs',res) \<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(Br_if k)]) \<Down>{\<Gamma>} (s',vs',res)"
@@ -140,7 +140,7 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
 | if_false:"\<lbrakk>int_eq n 0; const_list ves; (s,vs,ves@[$(Block tf e2s)]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>k{\<Gamma>} (s',vs',res)"
 | if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Block tf e1s)]) \<Down>k{\<Gamma>} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>k{\<Gamma>} (s',vs',res)"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>length vcs = n; ls!j = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br j)])) \<Down>k{(ls,r,i)} (s,vs,RBreak j vcs)"
+| br:"\<lbrakk>length vcs = n; j < length ls; ls!j = n\<rbrakk> \<Longrightarrow> (s,vs,(($$*vcs) @ [$(Br j)])) \<Down>k{(ls,r,i)} (s,vs,RBreak j vcs)"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Br_if j)]) \<Down>k{\<Gamma>} (s,vs,RValue [])"
 | br_if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,vs,ves@[$(Br j)]) \<Down>k{\<Gamma>} (s',vs',res) \<rbrakk> \<Longrightarrow> (s,vs,ves@[$C (ConstInt32 n), $(Br_if j)]) \<Down>k{\<Gamma>} (s',vs',res)"
@@ -364,10 +364,32 @@ qed auto
 lemma reduce_to_break_n:
   assumes "(s,vs,es) \<Down>{(ls,r,i)} (s',vs',RBreak n vbs)"
   shows "ls!n = length vbs"
+        "n < length ls"
   using assms
   apply (induction "(s,vs,es)" "(ls,r,i)" "(s',vs',RBreak n vbs)" arbitrary: s vs es s' vs' ls n rule: reduce_to.induct)
   apply auto
   done
+
+lemma reduce_to_n_break_n:
+  assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',RBreak n vbs)"
+  shows "ls!n = length vbs"
+        "n < length ls"
+  using reduce_to_break_n assms
+  by (meson reduce_to_n_imp_reduce_to)+
+
+lemma reduce_to_return:
+  assumes "(s,vs,es) \<Down>{(ls,r,i)} (s',vs',RReturn vrs)"
+  shows "\<exists>r_r. r = Some r_r \<and> r_r = length vrs"
+  using assms
+  apply (induction "(s,vs,es)" "(ls,r,i)" "(s',vs',RReturn vrs)" arbitrary: s vs es s' vs' ls rule: reduce_to.induct)
+  apply auto
+  done
+
+lemma reduce_to_n_return1:
+  assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',RReturn vrs)"
+  shows "\<exists>r_r. r = Some r_r \<and> r_r = length vrs"
+  using reduce_to_return assms
+  by (meson reduce_to_n_imp_reduce_to)
 
 lemma reduce_to_single_helper1:
   assumes "($$*ves)@es = [e]"
@@ -1591,6 +1613,7 @@ qed auto
 lemma reduce_to_n_br:
   assumes "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)"
           "length vcs = (ls!j)"
+          "j < length ls"
   shows "((s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r,i)} (s',vs',res)) \<and> s = s' \<and> vs = vs' \<and> (res = RBreak j vcs)"
   using assms
 proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
@@ -1601,7 +1624,7 @@ proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j])" k "(ls,r,i)" "(s',vs'
     apply (metis append_eq_append_conv append_eq_append_conv2 length_map map_injective)
     done
   thus ?case
-    by (metis br(1,2) reduce_to_n.br)
+    by (metis br(1,2,3) reduce_to_n.br)
 next
   case (const_value s vs es k s' vs' res ves)
   then consider
@@ -1626,7 +1649,7 @@ next
         using 2
         by simp
       show ?thesis
-        using const_value(2)[OF 3] const_value(5)
+        using const_value(2)[OF 3] const_value(5,6)
         by simp
     next
       case False
@@ -3595,6 +3618,139 @@ lemma reduce_to_label_loop2:
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcsf@rvs' \<and> ((s,locs,[(Label n [$(Loop (t1s _> t2s) b_es)] (vs @ ($*b_es)))]) \<Down>{(ls,r,i)} (s',locs',RValue rvs')))))"
   using reduce_to_label_loop1[OF _ _ _ assms(3)] e_type_const_conv_vs[OF assms(4)] assms(1,2)
   by blast
+
+lemma reduce_to_n_not_break_n:
+  assumes "(s,vs,es) \<Down>n{(ls,r,i)} (s',vs',res)"
+          "length ls = length ls'"
+          "\<forall>k < length ls. (ls!k \<noteq> ls'!k \<longrightarrow> (\<forall>rbs. res \<noteq> RBreak k rbs))"
+  shows "(s,vs,es) \<Down>n{(ls',r,i)} (s',vs',res)"
+  using assms
+proof (induction "(s,vs,es)" n "(ls,r,i)" "(s',vs',res)" arbitrary: s vs es s' vs' ls ls' res rule: reduce_to_n.induct)
+  case (br vcs n ls j s vs k)
+  thus ?case
+    by (metis reduce_to_n.br)
+next
+  case (get_local vi j s v vs k)
+  thus ?case
+    by (metis reduce_to_n.get_local)
+next
+  case (set_local vi j s v vs v' k)
+  thus ?case
+    by (metis reduce_to_n.set_local)
+next
+  case (label_value s vs es k n ls s' vs' res les)
+  thus ?case
+    using label_value(2)[of "n#ls'"]
+    by (simp add: reduce_to_n.label_value)
+next
+  case (label_trap s vs es k n ls s' vs' les)
+  thus ?case
+    using label_trap(2)[of "n#ls'"]
+    by (simp add: reduce_to_n.label_trap)
+next
+  case (label_break_suc s vs es k n ls s' vs' bn bvs les)
+  thus ?case
+    using label_break_suc(2)[of "n#ls'"]
+    by simp (metis Suc_less_SucD length_Cons nth_Cons_Suc reduce_to_n.label_break_suc) 
+next
+  case (label_break_nil s vs es k n ls s'' vs'' bvs vcs les s' vs' res)
+  show ?case
+    using label_break_nil(1,3,5) label_break_nil(2)[of "n#ls'"]
+    by simp (metis label_break_nil(4)[of "ls'"] gr0I label_break_nil.prems(2) nth_Cons_0 reduce_to_n.label_break_nil)
+next
+  case (label_return s vs es k n ls s' vs' rvs les)
+  thus ?case
+    by (simp add: reduce_to_n.label_return)
+qed (auto intro: reduce_to_n.intros)
+
+lemma reduce_to_n_not_return:
+  assumes "(s,vs,es) \<Down>n{(ls,r,i)} (s',vs',res)"
+          "(pred_option (\<lambda>r_r. r' \<noteq> Some r_r) r \<longrightarrow> (\<forall>rbs. res \<noteq> RReturn rbs))"
+  shows "(s,vs,es) \<Down>n{(ls,r',i)} (s',vs',res)"
+  using assms
+proof (induction "(s,vs,es)" n "(ls,r,i)" "(s',vs',res)" arbitrary: s vs es s' vs' ls res rule: reduce_to_n.induct)
+  case (get_local vi j s v vs k)
+  thus ?case
+    by (metis reduce_to_n.get_local)
+next
+  case (set_local vi j s v vs v' k)
+  thus ?case
+    by (metis reduce_to_n.set_local)
+qed (auto intro: reduce_to_n.intros)
+
+lemma reduce_to_n_not_break_n_return:
+  assumes "(s,vs,es) \<Down>n{(ls,r,i)} (s',vs',res)"
+          "length ls = length ls'"
+          "\<forall>k < length ls. (ls!k \<noteq> ls'!k \<longrightarrow> (\<forall>rbs. res \<noteq> RBreak k rbs))"
+          "(pred_option (\<lambda>r_r. r' \<noteq> Some r_r) r \<longrightarrow> (\<forall>rbs. res \<noteq> RReturn rbs))"
+  shows "(s,vs,es) \<Down>n{(ls',r',i)} (s',vs',res)"
+  using reduce_to_n_not_return[OF reduce_to_n_not_break_n] assms
+  by blast
+
+lemma reduce_to_n_break_n2:
+  assumes "(s,vs,es) \<Down>k{(ls,r,i)} (s',vs',RBreak n vrs)"
+          "length ls = length ls'"
+          "(ls'!n \<le> ls!n)"
+  shows "\<exists>vrs'. ((s,vs,es) \<Down>k{(ls',r,i)} (s',vs',RBreak n vrs'))"
+  using assms
+proof (induction "(s,vs,es)" k "(ls,r,i)" "(s',vs', RBreak n vrs)" arbitrary: s vs es s' vs' ls ls' n rule: reduce_to_n.induct)
+  case (br n j ls s vs k)
+  obtain vrsf vrs' where "vrs = vrsf@vrs'"
+                         "ls' ! j = length vrs'"
+    using br
+    by (metis append_take_drop_id diff_diff_cancel length_drop)
+  thus ?case
+    using reduce_to_n.seq_nonvalue1[of "$$*vrsf"]
+          is_const_list reduce_to_n.br[of vrs' _ j ls' s vs k r i] br.hyps(2) br.prems(1)
+    by fastforce
+next
+  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k ls s' vs')
+  thus ?case
+    using local_value_trap
+    by blast
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs')
+  thus ?case
+    by (metis reduce_to_n_not_break_n reduce_to_n_seq_value_all res_b.simps(5))
+next
+  case (label_break_suc s vs es k n ls s' vs' bn les)
+  show ?case
+    using label_break_suc(1,3,4) label_break_suc(2)[of "n#ls'"]
+    by simp (metis reduce_to_n.label_break_suc)
+next
+  case (label_break_nil s vs es k n' ls s'' vs'' bvs vcs les s' vs')
+  show ?case
+    using label_break_nil(1,3,5,6) label_break_nil(2)[of "(n'#ls')"] label_break_nil(4)[of ls']
+    by (metis (no_types, lifting) length_Cons nth_Cons_0 reduce_to_n.label_break_nil reduce_to_n_not_break_n res_b.inject(2))
+qed (auto intro: reduce_to_n.intros)
+
+lemma reduce_to_n_return2:
+  assumes "(s,vs,es) \<Down>k{(ls,Some r_r,i)} (s',vs',RReturn vrs)"
+          "r_r' \<le> r_r"
+  shows "\<exists>vrs'. ((s,vs,es) \<Down>k{(ls,Some r_r',i)} (s',vs',RReturn vrs'))"
+  using assms
+proof (induction "(s,vs,es)" k "(ls,Some r_r,i)" "(s',vs',RReturn vrs)" arbitrary: s vs es s' vs' ls rule: reduce_to_n.induct)
+  case (return s vs k ls)
+  obtain vrsf vrs' where "vrs = vrsf@vrs'"
+                         "r_r' = length vrs'"
+    using return
+    by (metis append_take_drop_id diff_diff_cancel length_drop)
+  thus ?case
+    using reduce_to_n.seq_nonvalue1[of "$$*vrsf"]
+          is_const_list reduce_to_n.return[of vrs' r_r' s vs k ls i]
+    by fastforce
+next
+  case (seq_value s vs es k s'' vs'' res'' es' s' vs')
+  thus ?case
+    using reduce_to_n_not_return[OF seq_value(1)] reduce_to_n.seq_value
+    by blast
+next
+  case (label_break_nil s vs es k n ls s'' vs'' bvs vcs les s' vs')
+  thus ?case
+    using reduce_to_n_not_return[OF label_break_nil(1)] reduce_to_n.label_break_nil
+    by blast 
+qed (auto intro: reduce_to_n.intros)
+
 (*
 lemma reduce_to_label_label:
   assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"

@@ -1496,17 +1496,17 @@ lemma valid_triple_n_call_equiv_callcl:
 proof -
   {
     fix lvar_st::"(lvar \<Rightarrow> 'a lvar_v option)"
-    and P es Q vcs h st s locs labs ret hf vcsf s' locs' res
+    and P es Q vcs h st s locs labs labsf ret hf vcsf s' locs' res
     {
       assume local_assms:"ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-      have "((s,locs,($$*vcsf)@($$*vcs)@[$Call j]) \<Down>(Suc n){(labs,ret,i)} (s',locs', res)) =
-              ((s,locs,($$*vcsf)@($$*vcs)@[Callcl (fs!j)]) \<Down>n{(labs,ret,i)} (s',locs', res))"
+      have "((s,locs,($$*vcsf)@($$*vcs)@[$Call j]) \<Down>(Suc n){(labs@labsf,ret,i)} (s',locs', res)) =
+              ((s,locs,($$*vcsf)@($$*vcs)@[Callcl (fs!j)]) \<Down>n{(labs@labsf,ret,i)} (s',locs', res))"
         using calln reifies_func_ind[OF _ assms(1)] local_assms
         unfolding ass_wf_def reifies_s_def assms(2)
         by (metis (no_types, lifting) Pair_inject append.assoc map_append prod.collapse)
     }
-    hence "((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[$Call j]) \<Down>(Suc n){(labs,ret,i)} (s',locs', res))) =
-              ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[Callcl (fs!j)]) \<Down>n{(labs,ret,i)} (s',locs', res)))"
+    hence "((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[$Call j]) \<Down>(Suc n){(labs@labsf,ret,i)} (s',locs', res))) =
+              ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[Callcl (fs!j)]) \<Down>n{(labs@labsf,ret,i)} (s',locs', res)))"
       by blast
   }
   thus ?thesis
@@ -1627,7 +1627,7 @@ lemma heap_ass_sat_differ:
 
 lemma res_wf_ext:
   assumes "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h (vcs_sf @ vcs_s) (Stf @ St \<^sub>s|\<^sub>h H))"
-          "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', (RValue res))"
+          "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', (RValue res))"
           "res_wf lvar_st \<Gamma> (RValue res) locs' s' hf (vcsf@vcs_sf) (St' \<^sub>s|\<^sub>h H')"
           "stack_ass_ind_on Stf (modset (fst \<Gamma>) (($$*vcsf)@($$*vcs)@es))"
           "stack_ass_sat Stf vcs_sf st"
@@ -1670,7 +1670,7 @@ qed
 lemma res_wf_frame:
   assumes "\<Gamma> = (fs, map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)"
           "(ass_wf lvar_st ret \<Gamma> labs locs s hf st (heap_merge h_H h_Hf) vcs (St \<^sub>s|\<^sub>h (H \<^emph> Hf)))"
-          "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', res)"
+          "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', res)"
           "res_wf lvar_st (fs,ls,rs) res locs' s' (heap_merge h_Hf hf) vcsf (St' \<^sub>s|\<^sub>h H')"
           "heap_disj h_H h_Hf"
           "H h_H st"
@@ -1938,7 +1938,7 @@ definition P_reduce where
   "P_reduce P Q b_es k \<Gamma> \<equiv> \<forall>s vs vcs s' vs' res. (P s vs vcs \<longrightarrow> ((s,vs,($$*vcs) @ ($*b_es)) \<Down>k{\<Gamma>} (s',vs',res)) \<longrightarrow> ((\<forall>rvs. ((res = RBreak 0 rvs) \<longrightarrow> P s' vs' rvs)) \<and> ((\<nexists>rvs. res = RBreak 0 rvs) \<longrightarrow> Q s' vs' [] res)))"
 
 lemma reduce_to_n_loop:
-  assumes "(s,locs,es) \<Down>k{(labs, ret, i)} (s',locs',res)"
+  assumes "(s,locs,es) \<Down>k{(labs@labsf, ret, i)} (s',locs',res)"
           "es = ($$*vcsf) @ ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
            es = ($$*vcsf) @ [(Label n [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
           "length ($$*vcs) = n"
@@ -1950,7 +1950,7 @@ lemma reduce_to_n_loop:
           "(fs,P#ls,r) \<Turnstile>_k {P} ($*b_es) {Q}"
   shows "res_wf lvar_st (fs,ls,r) res locs' s' hf vcsf Q"
   using assms
-proof (induction "(s,locs,es)" k "(labs, ret, i)" "(s',locs',res)" arbitrary: s locs s' locs' res vcs vcsf es labs ls st h rule: reduce_to_n.induct)
+proof (induction "(s,locs,es)" k "(labs@labsf, ret, i)" "(s',locs',res)" arbitrary: s locs s' locs' res vcs vcsf es labs ls st h rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
   consider (loop) "($$* ves) @ es = ($$* vcsf) @ ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
          | (label) "($$* ves) @ es = ($$* vcsf) @ [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
@@ -2014,11 +2014,11 @@ proof (induction "(s,locs,es)" k "(labs, ret, i)" "(s',locs',res)" arbitrary: s 
       by simp
   qed
 next
-  case (label_value s vs es k n' labs s' vs' res les)
+  case (label_value s vs es k n' s' vs' res les)
   have les_is:"vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
     using label_value(3)
     by auto
-  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RValue res)"
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{((n # labs)@labsf, ret, i)} (s', vs', RValue res)"
     using label_value(1)
     by auto
   show ?case
@@ -2121,11 +2121,11 @@ next
     using seq_nonvalue2(1,3) reduce_to_n_consts
     by blast
 next
-  case (label_trap s vs es k n' labs s' vs' les)
+  case (label_trap s vs es k n' s' vs' les)
   have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
     using label_trap(3)
     by auto
-  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RTrap)"
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{((n # labs)@labsf, ret, i)} (s', vs', RTrap)"
     using label_trap(1)
     by auto
   show ?case
@@ -2133,11 +2133,11 @@ next
     unfolding res_wf_def
     by simp
 next
-  case (label_break_suc s vs es k n' labs s' vs' bn bvs les)
+  case (label_break_suc s vs es k n' s' vs' bn bvs les)
   have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
     using label_break_suc(3)
     by auto
-  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RBreak (Suc bn) bvs)"
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{((n # labs)@labsf, ret, i)} (s', vs', RBreak (Suc bn) bvs)"
     using label_break_suc(1)
     by auto
   show ?case
@@ -2145,7 +2145,7 @@ next
     unfolding res_wf_def
     by simp
 next
-  case (label_break_nil s vs es k n' labs s'' vs'' bvs vcs' les s' vs' res vcs)
+  case (label_break_nil s vs es k n' s'' vs'' bvs vcs' les s' vs' res)
   have 0:"reifies_lab (n # labs) (fs, P # ls, r)"
          "reifies_ret ret (fs, P # ls, r)"
     using label_break_nil(11)
@@ -2154,7 +2154,7 @@ next
   have les_is:"vcsf = vcs'" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
     using label_break_nil(5) inj_basic_econst
     by auto
-  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s'', vs'', RBreak 0 bvs)"
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{((n # labs)@labsf, ret, i)} (s'', vs'', RBreak 0 bvs)"
     using label_break_nil(1)
     by auto
   have res_wf_bvs:"res_wf lvar_st (fs, P # ls, r) (RBreak 0 bvs) vs'' s'' hf [] Q"
@@ -2174,11 +2174,11 @@ next
           les_is
     by simp
 next
-  case (label_return s vs es k n' labs s' vs' rvs les)
+  case (label_return s vs es k n' s' vs' rvs les)
   have "vcsf = []" "n' = n" "les  = [$Loop (t1s _> t2s) b_es]" "es = (($$* vcs) @ ($* b_es))"
     using label_return(3)
     by auto
-  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{(n # labs, ret, i)} (s', vs', RReturn rvs)"
+  hence 1:"(s, vs, ($$* []) @ ($$* vcs) @ ($* b_es)) \<Down>k{((n # labs)@labsf, ret, i)} (s', vs', RReturn rvs)"
     using label_return(1)
     by auto
   show ?case
@@ -2194,11 +2194,11 @@ lemma inf_triples_imp_valid_triples_assms_n:
 proof(induction arbitrary: n rule:inf_triples.induct)
   case (Const \<Gamma> assms v)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h emp )::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$C v]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$C v]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2213,7 +2213,7 @@ proof(induction arbitrary: n rule:inf_triples.induct)
       using ass_is(1)
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C v]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 2:"s = s'"
@@ -2243,11 +2243,11 @@ proof(induction arbitrary: n rule:inf_triples.induct)
 next
   case (Unop \<Gamma> assms lv t op)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Unop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Unop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2267,7 +2267,7 @@ next
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_unop_def list_all2_conv_all_nth is_lvar_def
                     var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Unop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Unop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_unop lv op] \<^sub>s|\<^sub>h emp)"
@@ -2285,11 +2285,11 @@ next
 next
   case (Testop \<Gamma> assms lv t op)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Testop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Testop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2309,7 +2309,7 @@ next
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
                     var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Testop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Testop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_testop lv op] \<^sub>s|\<^sub>h emp)"
@@ -2327,11 +2327,11 @@ next
 next
   case (Binop \<Gamma> assms lv1 lv2 op t)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h can_lvar_binop lv1 lv2 op)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Binop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Binop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h can_lvar_binop lv1 lv2 op) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2356,7 +2356,7 @@ next
     hence 0:"ass_sat ([is_lvar_binop lv1 lv2 op] \<^sub>s|\<^sub>h emp) [v] h st"
       using ass_is(1) vcs_is
       by (simp add: stack_ass_sat_def is_lvar_binop_def is_lvar_def var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $Binop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $Binop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "s = s' \<and> locs = locs' \<and> res = RValue (vcsf @ [v])"
@@ -2377,11 +2377,11 @@ next
 next
   case (Relop \<Gamma> assms lv1 lv2 t op)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Relop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Relop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv1, is_lvar lv2] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2400,7 +2400,7 @@ next
     hence 0:"ass_sat ([is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp) [app_relop op v1 v2] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_relop_def is_lvar_def var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $Relop t op]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $Relop t op]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp)"
@@ -2418,11 +2418,11 @@ next
 next
   case (Convert \<Gamma> assms lv t1 t2 sx)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar_t lv t1] \<^sub>s|\<^sub>h can_lvar_convert lv t2 sx)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Cvtop t2 Convert t1 sx]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Cvtop t2 Convert t1 sx]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar_t lv t1] \<^sub>s|\<^sub>h can_lvar_convert lv t2 sx) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2444,7 +2444,7 @@ next
       apply (simp add: stack_ass_sat_def is_lvar_t_def var_st_get_lvar_def can_lvar_convert_def)
       apply fastforce
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Convert t1 sx]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Convert t1 sx]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 2:"s = s' \<and> locs = locs' \<and> types_agree t1 v \<and> res = RValue (vcsf @ [v'])"
@@ -2454,7 +2454,7 @@ next
       using ass_is(1) vcs_is 1 v_def
       by (simp add: stack_ass_sat_def is_lvar_convert_def list_all2_conv_all_nth is_lvar_t_def
                     var_st_get_lvar_def types_agree_def)
-    have 3:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Convert t1 sx]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 3:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Convert t1 sx]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_convert lv t2 sx] \<^sub>s|\<^sub>h emp)"
@@ -2472,11 +2472,11 @@ next
 next
   case (Reinterpret \<Gamma> assms lv t1 t2)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar_t lv t1] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Cvtop t2 Reinterpret t1 None]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Cvtop t2 Reinterpret t1 None]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar_t lv t1] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2496,7 +2496,7 @@ next
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_reinterpret_def list_all2_conv_all_nth is_lvar_t_def
                     var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Reinterpret t1 None]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Cvtop t2 Reinterpret t1 None]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp)"
@@ -2514,11 +2514,11 @@ next
 next
   case (Nop \<Gamma> assms)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Nop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Nop]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2537,7 +2537,7 @@ next
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
                     var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$Nop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$Nop]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h emp)"
@@ -2555,11 +2555,11 @@ next
 next
   case (Drop \<Gamma> assms lv)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Drop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Drop]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2579,7 +2579,7 @@ next
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
                     var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Drop]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v,$Drop]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h emp)"
@@ -2597,11 +2597,11 @@ next
 next
   case (Select lv_arb lv1 lv2 lv32 \<Gamma> assms)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Select]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Select]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv1, is_lvar lv2, is_lvar32 lv32] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2621,7 +2621,7 @@ next
                                 "var_st_get_lvar st lv32 = Some (V_p (ConstInt32 c))"
       using ass_is(1) typeof_i32
       by (fastforce simp add: list_all2_Cons1 stack_ass_sat_def is_lvar_def is_lvar32_def var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $C ConstInt32 c, $Select]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v1, $C v2, $C ConstInt32 c, $Select]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 2:"s = s'"
@@ -2677,11 +2677,11 @@ next
 next
   case (Block fs Q ls r assms P es tn n tm m n')
   {
-    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n' assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Block (tn _> tm) es]) \<Down>n'{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Block (tn _> tm) es]) \<Down>n'{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat P vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2695,10 +2695,10 @@ next
     have vcs_is:"length vcs = n"
       using Block(4) stack_ass_sat_len[OF ass_is(1)]
       by simp
-    hence 2:"(s, locs, ($$* vcsf) @ [Label m [] (($$* vcs) @ ($* es))]) \<Down>n'{(labs, ret, i)} (s', locs', res)"
+    hence 2:"(s, locs, ($$* vcsf) @ [Label m [] (($$* vcs) @ ($* es))]) \<Down>n'{(labs@labsf, ret, i)} (s', locs', res)"
       using reduce_to_n_block[OF local_assms(4)] Block(2,3)
       by auto
-    obtain res' where res'_def:"(s, locs, ($$* []) @ ($$* vcs) @ ($* es)) \<Down>n'{(m # labs, ret, i)} (s', locs', res')"
+    obtain res' where res'_def:"(s, locs, ($$* []) @ ($$* vcs) @ ($* es)) \<Down>n'{((m # labs)@labsf, ret, i)} (s', locs', res')"
                       "(res' = RTrap \<and> res = RTrap \<or>
                             (\<exists>rvs. res' = RValue rvs \<and>
                                    res = RValue (vcsf @ rvs)) \<or>
@@ -2759,11 +2759,11 @@ next
 next
   case (Loop fs P ls r assms es Q tn n tm m n')
   {
-    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n' assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Loop (tn _> tm) es]) \<Down>n'{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Loop (tn _> tm) es]) \<Down>n'{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat P vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2781,7 +2781,7 @@ next
       using Loop(6) local_assms(2)
       unfolding valid_triple_defs
       by auto
-    have 4:"ass_wf lvar_st ret (fs, P # ls, r) (n # labs)  locs s hf st h vcs P"
+    have 4:"ass_wf lvar_st ret (fs, P # ls, r) (n # labs) locs s hf st h vcs P"
       using ass_is local_assms(1) Loop(4)
       unfolding ass_wf_def reifies_lab_def reifies_ret_def
       by simp
@@ -2797,11 +2797,11 @@ next
 next
   case (If \<Gamma> assms St H lv tf es1 Q es2)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs ((St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$If tf es1 es2]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$If tf es1 es2]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat (St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2827,13 +2827,13 @@ next
     then obtain c where v_is:"v = ConstInt32 c"
       using typeof_i32
       by (fastforce simp add: is_lvar32_def var_st_get_lvar_def)
-    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $If tf es1 es2]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $If tf es1 es2]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by simp
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
     proof (cases "int_eq c 0")
       case True
-      hence true_is:"(s, locs, ($$* vcsf) @ ($$* vcs') @ [$Block tf es2]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      hence true_is:"(s, locs, ($$* vcsf) @ ($$* vcs') @ [$Block tf es2]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
         using reduce_to_n_if[OF 2]
         by (metis append_assoc map_append)
       hence 0:"ass_sat  (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv)) vcs' h st"
@@ -2847,7 +2847,7 @@ next
         by (metis ass_is(2,3,4,5,6,7))
     next
       case False
-      hence false_is:"(s, locs, ($$* vcsf) @ ($$* vcs') @ [$Block tf es1]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      hence false_is:"(s, locs, ($$* vcsf) @ ($$* vcs') @ [$Block tf es1]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
         using reduce_to_n_if[OF 2]
         by (metis append_assoc map_append)
       hence 0:"ass_sat  (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_n lv)) vcs' h st"
@@ -2869,11 +2869,11 @@ next
 next
   case (Get_local \<Gamma> assms j lv)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h local_is_lvar j lv)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Get_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Get_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h local_is_lvar j lv) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2888,7 +2888,7 @@ next
       using ass_is(1)
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$Get_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$Get_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 2:"s = s'"
@@ -2919,11 +2919,11 @@ next
 next
   case (Set_local \<Gamma> assms lv j)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Set_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Set_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2941,7 +2941,7 @@ next
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       apply (metis length_Suc_conv list_exhaust_size_eq0)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 2:"s = s'"
@@ -2976,11 +2976,11 @@ next
 next
   case (Tee_local \<Gamma> assms lv j Q)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Tee_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Tee_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -2998,10 +2998,10 @@ next
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       apply (metis length_Suc_conv list_exhaust_size_eq0)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Tee_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Tee_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
-    have 4:"(s, locs, ($$* vcsf) @ ($$*[v,v]) @ [$Set_local j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 4:"(s, locs, ($$* vcsf) @ ($$*[v,v]) @ [$Set_local j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using reduce_to_n_tee_local[OF 1]
       by fastforce
     have 2:"\<Gamma> \<Turnstile>_n {[is_lvar lv, is_lvar lv] \<^sub>s|\<^sub>h emp} [$Set_local j] {Q}"
@@ -3027,11 +3027,11 @@ next
 next
   case (Get_global j \<Gamma> assms lv)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h global_is_lvar j lv)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Get_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Get_global j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h global_is_lvar j lv) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3046,7 +3046,7 @@ next
       using ass_is(1)
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$Get_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$Get_global j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 2:"s = s'"
@@ -3078,11 +3078,11 @@ next
 next
   case (Set_global j \<Gamma> assms lv)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar lv] \<^sub>s|\<^sub>h emp)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Set_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Set_global j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar lv] \<^sub>s|\<^sub>h emp) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3100,7 +3100,7 @@ next
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
       apply (metis length_Suc_conv list_exhaust_size_eq0)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_global j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_global j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     have 3:"j < length (fst st)"
@@ -3142,11 +3142,11 @@ next
 next
 case (Load \<Gamma> assms lv lvs t off a)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (t_length t) lv off)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Load t None a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Load t None a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (t_length t) lv off) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3163,7 +3163,7 @@ case (Load \<Gamma> assms lv lvs t off a)
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def)
       apply (metis Suc_length_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t None a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t None a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     obtain j m where  2:"s = s'" "locs = locs'"
@@ -3221,11 +3221,11 @@ case (Load \<Gamma> assms lv lvs t off a)
 next
   case (Load_packed \<Gamma> assms lv lvs tp off t sx a)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Load t (Some (tp,sx)) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Load t (Some (tp,sx)) a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvars lvs (tp_length tp) lv off) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3242,7 +3242,7 @@ next
       apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def)
       apply (metis Suc_length_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
       done
-    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t (Some (tp,sx)) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t (Some (tp,sx)) a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     obtain j m where  2:"s = s'" "locs = locs'"
@@ -3303,11 +3303,11 @@ next
 next
   case (Store \<Gamma> assms lv32 lv t off a)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. \<exists>bs. is_n_locs_from_lvar32_off bs (t_length t) lv32 off h st))::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Store t None a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Store t None a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. \<exists>bs. is_n_locs_from_lvar32_off bs (t_length t) lv32 off h st)) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3323,7 +3323,7 @@ next
                             "lvar_st lv = Some (V_p v)"
       using ass_is(1,7) typeof_i32
       by (fastforce simp add: list_all2_Cons1 stack_ass_sat_def is_lvar_def is_lvar32_def var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c,$C v, $Store t None a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c,$C v, $Store t None a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     obtain j m where  2:"locs = locs'"
@@ -3395,11 +3395,11 @@ next
 next
   case (Store_packed \<Gamma> assms lv32 lv tp off t a)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. \<exists>bs. is_n_locs_from_lvar32_off bs (tp_length tp) lv32 off h st))::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Store t (Some tp) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Store t (Some tp) a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ([is_lvar32 lv32, is_lvar lv] \<^sub>s|\<^sub>h (\<lambda>h st. \<exists>bs. is_n_locs_from_lvar32_off bs (tp_length tp) lv32 off h st)) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3415,7 +3415,7 @@ next
                             "lvar_st lv = Some (V_p v)"
       using ass_is(1,7) typeof_i32
       by (fastforce simp add: list_all2_Cons1 stack_ass_sat_def is_lvar_def is_lvar32_def var_st_get_lvar_def)
-    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c,$C v, $Store t (Some tp) a off]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c,$C v, $Store t (Some tp) a off]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
     obtain j m where  2:"locs = locs'"
@@ -3487,11 +3487,11 @@ next
 next
   case (Br j ls fs r assms Q)
   {
-    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (ls!j)"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat ((ls!j)) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3502,13 +3502,22 @@ next
       using local_assms(3)
       unfolding ass_wf_def
       by blast+
+    have ls_len:"j < length labs"
+      using Br ass_is(5) local_assms(1)
+      unfolding reifies_lab_def
+      by simp
     have 0:"length vcs = (labs!j)"
       using ass_is(5) local_assms(1) stack_ass_sat_len[OF ass_is(1)] Br
       unfolding reifies_lab_def
       by simp
-    hence "s = s' \<and> locs = locs' \<and> res = RBreak j vcs"
-      using reduce_to_n_br[OF local_assms(4)]
-      by metis
+    hence ls_len1:"length vcs = (labs @ labsf) ! j"
+                 "j < length (labs @ labsf)"
+      using ls_len
+      by (simp_all add: nth_append)
+  hence "s = s' \<and> locs = locs' \<and> res = RBreak j vcs"
+      using reduce_to_n_br[OF local_assms(4)] Br ass_is(5) local_assms(1)
+      unfolding reifies_lab_def
+      by simp
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
       using ass_is local_assms(1)
       unfolding res_wf_def
@@ -3525,11 +3534,11 @@ next
 next
   case (Br_if \<Gamma> assms St H lv j Q)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs ((St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br_if j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br_if j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat (St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3550,7 +3559,7 @@ next
     then obtain c where v_is:"v = ConstInt32 c"
       using typeof_i32
       by (fastforce simp add: is_lvar32_def var_st_get_lvar_def)
-    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $Br_if j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $Br_if j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by simp
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (St \<^sub>s|\<^sub>h (H \<^emph> is_lvar32_zero lv))"
@@ -3573,7 +3582,7 @@ next
         done
     next
       case False
-      hence false_is:"((s, locs, ($$* vcsf @ vcs') @ [$Br j]) \<Down>n{(labs, ret, i)} (s', locs', res))"
+      hence false_is:"((s, locs, ($$* vcsf @ vcs') @ [$Br j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res))"
         using reduce_to_n_br_if[OF 2]
         by metis
       moreover
@@ -3615,11 +3624,11 @@ next
 next
   case (Br_table js \<Gamma> assms St H lv Q j)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs ((St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br_table js j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Br_table js j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat (St @ [is_lvar32 lv] \<^sub>s|\<^sub>h H) vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3640,7 +3649,7 @@ next
     then obtain c where v_is:"v = ConstInt32 c"
       using typeof_i32
       by (fastforce simp add: is_lvar32_def var_st_get_lvar_def)
-    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $Br_table js j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    hence 2:"(s, locs, ($$* vcsf@vcs') @ [$C ConstInt32 c, $Br_table js j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by simp
     obtain c' where c'_def:"nat_of_int c = c'"
@@ -3648,7 +3657,7 @@ next
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
     proof (cases "c' < (length js)")
       case True
-      hence true_is:"(s, locs, ($$* vcsf @ vcs') @ [$Br (js !  c')]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      hence true_is:"(s, locs, ($$* vcsf @ vcs') @ [$Br (js !  c')]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
         using reduce_to_n_br_table[OF 2]
         by (metis c'_def le_antisym less_imp_le_nat nat_neq_iff)
       moreover
@@ -3672,7 +3681,7 @@ next
         by (metis append.assoc map_append)
     next
       case False
-      hence false_is:"(s, locs, ($$* vcsf @ vcs') @ [$Br j]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+      hence false_is:"(s, locs, ($$* vcsf @ vcs') @ [$Br j]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
         using reduce_to_n_br_table[OF 2]
         by (metis c'_def)
       moreover
@@ -3704,11 +3713,11 @@ next
 next
   case (Return fs ls r' assms Q)
   {
-    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,Some r')"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs r'"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Return]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Return]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     have ass_is:"ass_sat (r') vcs h st"
                 "heap_disj h hf"
                 "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -3742,11 +3751,11 @@ next
 next
   case (Size_mem \<Gamma> assms lv_l)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([] \<^sub>s|\<^sub>h is_lvar_len lv_l)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Current_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Current_memory]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
     obtain n j m where s_is:"s = s'"
                        "locs = locs'"
                        "res =  RValue ((vcsf@vcs) @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)])"
@@ -3790,11 +3799,11 @@ next
 next
   case (Grow_mem lv_arb lv lv_l \<Gamma> assms)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res Q
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res Q
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (([is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l)::('a ass))"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Grow_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Grow_memory]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
                        "(Q::'a ass) = (Ex_ass lv_arb
                      ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h
                                             (\<lambda>h v_st.
@@ -3809,7 +3818,7 @@ next
       apply (simp add: list_all2_conv_all_nth stack_ass_sat_def is_lvar32_def)
       apply (metis length_Suc_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
       done
-    hence 0:"(s, locs, ($$* vcsf) @ [$C ConstInt32 k_g,$Grow_memory]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    hence 0:"(s, locs, ($$* vcsf) @ [$C ConstInt32 k_g,$Grow_memory]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using local_assms(4)
       by simp
       have ass_wf_is:"ass_sat ([is_lvar32 lv] \<^sub>s|\<^sub>h is_lvar_len lv_l) [ConstInt32 k_g] h st"
@@ -3894,11 +3903,11 @@ next
 next
   case (Function cl tn tm tls es St St' H H' fs assms ls r)
   {
-    fix \<Gamma> vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (St \<^sub>s|\<^sub>h H)"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [Callcl cl]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [Callcl cl]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
 
     obtain \<Gamma>l where \<Gamma>l_def:"\<Gamma>l = (fs, []::'a ass list, Some (St' \<^sub>s|\<^sub>h  H'))"
       by blast
@@ -3919,7 +3928,7 @@ next
       using Function(2) local_assms(3) list_all2_lengthD
       unfolding ass_wf_def
       by (fastforce simp add: stack_ass_sat_def)
-    hence 1:"(s, locs, ($$* vcsf) @ [Local (length tm) i (vcs @ n_zeros tls) [$Block ([] _> tm) es]]) \<Down>n{(labs, ret, i)} (s', locs', res)"
+    hence 1:"(s, locs, ($$* vcsf) @ [Local (length tm) i (vcs @ n_zeros tls) [$Block ([] _> tm) es]]) \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
       using callcl_native_imp_local[OF _ Function(1)] local_assms(4)
       by blast
     obtain lvs' lres lrvs where lres_def:
@@ -4038,22 +4047,22 @@ next
 next
   case (Seq \<Gamma> assms P es Q es' R)
   {
-    fix fs ls r vcs h st s locs labs ret lvar_st hf vcsf s' locs' res
+    fix fs ls r vcs h st s locs labs labsf ret lvar_st hf vcsf s' locs' res
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ es @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
-    consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs, ret, i)} (s',locs',res)))"
-      | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
-      using reduce_to_n_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs, ret, i)" s' locs' res]
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ es @ es') \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
+    consider (1) "(\<exists>s'' locs'' rvs. ((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs@labsf, ret, i)} (s'',locs'',RValue rvs)) \<and> ((s'',locs'',($$*rvs)@es') \<Down>n{(labs@labsf, ret, i)} (s',locs',res)))"
+      | (2)"(((s,locs,($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs@labsf, ret, i)} (s',locs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
+      using reduce_to_n_app[of s locs "($$* vcsf) @ ($$* vcs) @ es" "es'" n "(labs@labsf, ret, i)" s' locs' res]
             local_assms(4)
       by fastforce
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf R"
     proof (cases)
       case 1
       then obtain s'' locs'' res' rvs where res'_def:
-         "(s, locs, ($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs, ret,i)} (s'', locs'', res')"
-         "(s'', locs'', ($$* rvs) @ es') \<Down>n{(labs, ret, i)} (s', locs', res)"
+         "(s, locs, ($$* vcsf) @ ($$* vcs) @ es) \<Down>n{(labs@labsf, ret,i)} (s'', locs'', res')"
+         "(s'', locs'', ($$* rvs) @ es') \<Down>n{(labs@labsf, ret, i)} (s', locs', res)"
          "res' = RValue rvs"
         by blast
       have "res_wf lvar_st \<Gamma> res' locs'' s'' hf vcsf Q"
@@ -4133,11 +4142,11 @@ next
 next
   case (Exists fs ls r assms P es Q lv)
   {
-    fix \<Gamma> vcs h st s locs labs ret lvar_st vcsf s' locs' res hf
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st vcsf s' locs' res hf
     assume local_assms:"\<Gamma> = (fs, map (Ex_ass lv) ls, map_option (Ex_ass lv) r)"
                        "(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
                        "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (Ex_ass lv P))"
-                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', res)"
+                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', res)"
     have ass_wf_is:"ass_sat (Ex_ass lv P) vcs h st"
                    "heap_disj h hf"
                    "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
@@ -4209,11 +4218,11 @@ next
 next
   case (Frame fs ls rs assms St H es St' H' Hf)
   {
-    fix vcs h st s locs labs ret lvar_st vcsf s' locs' res hf \<Gamma>
+    fix vcs h st s locs labs labsf ret lvar_st vcsf s' locs' res hf \<Gamma>
     assume local_assms:"\<Gamma> = (fs, map (ass_frame Hf) ls,  map_option (ass_frame Hf) rs)"
                        "(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
                        "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (St \<^sub>s|\<^sub>h (H \<^emph> Hf)))"
-                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', res)"
+                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', res)"
     then obtain h_H h_Hf where h_H_def:"heap_disj h_H h_Hf"
                                        "H h_H st"
                                        "Hf h_Hf st"
@@ -4247,10 +4256,10 @@ next
 next
   case (Ext \<Gamma> assms St H es St' H' Stf)
   {
-    fix vcs h st s locs labs ret lvar_st vcsf s' locs' res hf
+    fix vcs h st s locs labs labsf ret lvar_st vcsf s' locs' res hf
     assume local_assms:"(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
                        "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (Stf @ St \<^sub>s|\<^sub>h H))"
-                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', res)"
+                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', res)"
     obtain vcs' vcs'' where vcs_is:"stack_ass_sat (Stf @ St) vcs st"
                                     "stack_ass_sat Stf vcs' st"
                                     "stack_ass_sat St vcs'' st"
@@ -4274,7 +4283,7 @@ next
     proof (cases res)
       case (RValue x1)
       hence 3:"(ass_wf lvar_st ret \<Gamma> labs locs s hf st h (vcs'@vcs'') (Stf @ St \<^sub>s|\<^sub>h H))"
-              "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs,ret,i)} (s',locs', (RValue x1))"
+              "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', (RValue x1))"
               "res_wf lvar_st \<Gamma> (RValue x1) locs' s' hf (vcsf@vcs') (St' \<^sub>s|\<^sub>h H')"
         using local_assms(2,3) vcs_is(4) 2
         by auto

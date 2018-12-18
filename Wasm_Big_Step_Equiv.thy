@@ -990,13 +990,14 @@ qed
 lemma reduce_to_n_br_lfilled:
   assumes "Lfilled j lholed (($$*vcs) @ [$Br (k+j)]) es"
           "length vcs = n"
+          "k < length ls"
           "ls!k = n"
   shows "((s,vs,es) \<Down>{(ls,r,i)} (s,vs,RBreak k vcs))"
   using assms
 proof (induction j lholed "(($$*vcs) @ [$Br (k+j)])" es arbitrary: ls k rule: Lfilled.induct)
   case (L0 vls lholed es')
-  have "(s, vs, ($$* vcs) @ [$Br (k)]) \<Down>{(ls, r, i)} (s, vs, RBreak k vcs)"
-    using reduce_to.br[OF L0(3,4)]
+  hence "(s, vs, ($$* vcs) @ [$Br (k)]) \<Down>{(ls, r, i)} (s, vs, RBreak k vcs)"
+    using reduce_to.br
     by fastforce
   thus ?case
     using reduce_to_L0 L0
