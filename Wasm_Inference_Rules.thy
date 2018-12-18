@@ -96,11 +96,17 @@ definition stack_ass_ind_on :: "'a stack_ass \<Rightarrow> var set \<Rightarrow>
 definition heap_ass_ind_on :: "'a heap_ass \<Rightarrow> var set \<Rightarrow> bool" where
   "heap_ass_ind_on H vars \<equiv> \<forall>h v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> H h v_st = H h v_st'"
 
+definition ass_ind_on :: "'a ass \<Rightarrow> var set \<Rightarrow> bool" where
+  "ass_ind_on P vars \<equiv> \<forall>h vs v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> ass_sat P vs h v_st = ass_sat P vs h v_st'"
+
 definition stack_ass_ind_on_locals :: "'a stack_ass \<Rightarrow> bool" where
   "stack_ass_ind_on_locals St \<equiv> stack_ass_ind_on St {lc. \<exists>n. lc = Lc n}"
 
 definition heap_ass_ind_on_locals :: "'a heap_ass \<Rightarrow> bool" where
   "heap_ass_ind_on_locals H \<equiv> heap_ass_ind_on H {lc. \<exists>n. lc = Lc n}"
+
+definition ass_ind_on_locals :: "'a ass \<Rightarrow> bool" where
+  "ass_ind_on_locals P \<equiv> ass_ind_on P {lc. \<exists>n. lc = Lc n}"
 
 context encapsulated_module
 begin
@@ -1100,6 +1106,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Exists:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,(map (\<lambda>l. Ex_ass lv l) ls),(map_option) (\<lambda>l. Ex_ass lv l) rs)\<bullet>assms \<turnstile> {Ex_ass lv P} es {Ex_ass lv Q}"
 | Frame:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; heap_ass_ind_on Hf (modset fs es); (\<forall>ass \<in> (set ls). \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha); pred_option (\<lambda>ass. \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha) rs\<rbrakk> \<Longrightarrow> (fs,map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h (H \<^emph> Hf)} es {St' \<^sub>s|\<^sub>h (H' \<^emph> Hf)}"
 | Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
+| Context:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls@lsf,rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Callcl (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
 | ConjI:"\<forall>(P,es,Q) \<in> specs. (\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}) \<Longrightarrow> \<Gamma>\<bullet>assms \<tturnstile> specs"
 | ConjE:"\<lbrakk>\<Gamma>\<bullet>assms \<tturnstile> specs; (P,es,Q) \<in> specs\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
@@ -4294,6 +4301,37 @@ next
         using res_wf_ext[OF 3(1,2,3) _ vcs_is(2,3)] RValue
         by fastforce
     qed (auto simp add: res_wf_def)
+  }
+  thus ?case
+    unfolding valid_triple_defs
+    by auto
+next
+  case (Context fs ls rs assms P es Q lsf)
+  {
+    fix \<Gamma> vcs h st s locs labs labsf ret lvar_st vcsf s' locs' res hf
+    assume local_assms:"\<Gamma> = (fs,ls@lsf,rs)"
+                       "(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
+                       "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P)"
+                       "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,ret,i)} (s',locs', res)"
+    obtain labs1 labs2 where labs_is:"labs = labs1@labs2"
+                                     "labs1 = map ass_stack_len ls"
+                                     "labs2 = map ass_stack_len lsf"
+      using local_assms(1,3)
+      unfolding ass_wf_def reifies_lab_def
+      by simp
+    have 0:"(ass_wf lvar_st ret (fs,ls,rs) labs1 locs s hf st h vcs P)"
+      using labs_is local_assms(1,3)
+      unfolding ass_wf_def reifies_lab_def reifies_loc_def reifies_ret_def
+      by simp
+    have "res_wf lvar_st (fs,ls,rs) res locs' s' hf vcsf Q"
+      using local_assms(1,2,3,4) Context(2)[of n] labs_is
+            res_wf_valid_triple_n_intro[OF _ 0, of n es Q vcsf "labs2@labsf" s' locs' res]
+      unfolding valid_triples_assms_n_def valid_triples_n_def
+      by simp
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
+      using local_assms(1)
+      unfolding res_wf_def
+      by (simp split: res_b.splits) (metis nth_append)
   }
   thus ?case
     unfolding valid_triple_defs
