@@ -141,6 +141,10 @@ inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarr
 
 definition modset where "modset cls es = {v. modifies cls es v}"
 
+fun boundset :: "'a ass \<Rightarrow> var set" where
+  "boundset (St \<^sub>s|\<^sub>h H) = {}"
+| "boundset (Ex_ass lv P) = ({Lv lv} \<union> boundset P)"
+
 lemma modifies_modset_eq [pred_set_conv]: "modifies cl es = (\<lambda>v. v \<in> modset cl es)"
 by(simp add: modset_def)
 
@@ -869,20 +873,19 @@ definition pred_option_Some :: "('a \<Rightarrow> bool) \<Rightarrow> 'a option 
 definition sep_conj :: "'a heap_ass \<Rightarrow> 'a heap_ass \<Rightarrow> 'a heap_ass" (infixr "\<^emph>" 60) where
   "ha' \<^emph> ha'' \<equiv> \<lambda>h st. \<exists>h' h''. heap_disj h' h'' \<and> ha' h' st \<and> ha'' h'' st \<and> heap_merge h' h'' = h"
 
-definition ass_frame :: "'a heap_ass \<Rightarrow> 'a ass \<Rightarrow> 'a ass" where
-  "ass_frame F ass \<equiv> (case ass of
-                        (St \<^sub>s|\<^sub>h H) \<Rightarrow>  St \<^sub>s|\<^sub>h (H \<^emph> F)
-                      | x \<Rightarrow> x)"
+fun ass_frame :: "'a heap_ass \<Rightarrow> 'a ass \<Rightarrow> 'a ass" where
+   "ass_frame F (St \<^sub>s|\<^sub>h H) =  St \<^sub>s|\<^sub>h (H \<^emph> F)"
+|  "ass_frame F (Ex_ass lv P) = Ex_ass lv (ass_frame F P)"
 
 lemma ass_stack_len_ass_frame_inv: "ass_stack_len (ass_frame Hf ass) = ass_stack_len ass"
-  unfolding ass_frame_def
-  apply (cases ass)
+  apply (induction ass)
    apply auto
   done
 
 lemma reifies_lab_ass_frame_inv: "reifies_lab labs (fs, map (ass_frame Hf) ls,  rs) = reifies_lab labs (fs, ls, rs)"
+  using ass_stack_len_ass_frame_inv
   unfolding reifies_lab_def
-  by (auto simp add: ass_stack_len_ass_frame_inv)
+  by (auto simp add: ass_stack_len_ass_frame_inv split: ass.splits)
 
 lemma reifies_ret_ass_frame_inv: "reifies_ret ret (fs, ls, map_option (ass_frame Hf) rs) = reifies_ret ret (fs, ls, rs)"
   unfolding reifies_ret_def
@@ -1550,17 +1553,17 @@ proof -
 qed
 
 lemma res_wf_intro_value:
-  assumes "ass_sat (St' \<^sub>s|\<^sub>h H') vcs' h'' st'"
+  assumes "ass_sat Q vcs' h'' st'"
           "rvs = vcsf @ vcs'"
           "heap_disj h'' hf"
           "h' = heap_merge h'' hf"
           "reifies_s s' i h' st' fs"
           "reifies_loc locs' st'"
           "snd (snd st') = lvar_st"
-  shows "res_wf lvar_st (fs,lesss,ress) (RValue rvs) locs' s' hf vcsf (St' \<^sub>s|\<^sub>h H')"
+  shows "res_wf lvar_st (fs,lesss,ress) (RValue rvs) locs' s' hf vcsf Q"
   using assms
 proof -
-  have "\<exists>p pa vs pb. ass_sat (St' \<^sub>s|\<^sub>h H') vs pa pb \<and> vcsf @ vcs' = vcsf @ vs \<and> heap_disj pa hf \<and> p = heap_merge pa hf \<and> reifies_s s' i p pb fs \<and> reifies_loc locs' pb \<and> snd (snd pb) = lvar_st"
+  have "\<exists>p pa vs pb. ass_sat Q vs pa pb \<and> vcsf @ vcs' = vcsf @ vs \<and> heap_disj pa hf \<and> p = heap_merge pa hf \<and> reifies_s s' i p pb fs \<and> reifies_loc locs' pb \<and> snd (snd pb) = lvar_st"
     using assms by blast
   then show ?thesis
     by (simp add: assms(2) res_wf_def)
@@ -1575,7 +1578,7 @@ lemma res_wf_intro_break:
           "reifies_s s' i h' st' fs"
           "reifies_loc locs' st'"
           "snd (snd st') = lvar_st"
-  shows "res_wf lvar_st (fs,lesss,ress) (RBreak k rvs) locs' s' hf vcsf (St' \<^sub>s|\<^sub>h H')"
+  shows "res_wf lvar_st (fs,lesss,ress) (RBreak k rvs) locs' s' hf vcsf Q"
   using assms
 proof -
 
@@ -1604,7 +1607,7 @@ lemma res_wf_intro_return:
           "reifies_s s' i h' st' fs"
           "reifies_loc locs' st'"
           "snd (snd st') = lvar_st"
-  shows "res_wf lvar_st (fs,lesss,ress) (RReturn rvs) locs' s' hf vcsf (St' \<^sub>s|\<^sub>h H')"
+  shows "res_wf lvar_st (fs,lesss,ress) (RReturn rvs) locs' s' hf vcsf Q"
   using assms
 proof -
   have "\<exists>h' h'' vcs' st' the_rass.
@@ -1794,7 +1797,6 @@ proof -
       by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(4) st_is(6))
     have 6:"(map (ass_frame Hf) ls)!x21 = (Str \<^sub>s|\<^sub>h (Hr \<^emph> Hf))"
       using st'_is(1) lsi
-      unfolding ass_frame_def
       by auto
     show ?thesis
       using RBreak res_wf_intro_break[OF _ _ _ 5 _ st'_is(6,7,8)] assms(1) heap_merge_assoc 4 6 st'_is(1,3,5)
@@ -1846,7 +1848,184 @@ proof -
       by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(4) st_is(6))
     have 6:"map_option (ass_frame Hf) rs = Some (Str \<^sub>s|\<^sub>h (Hr \<^emph> Hf))"
       using st'_is(1) rass_def
-      unfolding ass_frame_def
+      by auto
+    show ?thesis
+      using RReturn res_wf_intro_return[OF 6 4 st'_is(3) 5 _ st'_is(6,7,8)] assms(1) heap_merge_assoc st'_is(5)
+      by blast
+  qed
+qed
+
+lemma ass_sat_frame_ind_on_boundset:
+  assumes "ass_sat P vcs h st"
+          "heap_ass_ind_on Hf (boundset P)"
+          "Hf h_Hf st"
+          "heap_disj h h_Hf"
+  shows "ass_sat (ass_frame Hf P) vcs (heap_merge h h_Hf) st"
+  using assms
+proof (induction P vcs h st rule: ass_sat.induct)
+  case (1 St H ves h v_st)
+  thus ?case
+    by simp (metis sep_conj_def)
+next
+  case (2 lv P ves h st)
+  obtain v where v_is:"ass_sat P ves h (var_st_set_lvar st lv v)"
+    using 2(2)
+    by auto
+  have is_ind:"heap_ass_ind_on Hf (boundset P)"
+              "heap_ass_ind_on Hf {Lv lv}"
+    using 2(3)
+    unfolding heap_ass_ind_on_def var_st_differ_on_def
+    by simp_all
+  have "Hf h_Hf (var_st_set_lvar st lv v)"
+    using heap_ass_sat_differ[of Hf h_Hf st, OF 2(4) _ is_ind(2), of "(var_st_set_lvar st lv v)"]
+    unfolding var_st_differ_on_def var_st_set_lvar_def var_st_agree_def var_st_get_global_def
+              var_st_get_local_def var_st_get_lvar_def
+    by (auto split: prod.splits var.splits)
+  thus ?case
+    using 2(1)[OF v_is is_ind(1) _ 2(5)]
+    by fastforce
+qed
+
+lemma res_wf_frame2:
+  assumes "\<Gamma> = (fs, map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)"
+          "(ass_wf lvar_st ret \<Gamma> labs locs s hf st (heap_merge h_H h_Hf) vcs (ass_frame Hf P))"
+          "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res)"
+          "res_wf lvar_st (fs,ls,rs) res locs' s' (heap_merge h_Hf hf) vcsf Q"
+          "heap_disj h_H h_Hf"
+          "H h_H st"
+          "Hf h_Hf st"
+          "heap_ass_ind_on Hf (modset fs es)"
+          "heap_ass_ind_on Hf (boundset P)"
+          "heap_ass_ind_on Hf (boundset Q)"
+          "\<forall>ass\<in>set ls. heap_ass_ind_on Hf (boundset ass)"
+          "pred_option (\<lambda>ass. heap_ass_ind_on Hf (boundset ass)) rs"
+  shows "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (ass_frame Hf Q)"
+proof -
+  have st_is:"ass_sat (ass_frame Hf P) vcs (heap_merge h_H h_Hf) st"
+       "reifies_func (funcs s) (inst.funcs i) (fst \<Gamma>)"
+       "reifies_glob (globs s) (inst.globs i) st"
+       "reifies_loc locs st"
+       "snd (snd st) = lvar_st"
+       "heap_disj (heap_merge h_H h_Hf) hf"
+       "reifies_heap (s.mem s) (inst.mem i) (heap_merge (heap_merge h_H h_Hf) hf)"
+    using assms(2)
+    unfolding ass_wf_def reifies_s_def
+    by auto
+  show ?thesis
+  proof (cases res)
+    case (RValue x1)
+    then obtain  h' h'' vcs' st' where st'_is:
+          "ass_sat Q vcs' h'' st'"
+          "x1 = vcsf @ vcs'"
+          "heap_disj h'' (heap_merge h_Hf hf)"
+          "h' = heap_merge h'' (heap_merge h_Hf hf)"
+          "reifies_s s' i h' st' fs"
+          "reifies_loc locs' st'"
+          "snd (snd st') = lvar_st"
+      using assms(4)
+      unfolding res_wf_def
+      by fastforce
+    have 0:"heap_disj h'' h_Hf"
+      using st'_is(3)
+      unfolding heap_disj_def heap_merge_def map_disj_def disjnt_def option_disj_def
+      by (auto split: option.splits prod.splits)
+    have 1:"reifies_glob (s.globs s') (inst.globs i) st'"
+      using st'_is(5)
+      unfolding reifies_s_def
+      by blast
+    have 3:"Hf h_Hf st'"
+      using heap_ass_sat_differ[OF assms(7) _ assms(8)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
+            modifies_var_st[OF assms(3) st_is(2,3,4,5) 1 st'_is(6,7)]
+      by (simp add: var_st_differ_on_def)
+    have 4:"ass_sat (ass_frame Hf Q) vcs' (heap_merge h'' h_Hf) st'"
+      using ass_sat_frame_ind_on_boundset[OF st'_is(1) assms(10) 3 0]
+      by simp
+    have "heap_disj (heap_merge h'' h_Hf) hf"
+      by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(3) st_is(6))
+    thus ?thesis
+      using RValue res_wf_intro_value[OF 4 st'_is(2) _ _ st'_is(5,6,7)] assms(1) heap_merge_assoc st'_is(4)
+      by blast
+  next
+    case (RBreak x21 x22)
+    then obtain  h' h'' vcs' st' where st'_is:
+          "x21 < length ls"
+          "ass_sat (ls ! x21) vcs' h'' st'"
+          "x22 = vcs'"
+          "heap_disj h'' (heap_merge h_Hf hf)"
+          "h' = heap_merge h'' (heap_merge h_Hf hf)"
+          "reifies_s s' i h' st' fs"
+          "reifies_loc locs' st'"
+          "snd (snd st') = lvar_st"
+      using assms(4)
+      unfolding res_wf_def
+      by fastforce
+    have 0:"heap_disj h'' h_Hf"
+      using st'_is(4)
+      unfolding heap_disj_def heap_merge_def map_disj_def disjnt_def option_disj_def
+      by (auto split: option.splits prod.splits)
+    obtain Pb where lsi:"(ls ! x21) = Pb"
+      using assms(9) st'_is(1) nth_mem
+      by blast
+    have 1:"reifies_glob (s.globs s') (inst.globs i) st'"
+      using st'_is(6)
+      unfolding reifies_s_def
+      by blast
+    have 3:"Hf h_Hf st'"
+      using heap_ass_sat_differ[OF assms(7) _ assms(8)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
+            modifies_var_st[OF assms(3) st_is(2,3,4,5) 1 st'_is(7,8)]
+      by (simp add: var_st_differ_on_def)
+    have 4:"ass_sat (ass_frame Hf Pb) vcs' (heap_merge h'' h_Hf) st'"
+      using ass_sat_frame_ind_on_boundset[OF _ _ _ 0]
+      using "3" assms(11) lsi nth_mem st'_is(1) st'_is(2)
+      by blast
+    have 5:"heap_disj (heap_merge h'' h_Hf) hf"
+      by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(4) st_is(6))
+    have 6:"(map (ass_frame Hf) ls)!x21 = (ass_frame Hf Pb)"
+      using st'_is(1) lsi
+      by auto
+    show ?thesis
+      using RBreak res_wf_intro_break[OF _ _ _ 5 _ st'_is(6,7,8)] assms(1) heap_merge_assoc 4 6 st'_is(1,3,5)
+      by auto
+  next
+    case RTrap
+    thus ?thesis
+      using assms(4)
+      unfolding res_wf_def
+      by auto
+  next
+    case (RReturn x3)
+    then obtain  h' h'' vcs' st' Pr where st'_is:
+          "rs = Some Pr"
+          "ass_sat Pr vcs' h'' st'"
+          "x3 = vcs'"
+          "heap_disj h'' (heap_merge h_Hf hf)"
+          "h' = heap_merge h'' (heap_merge h_Hf hf)"
+          "reifies_s s' i h' st' fs"
+          "reifies_loc locs' st'"
+          "snd (snd st') = lvar_st"
+      using assms(4)
+      unfolding res_wf_def
+      by fastforce
+    have 0:"heap_disj h'' h_Hf"
+      using st'_is(4)
+      unfolding heap_disj_def heap_merge_def map_disj_def disjnt_def option_disj_def
+      by (auto split: option.splits prod.splits)
+    have 1:"reifies_glob (s.globs s') (inst.globs i) st'"
+      using st'_is(6)
+      unfolding reifies_s_def
+      by blast
+    have 3:"Hf h_Hf st'"
+      using heap_ass_sat_differ[OF assms(7) _ assms(8)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
+            modifies_var_st[OF assms(3) st_is(2,3,4,5) 1 st'_is(7,8)]
+      by (simp add: var_st_differ_on_def)
+    have 4:"ass_sat (ass_frame Hf Pr) vcs' (heap_merge h'' h_Hf) st'"
+      using st'_is 3 0
+      using ass_sat_frame_ind_on_boundset[OF _ _ _ 0] assms(12)
+      by simp blast
+    have 5:"heap_disj (heap_merge h'' h_Hf) hf"
+      by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(4) st_is(6))
+    have 6:"map_option (ass_frame Hf) rs = Some (ass_frame Hf Pr)"
+      using st'_is(1)
       by auto
     show ?thesis
       using RReturn res_wf_intro_return[OF 6 4 st'_is(3) 5 _ st'_is(6,7,8)] assms(1) heap_merge_assoc st'_is(5)
