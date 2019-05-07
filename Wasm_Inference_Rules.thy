@@ -1114,7 +1114,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Seq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; \<Gamma>\<bullet>assms \<turnstile> {Q} es' {R}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es@es' {R}"
 | Conseq:"\<lbrakk>(fs,ls',rs')\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls' ls) \<and> (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs' rs) \<and> (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and> (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)\<rbrakk> \<Longrightarrow> (fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Exists:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,(map (\<lambda>l. Ex_ass lv l) ls),(map_option) (\<lambda>l. Ex_ass lv l) rs)\<bullet>assms \<turnstile> {Ex_ass lv P} es {Ex_ass lv Q}"
-| Frame:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; heap_ass_ind_on Hf (modset fs es); (\<forall>ass \<in> (set ls). \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha); pred_option (\<lambda>ass. \<exists>Sa Ha. ass = Sa \<^sub>s|\<^sub>h Ha) rs\<rbrakk> \<Longrightarrow> (fs,map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h (H \<^emph> Hf)} es {St' \<^sub>s|\<^sub>h (H' \<^emph> Hf)}"
+| Frame:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}; heap_ass_ind_on Hf (modset fs es); heap_ass_ind_on Hf (boundset P); heap_ass_ind_on Hf (boundset Q); (\<forall>ass \<in> (set ls). heap_ass_ind_on Hf (boundset ass)); pred_option (\<lambda>ass. heap_ass_ind_on Hf (boundset ass)) rs\<rbrakk> \<Longrightarrow> (fs,map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)\<bullet>assms \<turnstile> {(ass_frame Hf P)} es {(ass_frame Hf Q)}"
 | Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
 | Context:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls@lsf,rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Context_ret:"\<lbrakk>(fs,ls,None)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls,Some rs)\<bullet>assms \<turnstile> {P} es {Q}"
@@ -1886,13 +1886,60 @@ next
     by fastforce
 qed
 
+lemma heap_ass_ind_on_one_lvar:
+  assumes "heap_ass_ind_on F {Lv lv}"
+          "F h_Hf (var_st_set_lvar st lv v)"
+  shows "F h_Hf st"
+proof -
+  have "var_st_differ_on (var_st_set_lvar st lv v) {Lv lv} st"
+    unfolding var_st_set_lvar_def
+    by (simp add: var_st_differ_on_def var_st_agree_def var_st_get_global_def var_st_set_global_def
+                     var_st_get_local_def var_st_set_local_def var_st_get_lvar_def var_st_set_lvar_def
+                split: prod.splits var.splits)
+  thus ?thesis
+    using assms
+    unfolding heap_ass_ind_on_def
+    by fastforce
+qed
+
+lemma ass_sat_frame_ind_on_boundset_rev:
+  assumes "ass_sat (ass_frame Hf P) vcs h st"
+          "heap_ass_ind_on Hf (boundset P)"
+  shows "\<exists>h_H h_Hf. heap_disj h_H h_Hf \<and> Hf h_Hf st \<and> heap_merge h_H h_Hf = h \<and> ass_sat P vcs h_H st"
+  using assms
+proof (induction Hf P arbitrary: st rule: ass_frame.induct)
+  case (1 F St H)
+  thus ?case
+    by (fastforce simp add: sep_conj_def)
+next
+  case (2 F lv P)
+  obtain v where v_is:"ass_sat (ass_frame F P) vcs h (var_st_set_lvar st lv v)"
+    using 2(2)
+    by fastforce
+  have P_ind:"heap_ass_ind_on F (boundset P)"
+             "heap_ass_ind_on F {Lv lv}"
+    using 2(3)
+    by (simp_all add: heap_ass_ind_on_def var_st_differ_on_def)
+  obtain h_H h_Hf where h_H_is:"heap_disj h_H h_Hf"
+                               "F h_Hf (var_st_set_lvar st lv v)"
+                               "heap_merge h_H h_Hf = h"
+                               "ass_sat P vcs h_H (var_st_set_lvar st lv v)"
+    using 2(1)[OF v_is P_ind(1)]
+    by blast
+  have "F h_Hf st"
+    using heap_ass_ind_on_one_lvar[OF P_ind(2) h_H_is(2)]
+    by simp
+  thus ?case
+    using ass_sat.simps(2) h_H_is(1) h_H_is(3) h_H_is(4)
+    by blast
+qed
+
 lemma res_wf_frame2:
   assumes "\<Gamma> = (fs, map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)"
           "(ass_wf lvar_st ret \<Gamma> labs locs s hf st (heap_merge h_H h_Hf) vcs (ass_frame Hf P))"
           "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res)"
           "res_wf lvar_st (fs,ls,rs) res locs' s' (heap_merge h_Hf hf) vcsf Q"
           "heap_disj h_H h_Hf"
-          "H h_H st"
           "Hf h_Hf st"
           "heap_ass_ind_on Hf (modset fs es)"
           "heap_ass_ind_on Hf (boundset P)"
@@ -1934,11 +1981,11 @@ proof -
       unfolding reifies_s_def
       by blast
     have 3:"Hf h_Hf st'"
-      using heap_ass_sat_differ[OF assms(7) _ assms(8)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
+      using heap_ass_sat_differ[OF assms(6) _ assms(7)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
             modifies_var_st[OF assms(3) st_is(2,3,4,5) 1 st'_is(6,7)]
       by (simp add: var_st_differ_on_def)
     have 4:"ass_sat (ass_frame Hf Q) vcs' (heap_merge h'' h_Hf) st'"
-      using ass_sat_frame_ind_on_boundset[OF st'_is(1) assms(10) 3 0]
+      using ass_sat_frame_ind_on_boundset[OF st'_is(1) assms(9) 3 0]
       by simp
     have "heap_disj (heap_merge h'' h_Hf) hf"
       by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(3) st_is(6))
@@ -1971,12 +2018,12 @@ proof -
       unfolding reifies_s_def
       by blast
     have 3:"Hf h_Hf st'"
-      using heap_ass_sat_differ[OF assms(7) _ assms(8)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
+      using heap_ass_sat_differ[OF assms(6) _ assms(7)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
             modifies_var_st[OF assms(3) st_is(2,3,4,5) 1 st'_is(7,8)]
       by (simp add: var_st_differ_on_def)
     have 4:"ass_sat (ass_frame Hf Pb) vcs' (heap_merge h'' h_Hf) st'"
       using ass_sat_frame_ind_on_boundset[OF _ _ _ 0]
-      using "3" assms(11) lsi nth_mem st'_is(1) st'_is(2)
+      using "3" assms(10) lsi nth_mem st'_is(1) st'_is(2)
       by blast
     have 5:"heap_disj (heap_merge h'' h_Hf) hf"
       by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(4) st_is(6))
@@ -2015,12 +2062,12 @@ proof -
       unfolding reifies_s_def
       by blast
     have 3:"Hf h_Hf st'"
-      using heap_ass_sat_differ[OF assms(7) _ assms(8)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
+      using heap_ass_sat_differ[OF assms(6) _ assms(7)] assms(1) modset_consts_app[of _ fs "vcsf@vcs" es]
             modifies_var_st[OF assms(3) st_is(2,3,4,5) 1 st'_is(7,8)]
       by (simp add: var_st_differ_on_def)
     have 4:"ass_sat (ass_frame Hf Pr) vcs' (heap_merge h'' h_Hf) st'"
       using st'_is 3 0
-      using ass_sat_frame_ind_on_boundset[OF _ _ _ 0] assms(12)
+      using ass_sat_frame_ind_on_boundset[OF _ _ _ 0] assms(11)
       by simp blast
     have 5:"heap_disj (heap_merge h'' h_Hf) hf"
       by (metis heap_disj_merge_assoc heap_disj_merge_sub(2) heap_disj_sym st'_is(4) st_is(6))
@@ -4434,38 +4481,39 @@ next
     unfolding valid_triple_defs
     by auto
 next
-  case (Frame fs ls rs assms St H es St' H' Hf)
+  case (Frame fs ls rs assms P es Q Hf)
   {
     fix vcs h st s locs labs labsf ret retf lvar_st vcsf s' locs' res hf \<Gamma>
     assume local_assms:"\<Gamma> = (fs, map (ass_frame Hf) ls,  map_option (ass_frame Hf) rs)"
                        "(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
-                       "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (St \<^sub>s|\<^sub>h (H \<^emph> Hf)))"
+                       "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (ass_frame Hf P))"
                        "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res)"
     then obtain h_H h_Hf where h_H_def:"heap_disj h_H h_Hf"
-                                       "H h_H st"
                                        "Hf h_Hf st"
                                        "heap_merge h_H h_Hf = h"
-      unfolding ass_wf_def sep_conj_def
-      by fastforce
-    hence 0:"(ass_wf lvar_st ret \<Gamma> labs locs s (heap_merge h_Hf hf) st h_H vcs (St \<^sub>s|\<^sub>h H))"
+                                       "ass_sat P vcs h_H st"
+      using ass_sat_frame_ind_on_boundset_rev Frame.hyps(3)
+      unfolding ass_wf_def
+      by blast
+    hence 0:"(ass_wf lvar_st ret \<Gamma> labs locs s (heap_merge h_Hf hf) st h_H vcs P)"
       using sep_conj_imp_frame local_assms(1,3) heap_disj_merge_assoc heap_merge_assoc
       unfolding ass_wf_def sep_conj_def
       by auto
-    hence 1:"(ass_wf lvar_st ret (fs, ls, rs) labs locs s (heap_merge h_Hf hf) st h_H vcs (St \<^sub>s|\<^sub>h H))"
+    hence 1:"(ass_wf lvar_st ret (fs, ls, rs) labs locs s (heap_merge h_Hf hf) st h_H vcs P)"
       using reifies_lab_ass_frame_inv reifies_ret_ass_frame_inv local_assms(1)
       unfolding ass_wf_def
       by (metis fstI prod.sel(2) reifies_lab_def reifies_ret_def)
-    have "((fs, ls, rs) \<Turnstile>_n {(St \<^sub>s|\<^sub>h H)}es{(St' \<^sub>s|\<^sub>h H')})"
-      using local_assms(1,2) Frame(5)
+    have "((fs, ls, rs) \<Turnstile>_n {P}es{Q})"
+      using local_assms(1,2) Frame(7)
       unfolding valid_triples_assms_n_def valid_triples_n_def
       by auto
-    hence "res_wf lvar_st (fs, ls, rs) res locs' s' (heap_merge h_Hf hf) vcsf (St' \<^sub>s|\<^sub>h H')"
+    hence "res_wf lvar_st (fs, ls, rs) res locs' s' (heap_merge h_Hf hf) vcsf Q"
       using local_assms(4) 1
       unfolding valid_triple_defs
       by metis
-    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (St' \<^sub>s|\<^sub>h (H' \<^emph> Hf))"
-      using res_wf_frame[OF local_assms(1) _ local_assms(4) _ h_H_def(1) _ _ _ Frame(3,4)]
-            Frame(2) h_H_def(2,3,4) local_assms(3)
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (ass_frame Hf Q)"
+      using res_wf_frame2[OF local_assms(1) _ local_assms(4) _ h_H_def(1) h_H_def(2) Frame(2,3,4,5,6)]
+             h_H_def local_assms(3)
       by blast
   }
   thus ?case
