@@ -93,11 +93,26 @@ lemma var_st_differ_on_emp:
 definition stack_ass_ind_on :: "'a stack_ass \<Rightarrow> var set \<Rightarrow> bool" where
   "stack_ass_ind_on St vars \<equiv> \<forall>vs v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> stack_ass_sat St vs v_st = stack_ass_sat St vs v_st'"
 
+lemma stack_ass_ind_on_emp: "stack_ass_ind_on St {}"
+  using var_st_differ_on_emp
+  unfolding stack_ass_ind_on_def
+  by fastforce
+
 definition heap_ass_ind_on :: "'a heap_ass \<Rightarrow> var set \<Rightarrow> bool" where
   "heap_ass_ind_on H vars \<equiv> \<forall>h v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> H h v_st = H h v_st'"
 
+lemma heap_ass_ind_on_emp: "heap_ass_ind_on H {}"
+  using var_st_differ_on_emp
+  unfolding heap_ass_ind_on_def
+  by fastforce
+
 definition ass_ind_on :: "'a ass \<Rightarrow> var set \<Rightarrow> bool" where
   "ass_ind_on P vars \<equiv> \<forall>h vs v_st v_st'. var_st_differ_on v_st vars v_st' \<longrightarrow> (ass_sat P vs h v_st = ass_sat P vs h v_st')"
+
+lemma ass_ind_on_emp: "ass_ind_on H {}"
+  using var_st_differ_on_emp
+  unfolding ass_ind_on_def
+  by fastforce
 
 definition stack_ass_ind_on_locals :: "'a stack_ass \<Rightarrow> bool" where
   "stack_ass_ind_on_locals St \<equiv> stack_ass_ind_on St {lc. \<exists>n. lc = Lc n}"
@@ -877,6 +892,10 @@ fun ass_frame :: "'a heap_ass \<Rightarrow> 'a ass \<Rightarrow> 'a ass" where
    "ass_frame F (St \<^sub>s|\<^sub>h H) =  St \<^sub>s|\<^sub>h (H \<^emph> F)"
 |  "ass_frame F (Ex_ass lv P) = Ex_ass lv (ass_frame F P)"
 
+fun ass_ext :: "'a stack_ass \<Rightarrow> 'a ass \<Rightarrow> 'a ass" where
+   "ass_ext Stf (St \<^sub>s|\<^sub>h H) =  (Stf @ St) \<^sub>s|\<^sub>h H"
+|  "ass_ext Stf (Ex_ass lv P) = Ex_ass lv (ass_ext Stf P)"
+
 lemma ass_stack_len_ass_frame_inv: "ass_stack_len (ass_frame Hf ass) = ass_stack_len ass"
   apply (induction ass)
    apply auto
@@ -1115,7 +1134,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Conseq:"\<lbrakk>(fs,ls',rs')\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls' ls) \<and> (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs' rs) \<and> (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and> (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)\<rbrakk> \<Longrightarrow> (fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Exists:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,(map (\<lambda>l. Ex_ass lv l) ls),(map_option) (\<lambda>l. Ex_ass lv l) rs)\<bullet>assms \<turnstile> {Ex_ass lv P} es {Ex_ass lv Q}"
 | Frame:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}; heap_ass_ind_on Hf (modset fs es); heap_ass_ind_on Hf (boundset P); heap_ass_ind_on Hf (boundset Q); (\<forall>ass \<in> (set ls). heap_ass_ind_on Hf (boundset ass)); pred_option (\<lambda>ass. heap_ass_ind_on Hf (boundset ass)) rs\<rbrakk> \<Longrightarrow> (fs,map (ass_frame Hf) ls, map_option (ass_frame Hf) rs)\<bullet>assms \<turnstile> {(ass_frame Hf P)} es {(ass_frame Hf Q)}"
-| Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} es {St' \<^sub>s|\<^sub>h H'}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {(Stf @ St) \<^sub>s|\<^sub>h H} es {(Stf @ St') \<^sub>s|\<^sub>h H'}"
+| Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es); stack_ass_ind_on Stf (boundset P); stack_ass_ind_on Stf (boundset Q)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {ass_ext Stf P} es {ass_ext Stf Q}"
 | Context:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls@lsf,rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Context_ret:"\<lbrakk>(fs,ls,None)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls,Some rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Callcl (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
@@ -1652,16 +1671,47 @@ lemma ass_sat_differ:
   unfolding var_st_differ_on_def ass_ind_on_def
   by blast
 
+lemma ass_sat_ext_ind_on_boundset:
+  assumes "ass_sat P vcs h st"
+          "stack_ass_ind_on Stf (boundset P)"
+          "stack_ass_sat Stf vcsf st"
+  shows "ass_sat (ass_ext Stf P) (vcsf@vcs) h st"
+  using assms
+proof (induction P vcs h st rule: ass_sat.induct)
+  case (1 St H ves h v_st)
+  thus ?case
+    by (simp add: stack_ass_sat_def list_all2_appendI)
+next
+  case (2 lv P ves h st)
+  obtain v where v_is:"ass_sat P ves h (var_st_set_lvar st lv v)"
+    using 2(2)
+    by auto
+  have is_ind:"stack_ass_ind_on Stf (boundset P)"
+              "stack_ass_ind_on Stf {Lv lv}"
+    using 2(3)
+    unfolding stack_ass_ind_on_def var_st_differ_on_def
+    by simp_all
+  have "stack_ass_sat Stf vcsf (var_st_set_lvar st lv v)"
+    using stack_ass_sat_differ[OF 2(4) _ is_ind(2)]
+    unfolding var_st_differ_on_def var_st_set_lvar_def var_st_agree_def var_st_get_global_def
+              var_st_get_local_def var_st_get_lvar_def
+    by (auto split: prod.splits var.splits)
+  thus ?case
+    using 2(1)[OF v_is is_ind(1)]
+    by fastforce
+qed
+
 lemma res_wf_ext:
-  assumes "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h (vcs_sf @ vcs_s) (Stf @ St \<^sub>s|\<^sub>h H))"
+  assumes "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h (vcs_sf @ vcs_s) (ass_ext Stf P))"
           "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', (RValue res))"
-          "res_wf lvar_st \<Gamma> (RValue res) locs' s' hf (vcsf@vcs_sf) (St' \<^sub>s|\<^sub>h H')"
+          "res_wf lvar_st \<Gamma> (RValue res) locs' s' hf (vcsf@vcs_sf) Q"
           "stack_ass_ind_on Stf (modset (fst \<Gamma>) (($$*vcsf)@($$*vcs)@es))"
+          "stack_ass_ind_on Stf (boundset P)"
+          "stack_ass_ind_on Stf (boundset Q)"
           "stack_ass_sat Stf vcs_sf st"
-          "stack_ass_sat St vcs_s st"
-  shows "res_wf lvar_st \<Gamma> (RValue res) locs' s' hf vcsf (Stf @ St' \<^sub>s|\<^sub>h H')"
+  shows "res_wf lvar_st \<Gamma> (RValue res) locs' s' hf vcsf (ass_ext Stf Q)"
 proof -
-  have st_is:"ass_sat (Stf @ St \<^sub>s|\<^sub>h H) (vcs_sf @ vcs_s) h st"
+  have st_is:"ass_sat (ass_ext Stf P) (vcs_sf @ vcs_s) h st"
        "reifies_func (funcs s) (inst.funcs i) (fst \<Gamma>)"
        "reifies_glob (globs s) (inst.globs i) st"
        "reifies_loc locs st"
@@ -1670,7 +1720,7 @@ proof -
     unfolding ass_wf_def reifies_s_def
     by auto
   obtain  h' h'' vcs' st' where st'_is:
-          "ass_sat (St' \<^sub>s|\<^sub>h H') vcs' h''  st'"
+          "ass_sat Q vcs' h''  st'"
           "res = vcsf @ (vcs_sf @ vcs')"
           "heap_disj h'' hf"
           "h' = heap_merge h'' hf"
@@ -1684,11 +1734,13 @@ proof -
     using st'_is(5)
     unfolding reifies_s_def
     by blast
-  have "ass_sat (Stf @ St' \<^sub>s|\<^sub>h H') (vcs_sf @ vcs') h'' st'"
-    using st'_is(1)
-          stack_ass_sat_differ[OF assms(5) _ assms(4)]
+  have "stack_ass_sat Stf vcs_sf st'"
+    using stack_ass_sat_differ[OF assms(7) _ assms(4)]
           modifies_var_st[OF assms(2) st_is(2,3,4,5) 1 st'_is(6,7)]
-    by (simp add: list_all2_appendI stack_ass_sat_def)
+    by simp
+  hence "ass_sat (ass_ext Stf Q) (vcs_sf @ vcs') h'' st'"
+    using ass_sat_ext_ind_on_boundset[OF st'_is(1) assms(6)]
+    by blast
   thus ?thesis
     using res_wf_intro_value[OF _ st'_is(2,3,4,5,6,7)]
     by (metis prod.exhaust_sel)
@@ -1886,6 +1938,22 @@ next
     by fastforce
 qed
 
+lemma stack_ass_ind_on_one_lvar:
+  assumes "stack_ass_ind_on Stf {Lv lv}"
+          "stack_ass_sat Stf vcs (var_st_set_lvar st lv v)"
+  shows "stack_ass_sat Stf vcs st"
+proof -
+  have "var_st_differ_on (var_st_set_lvar st lv v) {Lv lv} st"
+    unfolding var_st_set_lvar_def
+    by (simp add: var_st_differ_on_def var_st_agree_def var_st_get_global_def var_st_set_global_def
+                     var_st_get_local_def var_st_set_local_def var_st_get_lvar_def var_st_set_lvar_def
+                split: prod.splits var.splits)
+  thus ?thesis
+    using assms
+    unfolding stack_ass_ind_on_def
+    by fastforce
+qed
+
 lemma heap_ass_ind_on_one_lvar:
   assumes "heap_ass_ind_on F {Lv lv}"
           "F h_Hf (var_st_set_lvar st lv v)"
@@ -1900,6 +1968,39 @@ proof -
     using assms
     unfolding heap_ass_ind_on_def
     by fastforce
+qed
+
+lemma ass_sat_ext_ind_on_boundset_rev:
+  assumes "ass_sat (ass_ext Stf P) vcs h st"
+          "stack_ass_ind_on Stf (boundset P)"
+  shows "\<exists>vcs_Stf vcs_P. ass_sat P vcs_P h st \<and> stack_ass_sat Stf vcs_Stf st \<and> vcs = vcs_Stf @ vcs_P"
+  using assms
+proof (induction Stf P arbitrary: st rule: ass_ext.induct)
+  case (1 Stf St H)
+  thus ?case
+    apply (simp add: stack_ass_sat_def)
+    apply (meson list_all2_append1)
+    done
+next
+  case (2 Stf lv P)
+  obtain v where v_is:"ass_sat (ass_ext Stf P) vcs h (var_st_set_lvar st lv v)"
+    using 2(2)
+    by fastforce
+  have P_ind:"stack_ass_ind_on Stf (boundset P)"
+             "stack_ass_ind_on Stf {Lv lv}"
+    using 2(3)
+    by (simp_all add: stack_ass_ind_on_def var_st_differ_on_def)
+  obtain vcs_Stf vcs_P where vcs_Stf_is:"ass_sat P vcs_P h (var_st_set_lvar st lv v)"
+                                        "stack_ass_sat Stf vcs_Stf (var_st_set_lvar st lv v)"
+                                        "vcs = vcs_Stf @ vcs_P"
+    using 2(1)[OF v_is P_ind(1)]
+    by blast
+  have "stack_ass_sat Stf vcs_Stf st"
+    using stack_ass_ind_on_one_lvar vcs_Stf_is(2) P_ind(2)
+    by blast
+  thus ?case
+    using ass_sat.simps(2) vcs_Stf_is
+    by blast
 qed
 
 lemma ass_sat_frame_ind_on_boundset_rev:
@@ -4520,45 +4621,44 @@ next
     unfolding valid_triple_defs
     by auto
 next
-  case (Ext \<Gamma> assms St H es St' H' Stf)
+  case (Ext \<Gamma> assms P es Q Stf)
   {
     fix vcs h st s locs labs labsf ret retf lvar_st vcsf s' locs' res hf
     assume local_assms:"(fst \<Gamma>,[],None) \<TTurnstile>_n assms"
-                       "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (Stf @ St \<^sub>s|\<^sub>h H))"
+                       "(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (ass_ext Stf P))"
                        "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res)"
-    obtain vcs' vcs'' where vcs_is:"stack_ass_sat (Stf @ St) vcs st"
+    obtain vcs' vcs'' where vcs_is:"ass_sat P vcs'' h st"
                                     "stack_ass_sat Stf vcs' st"
-                                    "stack_ass_sat St vcs'' st"
                                     "vcs = vcs'@vcs''"
-      using local_assms(2)
+      using local_assms(2) ass_sat_ext_ind_on_boundset_rev Ext.hyps(3)
       unfolding ass_wf_def
-      by (fastforce simp add: stack_ass_sat_def list_all2_append1)
-    hence 1:"(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs'' (St \<^sub>s|\<^sub>h H))"
+      by blast
+    hence 1:"(ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs'' P)"
       using local_assms(2)
       unfolding ass_wf_def ass_sat.simps
       by simp
-    have "(\<Gamma> \<Turnstile>_n {(St \<^sub>s|\<^sub>h H)}es{(St' \<^sub>s|\<^sub>h H')})"
-      using local_assms(1) Ext(3)[of n]
+    have "(\<Gamma> \<Turnstile>_n {P}es{Q})"
+      using local_assms(1) Ext(5)[of n]
       unfolding valid_triples_assms_n_def valid_triples_n_def
       by auto
-    hence 2:"res_wf lvar_st \<Gamma> res locs' s' hf (vcsf@vcs') (St' \<^sub>s|\<^sub>h H')"
+    hence 2:"res_wf lvar_st \<Gamma> res locs' s' hf (vcsf@vcs') Q"
       using local_assms(3) 1
       unfolding valid_triple_defs
-      by (metis vcs_is(4) append.assoc map_append)
-    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (Stf @ St' \<^sub>s|\<^sub>h H')"
+      by (metis vcs_is(3) append.assoc map_append)
+    hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf (ass_ext Stf Q)"
     proof (cases res)
       case (RValue x1)
-      hence 3:"(ass_wf lvar_st ret \<Gamma> labs locs s hf st h (vcs'@vcs'') (Stf @ St \<^sub>s|\<^sub>h H))"
+      hence 3:"(ass_wf lvar_st ret \<Gamma> labs locs s hf st h (vcs'@vcs'') (ass_ext Stf P))"
               "(s,locs,($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', (RValue x1))"
-              "res_wf lvar_st \<Gamma> (RValue x1) locs' s' hf (vcsf@vcs') (St' \<^sub>s|\<^sub>h H')"
-        using local_assms(2,3) vcs_is(4) 2
+              "res_wf lvar_st \<Gamma> (RValue x1) locs' s' hf (vcsf@vcs') Q"
+        using local_assms(2,3) vcs_is(3) 2
         by auto
       have "stack_ass_ind_on Stf (modset (fst \<Gamma>) (($$* vcsf) @ ($$* vcs) @ es))"
         using Ext(2) modset_consts_app
         by (metis Collect_cong modifies_modset_eq modset_def)
       thus ?thesis
-        using res_wf_ext[OF 3(1,2,3) _ vcs_is(2,3)] RValue
-        by fastforce
+        using res_wf_ext[OF 3(1,2,3)] RValue Ext.hyps(3) Ext.hyps(4) vcs_is(2)
+        by blast
     qed (auto simp add: res_wf_def)
   }
   thus ?case
