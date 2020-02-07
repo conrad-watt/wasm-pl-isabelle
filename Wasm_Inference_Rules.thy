@@ -491,7 +491,7 @@ lemma set_local_differ:
           "(inst.globs i ! x1) < length (s.globs s)"
   shows "s.globs s ! (inst.globs i ! x1) =
           s.globs
-            (s\<lparr>s.globs := s.globs s
+            (s\<lparr>s.globs := (s.globs s)
                     [(inst.globs i ! j) :=
      (s.globs s ! (inst.globs i ! j))\<lparr>g_val := v\<rparr>]\<rparr>) !
            (inst.globs i ! x1)"
@@ -3704,7 +3704,7 @@ next
                                        (Wasm_Base_Defs.nat_of_int c) off
                                        (bits v) (t_length t) =
                                       Some mem' \<and>
-                                      s' = s\<lparr>s.mem := s.mem s[j := mem']\<rparr> \<and>
+                                      s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and>
                                       res = RValue vcsf))"
       using reduce_to_n_store[OF 1]
       by blast
@@ -3731,7 +3731,7 @@ next
       unfolding reifies_s_def reifies_heap_def
       by (metis 2(3,4) option.sel smem_ind_def)
     have res_is:"store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some m'"
-         "s' = s\<lparr>s.mem := s.mem s[j := m']\<rparr>"
+         "s' = s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>"
          "res = RValue vcsf"
       using 2(4,5) 7 m'_def(1)
       unfolding store_def
@@ -3796,7 +3796,7 @@ next
                                        (Wasm_Base_Defs.nat_of_int c) off
                                        (bits v) (tp_length tp) =
                                       Some mem' \<and>
-                                      s' = s\<lparr>s.mem := s.mem s[j := mem']\<rparr> \<and>
+                                      s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and>
                                       res = RValue vcsf))"
       using reduce_to_n_store_packed[OF 1]
       by blast
@@ -3823,7 +3823,7 @@ next
       unfolding reifies_s_def reifies_heap_def
       by (metis 2(3,4) option.sel smem_ind_def)
     have res_is:"store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some m'"
-         "s' = s\<lparr>s.mem := s.mem s[j := m']\<rparr>"
+         "s' = s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>"
          "res = RValue vcsf"
       using 2(4,5) 7 m'_def(1)
       unfolding store_def
@@ -4203,7 +4203,7 @@ next
            (s = s' \<and> res = RValue (vcsf @ [ConstInt32 int32_minus_one]))"
     | (2) "\<exists>n j m.
            (locs = locs' \<and> smem_ind s i = Some j \<and> s.mem s ! j = m \<and> mem_size m = n) \<and>
-           (s' = s\<lparr>s.mem := s.mem s[j := mem_grow (s.mem s ! j)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr> \<and>
+           (s' = s\<lparr>s.mem := (s.mem s)[j := mem_grow (s.mem s ! j)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr> \<and>
             res = RValue (vcsf @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)]))"
       using reduce_to_n_grow_memory[OF 0]
       by fastforce
@@ -4241,7 +4241,7 @@ next
                                             "smem_ind s i = Some j_m"
                                             "s.mem s ! j_m = m_m"
                                             "mem_size m_m = n_m"
-                                            "s' = s\<lparr>s.mem := s.mem s[j_m := mem_grow (s.mem s ! j_m)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr>"
+                                            "s' = s\<lparr>s.mem := (s.mem s)[j_m := mem_grow (s.mem s ! j_m)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr>"
                                             "res = RValue (vcsf @ [ConstInt32 (int_of_nat n_m)])"
         by fastforce
       have "\<exists>h''.
