@@ -475,6 +475,22 @@ lemma ass_wf_conseq1:
   unfolding ass_wf_def
   by (auto simp add: reifies_lab_def reifies_ret_def)
 
+lemma rel_option_to_eq_map_option:
+  assumes
+    "rel_option f x y" and
+    "\<And>a b. f a b \<Longrightarrow> g a = g b"
+  shows "map_option g x = map_option g y"
+  using assms
+  by (induction x y rule: option.rel_induct; simp)
+
+lemma list_all2_to_eq_map:
+  assumes
+    "list_all2 f xs ys" and
+    "\<And>a b. f a b \<Longrightarrow> g a = g b"
+  shows "map g xs = map g ys"
+  using assms
+  by (induction xs ys rule: list.rel_induct; simp)
+
 lemma ass_wf_conseq2:
   assumes "ass_wf lvar_st ret (fs,ls,rs) labs locs s hf st h vcs P"
           "(list_all2 (\<lambda>L L'. (ass_stack_len L = ass_stack_len L') \<and> ass_conseq L L' vcs h st) ls ls')"
@@ -484,8 +500,8 @@ proof -
   show ?thesis
     using assms
     unfolding ass_wf_def ass_conseq_def
-    by (fastforce simp add: list_all2_conv_all_nth nth_equalityI reifies_lab_def option.rel_sel
-                            reifies_ret_def)
+    unfolding reifies_lab_def reifies_ret_def
+    by (auto intro: list_all2_to_eq_map rel_option_to_eq_map_option)
 qed
 
 lemma valid_triple_assms_n_label_false:

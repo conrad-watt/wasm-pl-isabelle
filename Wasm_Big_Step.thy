@@ -947,7 +947,7 @@ lemma reduce_to_n_store:
   assumes "((s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
   shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mem s ! j = m \<and>
            ((s = s' \<and> store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and> res = RTrap) \<or>
-            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some mem' \<and> s' = s\<lparr>s.mem := s.mem s[j := mem']\<rparr> \<and> res = RValue ves)))"
+            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some mem' \<and> s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and> res = RValue ves)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -999,7 +999,7 @@ lemma reduce_to_n_store_packed:
   assumes "((s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
   shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mem s ! j = m \<and>
            ((s = s' \<and> store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and> res = RTrap) \<or>
-            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some mem' \<and> s' = s\<lparr>s.mem := s.mem s[j := mem']\<rparr> \<and> res = RValue ves)))"
+            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some mem' \<and> s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and> res = RValue ves)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -1484,7 +1484,7 @@ lemma no_reduce_to_n_grow_memory:
 
 lemma reduce_to_n_grow_memory:
   assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "\<exists>n j m. (vs = vs' \<and> smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (s' = s \<lparr>s.mem := s.mem s [j := mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)]\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
+  shows "\<exists>n j m. (vs = vs' \<and> smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (s' = s \<lparr>s.mem := (s.mem s)[j := mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)]\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k vs' res ves ves')

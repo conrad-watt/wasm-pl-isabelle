@@ -1399,9 +1399,9 @@ lemma store_extension_refl:
 lemma store_extension_mem_leq:
   assumes "s.mem s ! j = m"
           "mem_size m \<le> mem_size m'"
-  shows "store_extension s (s\<lparr>s.mem := s.mem s[j := m']\<rparr>)"
+  shows "store_extension s (s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>)"
 proof -
-  obtain s' where s'_def:"s' = (s\<lparr>s.mem := s.mem s[j := m']\<rparr>)"
+  obtain s' where s'_def:"s' = (s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>)"
     by blast
   hence "funcs s = funcs s'"
         "tab s = tab s'"
@@ -1438,7 +1438,7 @@ lemma update_glob_store_extension:
 proof -
   obtain k where k_def:"k = (sglob_ind s i j)"
     by blast
-  hence s'_def:"s' = s\<lparr>s.globs := s.globs s[k := (s.globs s ! k)\<lparr>g_val := v\<rparr>]\<rparr>"
+  hence s'_def:"s' = s\<lparr>s.globs := (s.globs s)[k := (s.globs s ! k)\<lparr>g_val := v\<rparr>]\<rparr>"
     using assms(1)
     unfolding supdate_glob_def sglob_ind_def supdate_glob_s_def
     by metis
