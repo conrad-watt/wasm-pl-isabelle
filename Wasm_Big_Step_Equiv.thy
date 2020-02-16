@@ -619,7 +619,7 @@ next
     by auto
 next
   case (call ves s vs i j ls r s' vs' res)
-  have 1:"\<lparr>s;vs;ves @ [$Call j]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [Callcl (sfunc s i j)]\<rparr>"
+  have 1:"\<lparr>s;vs;ves @ [$Call j]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [Invoke (sfunc s i j)]\<rparr>"
     using progress_L0_left[OF reduce.call] call(1)
     by fastforce
   show ?case
@@ -646,7 +646,7 @@ next
   qed
 next
   case (call_indirect_Some s i c cl j tf ves vs ls r s' vs' res)
-  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 c, $Call_indirect j]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [Callcl cl]\<rparr>"
+  have 1:"\<lparr>s;vs;ves @ [$C ConstInt32 c, $Call_indirect j]\<rparr> \<leadsto>_i \<lparr>s;vs;ves @ [Invoke cl]\<rparr>"
     using progress_L0_left[OF reduce.call_indirect_Some] call_indirect_Some
     by fastforce
   show ?case
@@ -678,42 +678,42 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs ls r i s' vs' res)
-  have 1:"\<lparr>s;vs;ves @ [Callcl cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Local m j (vcs @ zs) [$Block ([] _> t2s) es]]\<rparr>"
-    using reduce.callcl_native[OF callcl_native(1,2,3,4,5,6,7)]
+  case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s vs ls r i s' vs' res)
+  have 1:"\<lparr>s;vs;ves @ [Invoke cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Local m j (vcs @ zs) [$Block ([] _> t2s) es]]\<rparr>"
+    using reduce.invoke_native[OF invoke_native(1,2,3,4,5,6,7)]
     by fastforce
   show ?case
   proof (cases res)
     case (RValue x1)
     thus ?thesis
-      using 1 reduce_trans_app callcl_native(9)
+      using 1 reduce_trans_app invoke_native(9)
       by simp
   next
     case (RBreak x21 x22)
     thus ?thesis
-      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app callcl_native(9)
+      using lfilled_label_forward_helper[OF _ 1] reduce_trans_app invoke_native(9)
       by simp metis
   next
     case (RReturn x3)
     thus ?thesis
-      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app callcl_native(9)
+      using lfilled_local_forward_helper[OF _ 1] reduce_trans_app invoke_native(9)
       by simp metis
   next
     case RTrap
     thus ?thesis
-      using 1 reduce_trans_app callcl_native(9)
+      using 1 reduce_trans_app invoke_native(9)
       by simp
   qed
 next
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs)
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs)
   thus ?case
-    using reduce.callcl_host_Some
+    using reduce.invoke_host_Some
     unfolding reduce_trans_def
     by auto
 next
-  case (callcl_host_None cl t1s t2s f ves vcs n m s vs)
+  case (invoke_host_None cl t1s t2s f ves vcs n m s vs)
   thus ?case
-    using reduce.callcl_host_None
+    using reduce.invoke_host_None
     unfolding reduce_trans_def
     by auto
 next
@@ -1454,7 +1454,7 @@ next
     using reduce_to.call_indirect_None reduce_to_trap[of s vs "(ls, r, i)"]
     by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
-  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
+  case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
   thus ?case
   proof (cases "\<exists>rvs. res = RValue rvs")
     case True
@@ -1468,18 +1468,18 @@ next
                 [$Block ([] _> t2s)
                    es]]) \<Down>{(ls, r,
    i)} (s'', vs'', RValue rvs2))"
-      using reduce_to_local[OF callcl_native(8)]
+      using reduce_to_local[OF invoke_native(8)]
             True
       by fastforce
     thus ?thesis
-      using rvs'_def reduce_to.callcl_native[OF callcl_native(1,2,3,4,5,6,7)]
+      using rvs'_def reduce_to.invoke_native[OF invoke_native(1,2,3,4,5,6,7)]
       apply simp
       apply (metis reduce_to_L0_consts_left)
       done
   next
     case False
-    have 0:"(s, vs, ves @ [Callcl cl]) \<Down>{(ls, r, i)} (s'', vs'', res)"
-      using reduce_to.callcl_native[OF callcl_native(1,2,3,4,5,6,7)] reduce_to_local[OF callcl_native(8)]
+    have 0:"(s, vs, ves @ [Invoke cl]) \<Down>{(ls, r, i)} (s'', vs'', res)"
+      using reduce_to.invoke_native[OF invoke_native(1,2,3,4,5,6,7)] reduce_to_local[OF invoke_native(8)]
             False
       by blast
     thus ?thesis
@@ -1491,16 +1491,16 @@ next
   qed
 
 next
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
   thus ?case
-    using reduce_to.callcl_host_Some reduce_to_consts[of s' "vs" "vcsf@vcs'"]
+    using reduce_to.invoke_host_Some reduce_to_consts[of s' "vs" "vcsf@vcs'"]
     apply simp
     apply (metis reduce_to_L0_consts_left)
     done
 next
-  case (callcl_host_None cl t1s t2s f ves vcs n m s vs i)
+  case (invoke_host_None cl t1s t2s f ves vcs n m s vs i)
   thus ?case
-    using reduce_to.callcl_host_None reduce_to_trap[of s vs "(ls, r, i)"]
+    using reduce_to.invoke_host_None reduce_to_trap[of s vs "(ls, r, i)"]
     by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
   case (get_local vi j s v vs i)

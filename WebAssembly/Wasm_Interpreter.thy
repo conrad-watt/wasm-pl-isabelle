@@ -275,7 +275,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
            | _ \<Rightarrow> (s, vs, crash_error))
       \<comment> \<open>\<open>CALL\<close>\<close>
       | $Call j \<Rightarrow>
-          (s, vs, RSNormal ((vs_to_es ves) @ [Callcl (sfunc s i j)]))
+          (s, vs, RSNormal ((vs_to_es ves) @ [Invoke (sfunc s i j)]))
       \<comment> \<open>\<open>CALL_INDIRECT\<close>\<close>
       | $Call_indirect j \<Rightarrow>
           (case ves of
@@ -284,7 +284,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
                   Some cl \<Rightarrow>
                     if (stypes s i j = cl_type cl)
                       then
-                        (s, vs, RSNormal ((vs_to_es ves') @ [Callcl cl]))
+                        (s, vs, RSNormal ((vs_to_es ves') @ [Invoke cl]))
                       else
                         (s, vs, RSNormal ((vs_to_es ves')@[Trap]))
                 | _ \<Rightarrow> (s, vs, RSNormal ((vs_to_es ves')@[Trap])))
@@ -392,7 +392,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
       | $C v \<Rightarrow> (s, vs, crash_error)
     \<comment> \<open>\<open>E\<close>\<close>
       \<comment> \<open>\<open>CALLCL\<close>\<close>
-      | Callcl cl \<Rightarrow>
+      | Invoke cl \<Rightarrow>
           (case cl of
              Func_native i' (t1s _> t2s) ts es \<Rightarrow>
                let n = length t1s in

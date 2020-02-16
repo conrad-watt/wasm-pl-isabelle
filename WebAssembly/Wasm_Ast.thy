@@ -30,7 +30,7 @@ definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" where
   "bytes_replicate = (\<lambda>n (b::8 word). replicate n b)"
 
 definition msbyte :: "bytes \<Rightarrow> byte" where
-  "msbyte bs = last ( bs)"
+  "msbyte bs = last (bs)"
 
 typedef mem = "UNIV :: (byte list) set" ..
 setup_lifting type_definition_mem
@@ -193,7 +193,7 @@ record s = \<comment> \<open>store\<close>
 datatype e = \<comment> \<open>administrative instruction\<close>
   Basic b_e ("$_" 60)
   | Trap
-  | Callcl cl
+  | Invoke cl
   | Label nat "e list" "e list"
   | Local nat inst "v list" "e list"
 
@@ -201,5 +201,6 @@ datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>
     LBase "e list" "e list"
     \<comment> \<open>L(i+1) = v* (label n {e* } Li) e*\<close>
-  | LRec "e list" nat "e list" Lholed "e list"
+    | LRec "e list" nat "e list" Lholed "e list"
+
 end

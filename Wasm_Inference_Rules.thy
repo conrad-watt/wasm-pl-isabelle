@@ -143,13 +143,13 @@ inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarr
 | "\<lbrakk>(modifies fs [Label _ [] ($* b_es)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Block _ b_es] v"
 | "\<lbrakk>(modifies fs ($* b_es) v)\<rbrakk> \<Longrightarrow> modifies fs [$Loop tf b_es] v"
 | "\<lbrakk>(modifies fs [$Block _ b_es1] v) \<or> (modifies fs [$Block _ b_es2] v)\<rbrakk> \<Longrightarrow> modifies fs [$If _ b_es1 b_es2] v"
-| "\<lbrakk>(modifies fs [Callcl (fs!j)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
+| "\<lbrakk>(modifies fs [Invoke (fs!j)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
 | "\<lbrakk>j \<ge> length fs\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
 | "\<lbrakk>(modifies fs les v) \<or> (modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Label _ les es] v"
 | "\<lbrakk>(modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Local _ i lvs es] v"
 | "\<lbrakk>j \<noteq> i\<rbrakk> \<Longrightarrow> modifies fs [Local _ j lvs es] v"
-| "\<lbrakk>cl = Func_native j _ _ b_es; (modifies fs [Local _ j _ [$Block _ b_es]] v)\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
-| "\<lbrakk>cl = Func_host _ _\<rbrakk> \<Longrightarrow> modifies fs [Callcl cl] v"
+| "\<lbrakk>cl = Func_native j _ _ b_es; (modifies fs [Local _ j _ [$Block _ b_es]] v)\<rbrakk> \<Longrightarrow> modifies fs [Invoke cl] v"
+| "\<lbrakk>cl = Func_host _ _\<rbrakk> \<Longrightarrow> modifies fs [Invoke cl] v"
 | "modifies fs [$Call_indirect k] v"
 
 
@@ -331,7 +331,7 @@ lemma modset_implies:
 
 lemma modset_call1:
   assumes "reifies_func (s.funcs s) (inst.funcs i) fs"
-          "x \<in> modset fs ([Callcl (sfunc s i j)])"
+          "x \<in> modset fs ([Invoke (sfunc s i j)])"
   shows "x \<in> modset fs ([$Call j])"
   using reifies_func_ind[OF assms(1)] modset_call assms(2) modset_intros(9)
   apply (cases "j < length fs")
@@ -382,12 +382,12 @@ lemma modset_set_global:
   using modset_def modifies.intros(5) assms
   by fastforce
 
-lemma modset_callcl_native1:
-  assumes "v \<in> modset fs [Callcl cl]"
+lemma modset_invoke_native1:
+  assumes "v \<in> modset fs [Invoke cl]"
           "cl = Func_native j tf ts b_es"
   shows "v \<in> modset fs [Local m j vls [$Block tf' b_es]]"
   using assms
-proof (induction fs "[Callcl cl]" v arbitrary: rule: modset_induct)
+proof (induction fs "[Invoke cl]" v arbitrary: rule: modset_induct)
   case (14 j' vc vd b_es' fs ve vf vg v)
   hence j'_def:"j = j'"
                "b_es = b_es'"
@@ -406,10 +406,10 @@ proof (induction fs "[Callcl cl]" v arbitrary: rule: modset_induct)
   qed
 qed (auto dest: modset_emp)
 
-lemma modset_callcl_native:
+lemma modset_invoke_native:
   assumes "cl = Func_native j tf ts b_es"    
-  shows "modset fs [Local m j vls [$Block tf' b_es]] = modset fs [Callcl cl]"
-  using assms modset_callcl_native1 modset_intros(14)
+  shows "modset fs [Local m j vls [$Block tf' b_es]] = modset fs [Invoke cl]"
+  using assms modset_invoke_native1 modset_intros(14)
   by blast
 
 lemma var_st_differ_on_subset_const_list_helper:
@@ -651,17 +651,17 @@ next
   show ?case
     by (meson modset_arb_app modset_intros(1,16) var_st_differ_on_def)
 next
-  case (callcl_native cl j t1s t2s ts es ves vcs n m zs s vs k ls r s' vs' res)
+  case (invoke_native cl j t1s t2s ts es ves vcs n m zs s vs k ls r s' vs' res)
   hence "var_st_differ_on var_st (modset fs [Local m j (vcs @ zs) [$Block ([] _> t2s) es]]) var_st'"
     by blast
-  hence "var_st_differ_on var_st (modset fs ([Callcl cl])) var_st'"
-    using modset_callcl_native[OF callcl_native(1)]
+  hence "var_st_differ_on var_st (modset fs ([Invoke cl])) var_st'"
+    using modset_invoke_native[OF invoke_native(1)]
     by simp
   thus ?case
-    using callcl_native(2)
+    using invoke_native(2)
     by (simp add: modset_consts_app_equiv)
 next
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k)
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k)
   thus ?case
     by (simp add: modset_consts_app_equiv modset_intros(15) var_st_differ_on_def)
 next
@@ -1128,7 +1128,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
              heap_ass_ind_on_locals H;
              ass_ind_on_locals Q;
              (fs,[],Some Q)\<bullet>assms \<turnstile> {[] \<^sub>s|\<^sub>h (\<lambda>h v_st. H h v_st \<and> (args_ass St (length tn) v_st) \<and> (zeros_ass (length tn) tls v_st))} [$Block ([] _> tm) es] {Q}\<rbrakk>
-             \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} [Callcl cl] {Q}"
+             \<Longrightarrow> (fs,ls,r)\<bullet>assms \<turnstile> {St \<^sub>s|\<^sub>h H} [Invoke cl] {Q}"
 | Asm:"\<lbrakk>(P, [$Call k], Q) \<in> assms\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} [$Call k] {Q}"
 | Seq:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; \<Gamma>\<bullet>assms \<turnstile> {Q} es' {R}\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es@es' {R}"
 | Conseq:"\<lbrakk>(fs,ls',rs')\<bullet>assms \<turnstile> {P'} es {Q'}; \<forall>vs h v_st. (list_all2 (\<lambda>L L'. ass_conseq L L' vs h v_st) ls' ls) \<and> (rel_option (\<lambda>R R'. ass_conseq R R' vs h v_st) rs' rs) \<and> (ass_sat P vs h v_st \<longrightarrow> ass_sat P' vs h v_st) \<and> (ass_sat Q' vs h v_st \<longrightarrow> ass_sat Q vs h v_st)\<rbrakk> \<Longrightarrow> (fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}"
@@ -1137,7 +1137,7 @@ inductive inf_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Righta
 | Ext:"\<lbrakk>\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}; stack_ass_ind_on Stf (modset (fst \<Gamma>) es); stack_ass_ind_on Stf (boundset P); stack_ass_ind_on Stf (boundset Q)\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {ass_ext Stf P} es {ass_ext Stf Q}"
 | Context:"\<lbrakk>(fs,ls,rs)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls@lsf,rs)\<bullet>assms \<turnstile> {P} es {Q}"
 | Context_ret:"\<lbrakk>(fs,ls,None)\<bullet>assms \<turnstile> {P} es {Q}\<rbrakk> \<Longrightarrow> (fs,ls,Some rs)\<bullet>assms \<turnstile> {P} es {Q}"
-| Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Callcl (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
+| Call:"\<lbrakk>(fs,[],None)\<bullet>specs \<tturnstile> ({(P,c,Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i< length fs \<and> c = [Invoke (fs!i)]}); \<forall>(P,c,Q) \<in> specs. \<exists>i. c = [$Call i] \<and> i < length fs\<rbrakk> \<Longrightarrow> (fs,[],None)\<bullet>({}) \<tturnstile> specs"
 | ConjI:"\<forall>(P,es,Q) \<in> specs. (\<Gamma>\<bullet>assms \<turnstile> {P} es {Q}) \<Longrightarrow> \<Gamma>\<bullet>assms \<tturnstile> specs"
 | ConjE:"\<lbrakk>\<Gamma>\<bullet>assms \<tturnstile> specs; (P,es,Q) \<in> specs\<rbrakk> \<Longrightarrow> \<Gamma>\<bullet>assms \<turnstile> {P} es {Q}"
 
@@ -1526,10 +1526,10 @@ proof -
     by (simp add: stack_ass_sat_def)
 qed
 
-lemma valid_triple_n_call_equiv_callcl:
+lemma valid_triple_n_call_equiv_invoke:
   assumes "j < length fs"
           "(\<Gamma>::'a triple_context) = (fs, [], None)"
-  shows "\<Gamma> \<Turnstile>_ (Suc n) {P} [$Call j] {Q} = (\<Gamma> \<Turnstile>_n {P} [Callcl (fs!j)] {Q})"
+  shows "\<Gamma> \<Turnstile>_ (Suc n) {P} [$Call j] {Q} = (\<Gamma> \<Turnstile>_n {P} [Invoke (fs!j)] {Q})"
 proof -
   {
     fix lvar_st::"(lvar \<Rightarrow> 'a lvar_v option)"
@@ -1537,13 +1537,13 @@ proof -
     {
       assume local_assms:"ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
       have "((s,locs,($$*vcsf)@($$*vcs)@[$Call j]) \<Down>(Suc n){(labs@labsf,case_ret ret retf,i)} (s',locs', res)) =
-              ((s,locs,($$*vcsf)@($$*vcs)@[Callcl (fs!j)]) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res))"
+              ((s,locs,($$*vcsf)@($$*vcs)@[Invoke (fs!j)]) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res))"
         using calln reifies_func_ind[OF _ assms(1)] local_assms
         unfolding ass_wf_def reifies_s_def assms(2)
         by (metis (no_types, lifting) Pair_inject append.assoc map_append prod.collapse)
     }
     hence "((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[$Call j]) \<Down>(Suc n){(labs@labsf,case_ret ret retf,i)} (s',locs', res))) =
-              ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[Callcl (fs!j)]) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res)))"
+              ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P) \<and> ((s,locs,($$*vcsf)@($$*vcs)@[Invoke (fs!j)]) \<Down>n{(labs@labsf,case_ret ret retf,i)} (s',locs', res)))"
       by blast
   }
   thus ?thesis
@@ -2181,17 +2181,17 @@ proof -
   qed
 qed
 
-lemma valid_triples_n_call_equiv_callcl:
+lemma valid_triples_n_call_equiv_invoke:
   assumes "(\<Gamma>::'a triple_context) = (fs, [], None)"
           "\<forall>(P, c, Q)\<in>specs. \<exists>i. c = [$Call i] \<and> i < length fs"
           "\<Gamma> \<TTurnstile>_n
              {(P, c, Q).
                 \<exists>i. (P, [$Call i], Q) \<in> specs \<and>
-                    i < length fs \<and> c = [Callcl (fs ! i)]}"
+                    i < length fs \<and> c = [Invoke (fs ! i)]}"
   shows "\<Gamma>\<bullet>{} \<TTurnstile>_ (Suc n) specs"
 proof -
   have "\<Gamma> \<TTurnstile>_(Suc n) specs"
-    using valid_triple_n_call_equiv_callcl[OF _ assms(1), symmetric] assms(2,3)
+    using valid_triple_n_call_equiv_invoke[OF _ assms(1), symmetric] assms(2,3)
     unfolding valid_triples_n_def
     by fastforce
   thus ?thesis
@@ -4273,7 +4273,7 @@ next
     assume local_assms:"\<Gamma> = (fs,ls,r)"
                        "(fs,[],None) \<TTurnstile>_n assms"
                        "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs (St \<^sub>s|\<^sub>h H)"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [Callcl cl]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
+                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [Invoke cl]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
 
     obtain \<Gamma>l where \<Gamma>l_def:"\<Gamma>l = (fs, []::'a ass list, Some Q)"
       by blast
@@ -4295,7 +4295,7 @@ next
       unfolding ass_wf_def
       by (fastforce simp add: stack_ass_sat_def)
     hence 1:"(s, locs, ($$* vcsf) @ [Local (length tm) i (vcs @ n_zeros tls) [$Block ([] _> tm) es]]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
-      using callcl_native_imp_local[OF _ Function(1)] local_assms(4)
+      using invoke_native_imp_local[OF _ Function(1)] local_assms(4)
       by blast
     obtain lvs' lres lrvs where lres_def:
       "(s, vcs @ n_zeros tls, [$Block ([] _> tm) es]) \<Down>n{([], Some (length tm), i)} (s', lvs', lres)"
@@ -4751,12 +4751,12 @@ next
     have "(fs, [], None)\<bullet>{} \<TTurnstile>_ n specs"
       using Suc(1)[OF Suc(2,3)]
       by -
-    hence "(fs, [], None) \<TTurnstile>_ n {(P, c, Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i < length fs \<and> c = [Callcl (fs ! i)]}"
+    hence "(fs, [], None) \<TTurnstile>_ n {(P, c, Q). \<exists>i. (P, [$Call i], Q) \<in> specs \<and> i < length fs \<and> c = [Invoke (fs ! i)]}"
       using Suc(3)[of n]
       unfolding valid_triples_assms_n_def
       by (simp add: valid_triples_n_emp)
     thus ?case
-      using valid_triples_n_call_equiv_callcl[OF _ Suc(2)]
+      using valid_triples_n_call_equiv_invoke[OF _ Suc(2)]
       by blast
   qed
 next

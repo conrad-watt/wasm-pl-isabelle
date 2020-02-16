@@ -97,8 +97,8 @@ and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Righ
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
   (* local *)
 | "\<lbrakk>\<S>\<bullet>Some ts \<tturnstile>_i vs;es : ts; length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Local n i vs es] : ([] _> ts)"
-  (* callcl *)
-| "\<lbrakk>cl_typing \<S> cl tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Callcl cl] : tf"
+  (* invoke *)
+| "\<lbrakk>cl_typing \<S> cl tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke cl] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
 (* section: s_typing *)
@@ -170,14 +170,14 @@ inductive reduce :: "[s, v list, e list, inst, s, v list, e list] \<Rightarrow> 
   \<comment> \<open>\<open>lifting basic reduction\<close>\<close>
   basic:"\<lparr>e\<rparr> \<leadsto> \<lparr>e'\<rparr> \<Longrightarrow> \<lparr>s;vs;e\<rparr> \<leadsto>_i \<lparr>s;vs;e'\<rparr>"
   \<comment> \<open>\<open>call\<close>\<close>
-| call:"\<lparr>s;vs;[$(Call j)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Callcl (sfunc s i j)]\<rparr>"
+| call:"\<lparr>s;vs;[$(Call j)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Invoke (sfunc s i j)]\<rparr>"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>stab s i (nat_of_int c) = Some cl; stypes s i j = tf; cl_type cl = tf\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Callcl cl]\<rparr>"
+| call_indirect_Some:"\<lbrakk>stab s i (nat_of_int c) = Some cl; stypes s i j = tf; cl_type cl = tf\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Invoke cl]\<rparr>"
 | call_indirect_None:"\<lbrakk>(stab s i (nat_of_int c) = Some cl \<and> stypes s i j \<noteq> cl_type cl) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
-  \<comment> \<open>\<open>call\<close>\<close>
-| callcl_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;vs;ves @ [Callcl cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]\<rparr>"
-| callcl_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) f vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> \<lparr>s;vs;ves @ [Callcl cl]\<rparr> \<leadsto>_i \<lparr>s';vs;($$* vcs')\<rparr>"
-| callcl_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;vs;ves @ [Callcl cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
+  \<comment> \<open>\<open>invoke\<close>\<close>
+| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;vs;ves @ [Invoke cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Local m j (vcs@zs) [$(Block ([] _> t2s) es)]]\<rparr>"
+| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) f vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> \<lparr>s;vs;ves @ [Invoke cl]\<rparr> \<leadsto>_i \<lparr>s';vs;($$* vcs')\<rparr>"
+| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) f; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;vs;ves @ [Invoke cl]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> \<lparr>s;(vi @ [v] @ vs);[$(Get_local j)]\<rparr> \<leadsto>_i \<lparr>s;(vi @ [v] @ vs);[$(C v)]\<rparr>"
   \<comment> \<open>\<open>set_local\<close>\<close>

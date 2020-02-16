@@ -128,7 +128,7 @@ proof (induction es' rule: reduce.induct)
     using reduce_simple_not_eq
     by simp
 next
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
   thus ?case
     by (cases vcs' rule:rev_cases) auto
 next
@@ -183,24 +183,24 @@ proof (induction es' arbitrary: ves rule: reduce.induct)
     using reduce_simple_not_value
     by fastforce
 next
-  case (callcl_native cl i' j ts es s t1s t2s ves vcs n k m zs vs i)
-  have "\<not>(is_const (Callcl cl))"
+  case (invoke_native cl i' j ts es s t1s t2s ves vcs n k m zs vs i)
+  have "\<not>(is_const (Invoke cl))"
     unfolding is_const_def
     by simp
   thus ?case
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s i s' vcs' vs)
-  have "\<not>(is_const (Callcl cl))"
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s i s' vcs' vs)
+  have "\<not>(is_const (Invoke cl))"
     unfolding is_const_def
     by simp
   thus ?case
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (callcl_host_None cl t1s t2s f ves vcs n m s vs i)
-  have "\<not>(is_const (Callcl cl))"
+  case (invoke_host_None cl t1s t2s f ves vcs n m s vs i)
+  have "\<not>(is_const (Invoke cl))"
     unfolding is_const_def
     by simp
   thus ?case
@@ -300,7 +300,7 @@ lemma reduce_call:
   assumes "\<lparr>s;vs;[$Call j]\<rparr> \<leadsto>_ i \<lparr>s';vs';es'\<rparr>"
   shows "s = s'"
         "vs = vs'"
-        "es' = [Callcl (sfunc s i j)]"
+        "es' = [Invoke (sfunc s i j)]"
   using assms
 proof (induction "[$Call j]:: e list" i s' vs' es' rule: reduce.induct)
   case (label s vs es i s' vs' es' k lholed les')
@@ -310,8 +310,8 @@ proof (induction "[$Call j]:: e list" i s' vs' es' rule: reduce.induct)
     by auto
   thus "s = s'"
        "vs = vs'"
-       "les' = [Callcl (sfunc s i j)]"
-    using label(2,3,4,6) Lfilled.simps[of k "LBase [] []" "[Callcl (sfunc s i j)]" les']
+       "les' = [Invoke (sfunc s i j)]"
+    using label(2,3,4,6) Lfilled.simps[of k "LBase [] []" "[Invoke (sfunc s i j)]" les']
     by auto
 qed (auto simp add: reduce_simple_call)
 
@@ -684,8 +684,8 @@ lemma run_one_step_trap_result:
   using assms
   by auto
 
-lemma run_one_step_callcl_result:
-  assumes "run_one_step d i (s,vs,ves,Callcl cl) = (s', vs', res)"
+lemma run_one_step_invoke_result:
+  assumes "run_one_step d i (s,vs,ves,Invoke cl) = (s', vs', res)"
   shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
 proof -
   obtain t1s t2s where cl_type_is:"cl_type cl = (t1s _> t2s)"
@@ -915,9 +915,9 @@ next
     using assms
     by auto
 next
-  case (Callcl x3)
+  case (Invoke x3)
   thus ?thesis
-    using assms run_one_step_callcl_result
+    using assms run_one_step_invoke_result
     by fastforce
 next
   case (Label x41 x42 x43)
@@ -1083,9 +1083,9 @@ next
     using assms
     by auto
 next
-  case (Callcl x3)
+  case (Invoke x3)
   thus ?thesis
-    using assms run_one_step_callcl_result
+    using assms run_one_step_invoke_result
     by fastforce
 next
   case (Label x41 x42 x43)
@@ -1650,7 +1650,7 @@ proof -
           thus ?thesis
           proof (cases "stypes s i x13 = cl_type cl")
             case True
-            hence "\<lparr>s;vs;(vs_to_es list) @ [$C ConstInt32 c, $Call_indirect x13]\<rparr> \<leadsto>_ i \<lparr>s;vs;(vs_to_es list) @ [Callcl cl]\<rparr>"
+            hence "\<lparr>s;vs;(vs_to_es list) @ [$C ConstInt32 c, $Call_indirect x13]\<rparr> \<leadsto>_ i \<lparr>s;vs;(vs_to_es list) @ [Invoke cl]\<rparr>"
               using progress_L0_left[OF reduce.intros(3)] True Some is_const_list_vs_to_es_list[of "rev list"]
               by fastforce
             thus ?thesis
@@ -1974,7 +1974,7 @@ proof -
         using 2(3)
         by simp
     next
-      case (Callcl cl)
+      case (Invoke cl)
       obtain t1s t2s where "cl_type cl = (t1s _> t2s)"
         using tf.exhaust[of _ thesis]
         by fastforce
@@ -1998,17 +1998,17 @@ proof -
         proof (cases cl)
           case (Func_native i' tf fts fes)
           hence "s' = s" "vs' = vs" "es' = (vs_to_es ves'' @ [Local (length t2s) i' (rev ves' @ (n_zeros fts)) [$Block ([] _> t2s) fes]])"
-            using 2(3) Callcl local_defs outer_True true_defs
+            using 2(3) Invoke local_defs outer_True true_defs
             unfolding cl_type_def
             by auto
           moreover
-          have "\<lparr>s;vs;(vs_to_es ves')@[Callcl cl]\<rparr> \<leadsto>_i \<lparr>s;vs;([Local (length t2s) i' (rev ves' @ (n_zeros fts)) [$Block ([] _> t2s) fes]])\<rparr>"
+          have "\<lparr>s;vs;(vs_to_es ves')@[Invoke cl]\<rparr> \<leadsto>_i \<lparr>s;vs;([Local (length t2s) i' (rev ves' @ (n_zeros fts)) [$Block ([] _> t2s) fes]])\<rparr>"
             using reduce.intros(5) local_defs(1,2) Func_native ves'_length
             unfolding cl_type_def
             by fastforce
           ultimately
           show ?thesis
-            using Callcl progress_L0_left is_const_list[of _ "(rev ves'')"]
+            using Invoke progress_L0_left is_const_list[of _ "(rev ves'')"]
             unfolding split_n_conv_app[OF true_defs(1)]
             by auto
         next
@@ -2019,14 +2019,14 @@ proof -
             hence "s = s'"
                   "vs = vs'"
                   "es' = vs_to_es ves'' @ [Trap] "
-              using 2(3) Callcl local_defs outer_True true_defs Func_host
+              using 2(3) Invoke local_defs outer_True true_defs Func_host
               unfolding cl_type_def
               by auto
             thus ?thesis
               using is_const_list[of _ "(rev ves'')"]
                     reduce.intros(7)[OF _ _ ves'_length local_defs(2)]
                     split_n_conv_app[OF true_defs]
-                    progress_L0_left Callcl Func_host local_defs(1)
+                    progress_L0_left Invoke Func_host local_defs(1)
               unfolding cl_type_def
               by fastforce
           next
@@ -2035,19 +2035,19 @@ proof -
             proof (cases a)
             case (Pair rs rves)
               thus ?thesis
-                using 2(3) Callcl local_defs outer_True true_defs Func_host Some
+                using 2(3) Invoke local_defs outer_True true_defs Func_host Some
                 unfolding cl_type_def
               proof (cases "list_all2 types_agree t2s rves")
                 case True
                 hence "rs = s'"
                       "vs = vs'"
                       "es' = vs_to_es ves'' @ ($$* rves) "
-                  using 2(3) Callcl local_defs outer_True true_defs Func_host Pair Some      
+                  using 2(3) Invoke local_defs outer_True true_defs Func_host Pair Some      
                   unfolding cl_type_def
                   by auto
                 thus ?thesis
                   using progress_L0_left reduce.intros(6)[OF _ _ ves'_length local_defs(2)] Pair
-                        Callcl Func_host local_defs(1) True is_const_list[of _ "(rev ves'')"]
+                        Invoke Func_host local_defs(1) True is_const_list[of _ "(rev ves'')"]
                         split_n_conv_app[OF true_defs] host_apply_impl_correct[OF Some]
                   unfolding cl_type_def
                   by fastforce
@@ -2058,7 +2058,7 @@ proof -
       next
         case False
         thus ?thesis
-          using 2(3) Callcl local_defs
+          using 2(3) Invoke local_defs
           unfolding cl_type_def
           by (cases cl) auto
       qed

@@ -677,8 +677,8 @@ next
     by fastforce
 qed
 
-lemma e_type_callcl_native:
-  assumes "s\<bullet>\<C> \<turnstile> [Callcl cl] : (t1s' _> t2s')"
+lemma e_type_invoke_native:
+  assumes "s\<bullet>\<C> \<turnstile> [Invoke cl] : (t1s' _> t2s')"
           "cl = Func_native i tf ts es"
   shows "\<exists>t1s t2s ts_c \<C>i. (t1s' = ts_c @ t1s)
                          \<and> (t2s' = ts_c @ t2s)
@@ -686,7 +686,7 @@ lemma e_type_callcl_native:
                          \<and> inst_typing s i \<C>i
                          \<and> (\<C>i\<lparr>local := (local \<C>i) @ t1s @ ts, label := ([t2s] @ (label \<C>i)), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
   using assms
-proof (induction "s" "\<C>" "[Callcl cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
+proof (induction "s" "\<C>" "[Invoke cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
   case (1 \<C> b_es \<S>)
   thus ?case
     by auto
@@ -709,14 +709,14 @@ next
     by fastforce
 qed
 
-lemma e_type_callcl_host:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (t1s' _> t2s')"
+lemma e_type_invoke_host:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [Invoke cl] : (t1s' _> t2s')"
           "cl = Func_host tf f"
   shows "\<exists>t1s t2s ts_c. (t1s' = ts_c @ t1s)
                         \<and> (t2s' = ts_c @ t2s)
                         \<and> tf = (t1s _> t2s)"
   using assms
-proof (induction "\<S>" "\<C>" "[Callcl cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
+proof (induction "\<S>" "\<C>" "[Invoke cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
   case (1 \<C> b_es \<S>)
   thus ?case
     by auto
@@ -739,21 +739,21 @@ next
     by fastforce
 qed
 
-lemma e_type_callcl:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [Callcl cl] : (t1s' _> t2s')"
+lemma e_type_invoke:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [Invoke cl] : (t1s' _> t2s')"
   shows "\<exists>t1s t2s ts_c. (t1s' = ts_c @ t1s)
                         \<and> (t2s' = ts_c @ t2s)
                         \<and> cl_type cl = (t1s _> t2s)"
 proof (cases cl)
   case (Func_native x11 x12 x13 x14)
   thus ?thesis
-    using e_type_callcl_native[OF assms]
+    using e_type_invoke_native[OF assms]
     unfolding cl_type_def
     by (cases x12) fastforce
 next
   case (Func_host x21 x22)
   thus ?thesis
-    using e_type_callcl_host[OF assms]
+    using e_type_invoke_host[OF assms]
     unfolding cl_type_def
     by fastforce
 qed

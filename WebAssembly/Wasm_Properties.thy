@@ -23,20 +23,20 @@ lemma reduce_store_extension:
   shows "store_extension s s'"
   using assms
 proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.induct)
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')"
-                    "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
-    using e_type_comp[OF callcl_host_Some(9)]
+                    "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts'' _> ts')"
+    using e_type_comp[OF invoke_host_Some(9)]
     by blast
   then obtain ts''' where ts'''_def:"ts'' = ts'''@t1s"
-    using e_type_callcl_host callcl_host_Some(1)
+    using e_type_invoke_host invoke_host_Some(1)
     by blast
   hence "s\<bullet>\<C> \<turnstile> ves : ([] _> t1s)"
-    using ts'''_def callcl_host_Some(2,3,4)
-          e_type_const_list[OF is_const_list[OF callcl_host_Some(2)] ts''_def(1)]
+    using ts'''_def invoke_host_Some(2,3,4)
+          e_type_const_list[OF is_const_list[OF invoke_host_Some(2)] ts''_def(1)]
     by fastforce
   thus ?case
-    using host_apply_preserve_store[OF callcl_host_Some(6)] callcl_host_Some(2)
+    using host_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2)
     by (metis append_Nil e_typing_imp_list_types_agree)
 next
   case (set_global s i j v s' vs)
@@ -619,7 +619,7 @@ lemma types_preserved_call_indirect_Some:
           "store_typing s"
           "inst_typing s i' \<C>i"
           "\<C> = \<C>i\<lparr>local := local \<C>i @ tvs, label := arb_labs, return := arb_return\<rparr>"
-  shows "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts _> ts')"
 proof -
   obtain t1s t2s where tf_def:"tf = (t1s _> t2s)"
     using tf.exhaust by blast
@@ -651,11 +651,11 @@ proof -
     using assms(4)
     unfolding cl_typing.simps cl_type_def
     by auto
-  hence "s\<bullet>\<C> \<turnstile> [Callcl cl] : tf"
+  hence "s\<bullet>\<C> \<turnstile> [Invoke cl] : tf"
     using e_typing_s_typing.intros(6) assms(6,7) ts''a_def(1)
     by fastforce
   ultimately
-  show "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts _> ts')"
+  show "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts _> ts')"
     using tf_def e_typing_s_typing.intros(3)
     by auto
 qed
@@ -666,8 +666,8 @@ lemma types_preserved_call_indirect_None:
   using e_typing_s_typing.intros(4)
   by blast
 
-lemma types_preserved_callcl_native:
-  assumes "s\<bullet>\<C> \<turnstile> ves @ [Callcl cl] : (ts _> ts')"
+lemma types_preserved_invoke_native:
+  assumes "s\<bullet>\<C> \<turnstile> ves @ [Invoke cl] : (ts _> ts')"
           "cl = Func_native i (t1s _> t2s) tfs es"
           "ves = $$* vs"
           "length vs = n"
@@ -678,7 +678,7 @@ lemma types_preserved_callcl_native:
           "store_typing s"
   shows "s\<bullet>\<C> \<turnstile> [Local m i (vs @ zs) [$Block ([] _> t2s) es]] : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts'' _> ts')"
   using assms(1) e_type_comp
   by fastforce
   have ves_c:"const_list ves"
@@ -693,7 +693,7 @@ proof -
                                 "(ts' = ts_c @ t2s)"
                                 "inst_typing s i \<C>'"
                                 "(\<C>'\<lparr>local := (local \<C>') @ t1s @ tfs, label := ([t2s] @ (label \<C>')), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
-    using e_type_callcl_native[OF ts''_def(2) assms(2)]
+    using e_type_invoke_native[OF ts''_def(2) assms(2)]
     by fastforce
   obtain \<C>'' where c''_def:"\<C>'' = \<C>'\<lparr>local := (local \<C>') @ t1s @ tfs, return := Some t2s\<rparr>"
     by blast
@@ -724,8 +724,8 @@ proof -
     by fastforce
 qed
 
-lemma types_preserved_callcl_host_some:
-  assumes "s\<bullet>\<C> \<turnstile> ves @ [Callcl cl] : (ts _> ts')"
+lemma types_preserved_invoke_host_some:
+  assumes "s\<bullet>\<C> \<turnstile> ves @ [Invoke cl] : (ts _> ts')"
           "cl = Func_host (t1s _> t2s) f"
           "ves = $$* vcs"
           "length vcs = n"
@@ -735,7 +735,7 @@ lemma types_preserved_callcl_host_some:
           "store_typing s"
   shows "s'\<bullet>\<C> \<turnstile> $$* vcs' : (ts _> ts')"
 proof -
-  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts'' _> ts')"
   using assms(1) e_type_comp
   by fastforce
   have ves_c:"const_list ves"
@@ -748,7 +748,7 @@ proof -
     by fastforce
   hence "ts'' = ts @ t1s"
         "ts' = ts @ t2s"
-    using e_type_callcl_host[OF ts''_def(2) assms(2)]
+    using e_type_invoke_host[OF ts''_def(2) assms(2)]
     by auto
   moreover
   hence "list_all2 types_agree t1s vcs"
@@ -1384,17 +1384,17 @@ next
     using e_typing_s_typing.intros(4)
     by blast
 next
-  case (callcl_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
+  case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s vs i)
   thus ?case
-    using types_preserved_callcl_native
+    using types_preserved_invoke_native
     by fastforce
 next
-  case (callcl_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
   thus ?case
-    using types_preserved_callcl_host_some
+    using types_preserved_invoke_host_some
       by fastforce
 next
-  case (callcl_host_None cl t1s t2s f ves vcs n m s hs vs i)
+  case (invoke_host_None cl t1s t2s f ves vcs n m s hs vs i)
   thus ?case
     using e_typing_s_typing.intros(4)
     by blast
@@ -2883,13 +2883,13 @@ proof -
     qed
   next
     case (6 s cl tf \<C>)
-    obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> cs : ([] _> ts'')" "s\<bullet>\<C> \<turnstile> [Callcl cl] : (ts'' _> ts')"
+    obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> cs : ([] _> ts'')" "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts'' _> ts')"
       using 6(2,3) e_type_comp_conc1
       by fastforce
     obtain ts_c t1s t2s where cl_def:"(ts'' = ts_c @ t1s)"
                                      "(ts' = ts_c @ t2s)"
                                      "cl_type cl = (t1s _> t2s)"
-      using e_type_callcl[OF ts''_def(2)]
+      using e_type_invoke[OF ts''_def(2)]
       by fastforce
     obtain vs1 vs2 where vs_def:"s\<bullet>\<C> \<turnstile> vs1 : ([] _> ts_c)"
                                 "s\<bullet>\<C> \<turnstile> vs2 : (ts_c _> ts_c @ t1s)"
@@ -2908,7 +2908,7 @@ proof -
         using cl_def(3)
         unfolding cl_type_def
         by simp
-      have "\<exists>a a'. \<lparr>s;vs;vs2 @ [Callcl cl]\<rparr> \<leadsto>_ i \<lparr>s;vs;a\<rparr>"
+      have "\<exists>a a'. \<lparr>s;vs;vs2 @ [Invoke cl]\<rparr> \<leadsto>_ i \<lparr>s;vs;a\<rparr>"
         using reduce.intros(5)[OF func_native_def] e_type_const_conv_vs[OF vs_def(5)] l
         unfolding n_zeros_def
         by fastforce
@@ -2925,7 +2925,7 @@ proof -
         using e_type_const_conv_vs[OF vs_def(5)]
         by blast
       fix hs
-      have "\<exists>s' a a'. \<lparr>s;vs;vs2 @ [Callcl cl]\<rparr> \<leadsto>_ i \<lparr>s';vs;a\<rparr>"
+      have "\<exists>s' a a'. \<lparr>s;vs;vs2 @ [Invoke cl]\<rparr> \<leadsto>_ i \<lparr>s';vs;a\<rparr>"
       proof (cases "host_apply s (t1s _> t2s) x22 vcs hs")
         case None
         thus ?thesis
