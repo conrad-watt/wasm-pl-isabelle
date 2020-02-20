@@ -516,7 +516,7 @@ proof (cases x192)
       assume "smem_ind s i = Some aa" and "a = ConstInt32 x1" 
       thus ?thesis
         using assms None Cons
-        by (cases "load (s.mem s ! aa) (nat_of_int x1) x194 (t_length x191)") auto
+        by (cases "load (s.mems s ! aa) (nat_of_int x1) x194 (t_length x191)") auto
     qed auto
   qed auto
 next
@@ -532,7 +532,7 @@ next
       assume "smem_ind s i = Some aa" and "a = (x, y)" and "a' = ConstInt32 x1"
       thus ?thesis
         using assms Some Cons
-        by (cases "load_packed y (s.mem s ! aa) (nat_of_int x1) x194 (tp_length x) (t_length x191)") auto
+        by (cases "load_packed y (s.mems s ! aa) (nat_of_int x1) x194 (tp_length x) (t_length x191)") auto
     qed auto
   qed auto
 qed
@@ -558,7 +558,7 @@ proof (cases x202)
         assume "a' = ConstInt32 k" and "types_agree x201 a" and "smem_ind s i = Some aa"
         thus ?thesis
           using assms None outer_Cons Cons
-          by (cases "store (s.mem s ! aa) (nat_of_int k) x204 (bits a) (t_length x201)") auto
+          by (cases "store (s.mems s ! aa) (nat_of_int k) x204 (bits a) (t_length x201)") auto
       qed auto
     qed auto
   qed auto
@@ -580,7 +580,7 @@ next
         assume "a' = ConstInt32 k" and "types_agree x201 a" and "smem_ind s i = Some aa"
         thus ?thesis
           using assms Some outer_Cons Cons
-          by (cases "store_packed (s.mem s ! aa) (nat_of_int k) x204 (bits a) (tp_length a'')") auto
+          by (cases "store_packed (s.mems s ! aa) (nat_of_int k) x204 (bits a) (tp_length a'')") auto
       qed auto
     qed auto
   qed auto
@@ -605,7 +605,7 @@ proof (cases ves)
     assume "a = ConstInt32 c" and "smem_ind s i = Some a'"
     thus ?thesis
       using assms Cons
-      by (cases "mem_grow_impl (s.mem s ! a') (nat_of_int c)") auto
+      by (cases "mem_grow_impl (s.mems s ! a') (nat_of_int c)") auto
   qed auto
 qed auto
 
@@ -1751,7 +1751,7 @@ proof -
               progress_L0_left[OF reduce.intros(12)]
               progress_L0_left[OF reduce.intros(13)]
               is_const_list_vs_to_es_list[of "rev list"]
-          by (cases "load (s.mem s ! a) (nat_of_int x1) x194 (t_length x191)" )
+          by (cases "load (s.mems s ! a) (nat_of_int x1) x194 (t_length x191)" )
              (auto simp add: is_const_def)
       qed auto
     next
@@ -1768,7 +1768,7 @@ proof -
                   progress_L0_left[OF reduce.intros(14)]
                   progress_L0_left[OF reduce.intros(15)]
                   is_const_list_vs_to_es_list[of "rev list"]
-            by (cases "load_packed sx (s.mem s ! a) (nat_of_int x1) x194 (tp_length tp) (t_length x191)")
+            by (cases "load_packed sx (s.mems s ! a) (nat_of_int x1) x194 (tp_length tp) (t_length x191)")
                (auto simp add: is_const_def)
         qed auto
     qed auto
@@ -1799,7 +1799,7 @@ proof -
                       progress_L0_left[OF reduce.intros(16)]
                       progress_L0_left[OF reduce.intros(17)]
                       is_const_list_vs_to_es_list[of "rev list'"]
-                by (cases "store (s.mem s ! j) (nat_of_int x1) off (bits a) (t_length t)")
+                by (cases "store (s.mems s ! j) (nat_of_int x1) off (bits a) (t_length t)")
                    auto
             next
               case (Some the_tp)
@@ -1808,7 +1808,7 @@ proof -
                       progress_L0_left[OF reduce.intros(18)]
                       progress_L0_left[OF reduce.intros(19)]
                       is_const_list_vs_to_es_list[of "rev list'"]
-                by (cases "store_packed (s.mem s ! j) (nat_of_int x1) off (bits a) (tp_length the_tp)")
+                by (cases "store_packed (s.mems s ! j) (nat_of_int x1) off (bits a) (tp_length the_tp)")
                    auto
             qed
           qed (cases tp; auto)+
@@ -1843,7 +1843,7 @@ proof -
                              progress_L0_left[OF reduce.intros(21)]
                              progress_L0_left[OF reduce.intros(22)]
               is_const_list_vs_to_es_list[of "rev list"] 
-          by (cases "mem_grow_impl (s.mem s ! j) (nat_of_int x1)") (auto simp add: mem_grow_impl_correct is_const_def)
+          by (cases "mem_grow_impl (s.mems s ! j) (nat_of_int x1)") (auto simp add: mem_grow_impl_correct is_const_def)
       qed auto
     qed auto
   next

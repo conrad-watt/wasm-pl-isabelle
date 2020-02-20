@@ -168,8 +168,8 @@ definition reifies_heap_contents :: "[mem, ((nat, byte) map)] \<Rightarrow> bool
 definition reifies_heap_length :: "[mem, nat option] \<Rightarrow> bool" where
   "reifies_heap_length m l_opt \<equiv> pred_option (\<lambda>l. mem_length m = (l * Ki64)) l_opt"
 
-definition reifies_heap :: "[mem list, nat option, heap] \<Rightarrow> bool" where
-  "reifies_heap ms im_opt h \<equiv> let im = the im_opt in
+definition reifies_heap :: "[mem list, nat list, heap] \<Rightarrow> bool" where
+  "reifies_heap ms im_opt h \<equiv> let im = hd im_opt in
                                im < length ms
                              \<and> reifies_heap_contents (ms!im) (fst h)
                              \<and> reifies_heap_length (ms!im) (snd h)"
@@ -178,7 +178,7 @@ definition reifies_heap :: "[mem list, nat option, heap] \<Rightarrow> bool" whe
 definition reifies_s :: "[s, inst, heap, 'a var_st, cl list] \<Rightarrow> bool" where
   "reifies_s s i h st fs \<equiv> reifies_glob (globs s) (inst.globs i) st
                          \<and> reifies_func (funcs s) (inst.funcs i) fs
-                         \<and> reifies_heap (mem s) (inst.mem i) h"
+                         \<and> reifies_heap (mems s) (inst.mems i) h"
 
 definition var_st_agree :: "'a var_st \<Rightarrow> var \<Rightarrow> 'a var_st \<Rightarrow> bool" where
   "var_st_agree st1 var st2 \<equiv> case var of

@@ -203,22 +203,22 @@ qed auto
 lemma stab_typed_some_imp_member:
   assumes "stab s i c = Some cl"
           "inst_typing s i \<C>"
-        shows "Some cl \<in> set (concat (s.tab s))"
+        shows "Some cl \<in> set (concat (s.tabs s))"
 proof -
   show ?thesis
-  proof (cases "inst.tab i")
-    case None
+  proof (cases "inst.tabs i")
+    case Nil
     thus ?thesis
       using assms stab_def
       by auto
   next
-    case (Some a)
-    hence "a < length (tab s)"
+    case (Cons a l)
+    hence "a < length (tabs s)"
       using assms(2) inst_typing.simps
       unfolding tabi_agree_def
-      by (auto split: option.splits)
+      by (metis (no_types, lifting) inst.select_convs(3) list_all2_Cons1)
     thus ?thesis
-      using assms(1) Some
+      using assms(1) Cons
       unfolding stab_def stab_s_def
       apply simp
       apply (metis (full_types) nth_mem option.distinct(1))
@@ -232,11 +232,11 @@ lemma stab_typed_some_imp_cl_typed:
           "store_typing s"
   shows "\<exists>tf. cl_typing s cl tf"
 proof -
-  have "Some cl \<in> set (concat (s.tab s))"
+  have "Some cl \<in> set (concat (s.tabs s))"
     using assms stab_typed_some_imp_member
     by auto
   moreover
-  have "list_all (list_all (tab_agree s)) (tab s)"
+  have "list_all (list_all (tab_agree s)) (tabs s)"
     using assms(3)
     unfolding store_typing.simps
     by simp
@@ -274,7 +274,7 @@ lemma b_e_type_value:
 lemma b_e_type_load:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Load t tp_sx a off"
-  shows "\<exists>ts'' sec n. ts = ts''@[T_i32] \<and> ts' = ts''@[t] \<and> (memory \<C>) = True"
+  shows "\<exists>ts'' sec n. ts = ts''@[T_i32] \<and> ts' = ts''@[t] \<and> length (memory \<C>) \<ge> 1"
         "load_store_t_bounds a (option_projl tp_sx) t"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -283,7 +283,7 @@ lemma b_e_type_store:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Store t tp a off"
     shows "ts = ts'@[T_i32, t]"
-          "\<exists>sec n. (memory \<C>) = True"
+          "\<exists>sec n. length (memory \<C>) \<ge> 1"
           "load_store_t_bounds a tp t"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -291,14 +291,14 @@ lemma b_e_type_store:
 lemma b_e_type_current_memory:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Current_memory"
-  shows "\<exists>sec n. ts' = ts @ [T_i32] \<and> (memory \<C>) = True"
+  shows "\<exists>sec n. ts' = ts @ [T_i32] \<and> length (memory \<C>) \<ge> 1"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_grow_memory:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Grow_memory"
-  shows "\<exists>ts''. ts = ts''@[T_i32] \<and> ts = ts' \<and> (\<exists>n. (memory \<C>) = True)"
+  shows "\<exists>ts''. ts = ts''@[T_i32] \<and> ts = ts' \<and> length (memory \<C>) \<ge> 1"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
 
@@ -382,7 +382,7 @@ lemma b_e_type_call:
 lemma b_e_type_call_indirect:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Call_indirect i"
-  shows "i < length (types_t \<C>)"
+  shows "i < length (types_t \<C>) \<and> length (table \<C>) \<ge> 1"
         "\<exists>ts'' tf1 tf2. ts = ts''@tf1@[T_i32] \<and> ts' = ts''@tf2 \<and> (types_t \<C>)!i = (tf1 _> tf2)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -1397,14 +1397,14 @@ lemma store_extension_refl:
   by (metis (full_types) unit.exhaust s.surjective)
 
 lemma store_extension_mem_leq:
-  assumes "s.mem s ! j = m"
+  assumes "s.mems s ! j = m"
           "mem_size m \<le> mem_size m'"
-  shows "store_extension s (s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>)"
+  shows "store_extension s (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
 proof -
-  obtain s' where s'_def:"s' = (s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>)"
+  obtain s' where s'_def:"s' = (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
     by blast
   hence "funcs s = funcs s'"
-        "tab s = tab s'"
+        "tabs s = tabs s'"
         "globs s = globs s'"
     by simp_all
   moreover
@@ -1412,7 +1412,7 @@ proof -
     using assms(2)
     unfolding mem_extension_def
     by simp
-  hence "list_all2 mem_extension (mem s) (mem s')"
+  hence "list_all2 mem_extension (mems s) (mems s')"
     using assms(1) s'_def
     by (simp, metis eq_iff list.rel_refl list_all2_update_cong list_update_id mem_extension_def)
   ultimately
@@ -1450,8 +1450,8 @@ proof -
     by (simp, metis list_all2_refl list_all2_update_cong list_update_id list_update_overwrite)
   moreover
   have "(funcs s) = (funcs s')"
-       "(tab s) = (tab s')"
-       "list_all2 mem_extension (mem s) (mem s')"
+       "(tabs s) = (tabs s')"
+       "list_all2 mem_extension (mems s) (mems s')"
     using s'_def mem_extension_refl list_all2_refl
     by auto
   ultimately
@@ -1644,28 +1644,28 @@ qed
 
 lemma store_mem_exists:
   assumes "inst_typing s i \<C>"
-  shows "(memory \<C>) = (\<not>Option.is_none (inst.mem i))"
-  using assms
+  shows "length (memory \<C>) = length (inst.mems i)"
+  using assms list_all2_lengthD
   unfolding inst_typing.simps memi_agree_def
-  by (cases "(inst.mem i)")  auto
-  
+  by fastforce
+
 lemma inst_typing_store_extension_inv:
   assumes "inst_typing s i \<C>"
           "store_extension s s'" 
     shows "inst_typing s' i \<C>"
 proof -
   have 1:"list_all2 (globi_agree (globs s)) (inst.globs i) (global \<C>)"
-         "memi_agree (mem s) (inst.mem i) (memory \<C>)"
+         "list_all2 (memi_agree (mems s)) (inst.mems i) (memory \<C>)"
     using assms(1)
     unfolding inst_typing.simps
     by auto
   have "funcs s = funcs s'"
-       "tab s = tab s'"
+       "tabs s = tabs s'"
     using assms(2)
     unfolding store_extension.simps
     by auto
   hence "list_all2 (funci_agree (funcs s')) (inst.funcs i) (func_t \<C>)"
-        "tabi_agree (tab s') (inst.tab i) (table \<C>)"
+        "list_all2 (tabi_agree (tabs s')) (inst.tabs i) (table \<C>)"
     using assms(1)
     unfolding inst_typing.simps
     by auto
@@ -1680,10 +1680,10 @@ proof -
     unfolding globi_agree_def list_all2_conv_all_nth
     by fastforce
   moreover
-  have "memi_agree (mem s') (inst.mem i) (memory \<C>)"
+  have "list_all2 (memi_agree (mems s')) (inst.mems i) (memory \<C>)"
     using 1(2) assms(2)
     unfolding memi_agree_def
-    by (auto simp add: list_all2_lengthD store_extension.simps split: option.split)
+    by (auto simp add: list_all2_lengthD store_extension.simps)
   ultimately
   show ?thesis
     using assms(1)
@@ -1742,17 +1742,17 @@ lemma store_extension_imp_store_typing:
   shows "store_typing s'"
 proof -
   have 1:"funcs s = funcs s'"
-         "tab s = tab s"
+         "tabs s = tabs s"
     using assms(1)
     unfolding store_extension.simps
     by auto
   moreover
   have "list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s)"
-       "list_all (list_all (tab_agree s)) (tab s)"
+       "list_all (list_all (tab_agree s)) (tabs s)"
     using assms(2)
     unfolding store_typing.simps
     by auto
-  hence "list_all (list_all (tab_agree s')) (tab s')"
+  hence "list_all (list_all (tab_agree s')) (tabs s')"
         "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')"
     using cl_typing_store_extension_inv[OF assms(1)]
           tab_agree_store_extension_inv[OF assms(1)] 1

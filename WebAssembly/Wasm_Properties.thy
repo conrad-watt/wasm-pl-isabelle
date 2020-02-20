@@ -2101,7 +2101,7 @@ lemma progress_b_e:
           "const_list cs"
           "\<not> const_list ($* b_es)"
           "length (local \<C>) = length (vs)"
-          "(memory \<C>) = (\<not>(Option.is_none (inst.mem i)))"
+          "length (memory \<C>) = length (inst.mems i)"
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs@($*b_es)\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   using assms
 proof (induction b_es "(ts _> ts')" arbitrary: ts ts' cs rule: b_e_typing.induct)
@@ -2418,14 +2418,14 @@ next
     by fastforce
   obtain j where mem_some:"smem_ind s i = Some j"
     using load(1,9)
-    unfolding smem_ind_def Option.is_none_def
-    by fastforce
+    unfolding smem_ind_def
+    by (fastforce split: list.splits)
   have "\<exists>a' s' vs' es'. \<lparr>s;vs;[$C ConstInt32 c, $Load t tp_sx a off]\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   proof (cases tp_sx)
     case None
     note tp_none = None
     show ?thesis
-    proof (cases "load ((mem s)!j) (nat_of_int c) off (t_length t)")
+    proof (cases "load ((mems s)!j) (nat_of_int c) off (t_length t)")
       case None
       show ?thesis
         using reduce.intros(13)[OF mem_some _ None, of vs] tp_none load(2)
@@ -2442,7 +2442,7 @@ next
       using Some
       by fastforce
     show ?thesis
-    proof (cases "load_packed sx ((mem s)!j) (nat_of_int c) off (tp_length tp) (t_length t)")
+    proof (cases "load_packed sx ((mems s)!j) (nat_of_int c) off (tp_length tp) (t_length t)")
       case None
       show ?thesis
         using reduce.intros(15)[OF mem_some _ None, of vs] tp_some load(2)
@@ -2471,7 +2471,7 @@ next
   obtain j where mem_some:"smem_ind s i = Some j"
     using store(1,9)
     unfolding smem_ind_def
-    by fastforce
+    by (fastforce split: list.splits)
   obtain c where c_def:"cs' = $C ConstInt32 c"
     using const_of_i32[OF _ cs_def(1)] cs_def(3) store(6)
     unfolding const_list_def
@@ -2481,7 +2481,7 @@ next
     case None
     note tp_none = None
     show ?thesis
-    proof (cases "store (s.mem s ! j) (nat_of_int c) off (bits v) (t_length t)")
+    proof (cases "store (s.mems s ! j) (nat_of_int c) off (bits v) (t_length t)")
       case None
       show ?thesis
         using reduce.intros(17)[OF _ mem_some _ None, of vs] t_def tp_none store(2)
@@ -2498,7 +2498,7 @@ next
     case (Some a)
     note tp_some = Some
     show ?thesis
-    proof (cases "store_packed (s.mem s ! j) (nat_of_int c) off (bits v) (tp_length a)")
+    proof (cases "store_packed (s.mems s ! j) (nat_of_int c) off (bits v) (tp_length a)")
       case None
       show ?thesis
         using reduce.intros(19)[OF _ mem_some _ None, of t vs] t_def tp_some store(2)
@@ -2520,7 +2520,7 @@ next
   obtain j where mem_some:"smem_ind s i = Some j"
     using current_memory(1,8)
     unfolding smem_ind_def
-    by fastforce
+    by (fastforce split: list.splits)
   thus ?case
     using progress_L0[OF reduce.intros(20)[OF mem_some] current_memory(5), of _ _ vs "[]"]
     by fastforce
@@ -2532,7 +2532,7 @@ next
   obtain j where mem_some:"smem_ind s i = Some j"
     using grow_memory(1,8)
     unfolding smem_ind_def
-    by fastforce
+    by (fastforce split: list.splits)
   show ?case
     using reduce.intros(22)[OF mem_some, of _] c_def
     by fastforce
@@ -2669,7 +2669,7 @@ proof -
        \<not> const_list (cs_es) \<Longrightarrow>
        store_typing s \<Longrightarrow>
        length (local \<C>) = length (vs) \<Longrightarrow>
-       (memory \<C>) = (\<not> (Option.is_none (inst.mem i)))  \<Longrightarrow>
+       length (memory \<C>) = length (inst.mems i)  \<Longrightarrow>
          \<exists>a s' vs' cs_es'. \<lparr>s;vs;cs_es\<rparr> \<leadsto>_i \<lparr>s';vs';cs_es'\<rparr>"
    and prems2:
       "s\<bullet>None \<tturnstile>_i vs;cs_es : ts' \<Longrightarrow>
@@ -3045,7 +3045,7 @@ proof -
       using 8(1,3) store_local_label_empty[OF 8(2)]
       by fastforce
     moreover
-    have "(memory \<C>) = (\<not> Option.is_none (inst.mem i))"
+    have "length (memory \<C>) = length (inst.mems i)"
       using store_mem_exists[OF 8(2)] 8(3)
       by simp
     ultimately show ?case

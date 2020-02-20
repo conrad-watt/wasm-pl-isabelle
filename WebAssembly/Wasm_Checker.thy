@@ -140,7 +140,7 @@ foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
                                             (tn _> tm) \<Rightarrow> type_update ts (to_ct_list tn) (Type tm))
                                     else Bot)"
   (* call_indirect *)
-| "check_single \<C> (Call_indirect i) ts = (if (table \<C>) \<and> i < length (types_t \<C>)
+| "check_single \<C> (Call_indirect i) ts = (if length (table \<C>) \<ge> 1  \<and> i < length (types_t \<C>)
                                             then (case ((types_t \<C>)!i) of
                                                     (tn _> tm) \<Rightarrow> type_update ts (to_ct_list (tn@[T_i32])) (Type tm))
                                             else Bot)"
@@ -165,19 +165,19 @@ foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
                                          then type_update ts [TSome (tg_t ((global \<C>)!i))] (Type [])
                                          else Bot)"
   (* load *)
-| "check_single \<C> (Load t tp_sx a off) ts = (if (memory \<C>) \<and> load_store_t_bounds a (option_projl tp_sx) t
+| "check_single \<C> (Load t tp_sx a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_store_t_bounds a (option_projl tp_sx) t
                                  then type_update ts [TSome T_i32] (Type [t])
                                  else Bot)"
   (* store *)
-| "check_single \<C> (Store t tp a off) ts = (if (memory \<C>) \<and> load_store_t_bounds a tp t
+| "check_single \<C> (Store t tp a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_store_t_bounds a tp t
                                              then type_update ts [TSome T_i32,TSome t] (Type [])
                                              else Bot)"
   (* current_memory *)
-| "check_single \<C> Current_memory ts = (if (memory \<C>)
+| "check_single \<C> Current_memory ts = (if length (memory \<C>) \<ge> 1
                                          then type_update ts [] (Type [T_i32])
                                          else Bot)"
   (* grow_memory *)
-| "check_single \<C> Grow_memory ts = (if (memory \<C>)
+| "check_single \<C> Grow_memory ts = (if length (memory \<C>) \<ge> 1
                                       then type_update ts [TSome T_i32] (Type [T_i32])
                                       else Bot)"
 

@@ -34,7 +34,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>i < length(func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call i] : tf"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); (table \<C>) = True\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_i32] _> t2s)"
+| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); length (table \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_i32] _> t2s)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_local i] : ([] _> [t])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -46,13 +46,13 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>set_global\<close>\<close>
 | set_global:"\<lbrakk>i < length(global \<C>); tg_t ((global \<C>)!i) = t; is_mut ((global \<C>)!i)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Set_global i] : ([t] _> [])"
   \<comment> \<open>\<open>load\<close>\<close>
-| load:"\<lbrakk>(memory \<C>) = True; load_store_t_bounds a (option_projl tp_sx) t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load t tp_sx a off] : ([T_i32] _> [t])"
+| load:"\<lbrakk>length (memory \<C>) \<ge> 1; load_store_t_bounds a (option_projl tp_sx) t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load t tp_sx a off] : ([T_i32] _> [t])"
   \<comment> \<open>\<open>store\<close>\<close>
-| store:"\<lbrakk>(memory \<C>) = True; load_store_t_bounds a tp t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Store t tp a off] : ([T_i32,t] _> [])"
+| store:"\<lbrakk>length (memory \<C>) \<ge> 1; load_store_t_bounds a tp t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Store t tp a off] : ([T_i32,t] _> [])"
   \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"(memory \<C>) = True \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_i32])"
+| current_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_i32])"
   \<comment> \<open>\<open>Grow_memory\<close>\<close>
-| grow_memory:"(memory \<C>) = True \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_i32] _> [T_i32])"
+| grow_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_i32] _> [T_i32])"
   \<comment> \<open>\<open>empty program\<close>\<close>
 | empty:"\<C> \<turnstile> [] : ([] _> [])"
   \<comment> \<open>\<open>composition\<close>\<close>
@@ -64,20 +64,20 @@ definition "glob_agree g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_va
 
 definition "globi_agree gs n g = (n < length gs \<and> glob_agree (gs!n) g)"
 
-definition "tabi_agree ts j is_t =
-  (case j of
-    Some i \<Rightarrow> i < length ts \<and> is_t = True
-  | None \<Rightarrow> is_t = False)"
+definition "tabi_agree ts n tab_t =
+  (n < length ts)"
 
-definition "memi_agree ms j is_t =
-  (case j of
-    Some i \<Rightarrow> i < length ms \<and> is_t = True
-  | None \<Rightarrow> is_t = False)"
+(*  \<and> (min tab_t) \<ge> (length (ts!n)) \<and> pred_option (\<lambda>max. (length (ts!n)) \<le> max) (max tab_t) *)
+
+definition "memi_agree ms n mem_t =
+  (n < length ms)"
+
+(*  \<and> (min mem_t) \<ge> (mem_length (ms!n)) \<and> pred_option (\<lambda>max. (mem_length (ms!n)) \<le> max) (max mem_t) *)
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
 inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
-  "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs; list_all2 (globi_agree (globs s)) gs tgs; tabi_agree (tab s) i is_t; memi_agree (mem s) j is_m\<rbrakk> \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tab = i, mem = j, globs = gs\<rparr> \<lparr>types_t = ts, func_t = tfs, global = tgs, table = is_t, memory = is_m, local = [], label = [], return = None\<rparr>"
+  "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs; list_all2 (globi_agree (globs s)) gs tgs; list_all2 (tabi_agree (tabs s)) tbs tabs_t; list_all2 (memi_agree (mems s)) ms mems_t\<rbrakk> \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr> \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
 
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
    "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := (local \<C>) @ t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
@@ -107,7 +107,7 @@ and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Righ
 definition "tab_agree s tcl = (case tcl of None \<Rightarrow> True | Some cl \<Rightarrow> \<exists>tf. cl_typing s cl tf)"
 
 inductive store_typing :: "s \<Rightarrow> bool" where
-  "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s); list_all (list_all (tab_agree s)) (tab s)\<rbrakk> \<Longrightarrow> store_typing s"
+  "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s); list_all (list_all (tab_agree s)) (tabs s)\<rbrakk> \<Longrightarrow> store_typing s"
 
 inductive config_typing :: "[inst, s, v list, e list, t list] \<Rightarrow> bool" ("\<turnstile>'_ _ _;_;_ : _" 60) where
   "\<lbrakk>store_typing s; s\<bullet>None \<tturnstile>_i vs;es : ts\<rbrakk> \<Longrightarrow> \<turnstile>_i s;vs;es : ts"
@@ -187,23 +187,23 @@ inductive reduce :: "[s, v list, e list, inst, s, v list, e list] \<Rightarrow> 
   \<comment> \<open>\<open>set_global\<close>\<close>
 | set_global:"supdate_glob s i j v = s' \<Longrightarrow> \<lparr>s;vs;[$(C v), $(Set_global j)]\<rparr> \<leadsto>_i \<lparr>s';vs;[]\<rparr>"
   \<comment> \<open>\<open>load\<close>\<close>
-| load_Some:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load m (nat_of_int k) off (t_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (wasm_deserialise bs t)]\<rparr>"
-| load_None:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load m (nat_of_int k) off (t_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
+| load_Some:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (wasm_deserialise bs t)]\<rparr>"
+| load_None:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
   \<comment> \<open>\<open>load packed\<close>\<close>
-| load_packed_Some:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (wasm_deserialise bs t)]\<rparr>"
-| load_packed_None:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
+| load_packed_Some:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (wasm_deserialise bs t)]\<rparr>"
+| load_packed_None:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
   \<comment> \<open>\<open>store\<close>\<close>
-| store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t None a off)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>;vs;[]\<rparr>"
-| store_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t None a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
+| store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t None a off)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;vs;[]\<rparr>"
+| store_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t None a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
   \<comment> \<open>\<open>store packed\<close>\<close> (* take only (tp_length tp) lower order bytes *)
-| store_packed_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>;vs;[]\<rparr>"
-| store_packed_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
+| store_packed_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;vs;[]\<rparr>"
+| store_packed_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = None\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]\<rparr> \<leadsto>_i \<lparr>s;vs;[Trap]\<rparr>"
   \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[ $(Current_memory)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
+| current_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[ $(Current_memory)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
+| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
-| grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (ConstInt32 int32_minus_one)]\<rparr>"
+| grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (ConstInt32 int32_minus_one)]\<rparr>"
   (* The bad ones. *)
   \<comment> \<open>\<open>inductive label reduction\<close>\<close>
 | label:"\<lbrakk>\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>; Lfilled k lholed es les; Lfilled k lholed es' les'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;les\<rparr> \<leadsto>_i \<lparr>s';vs';les'\<rparr>"

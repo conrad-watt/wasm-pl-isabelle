@@ -660,7 +660,7 @@ proof -
       using 22
       by auto
     moreover
-    have "(table \<C>) \<and> i < length (types_t \<C>)"
+    have "length (table \<C>) \<ge> 1  \<and> i < length (types_t \<C>)"
       using 22
       by (simp, meson)
     hence "\<C> \<turnstile> [Call_indirect i] : (tn''@[T_i32] _> tm'')"
@@ -760,7 +760,7 @@ proof -
       unfolding to_ct_list_def
       by auto
     moreover
-    have "(memory \<C>) \<and> load_store_t_bounds a (option_projl tp_sx) t"
+    have "length (memory \<C>) \<ge> 1  \<and> load_store_t_bounds a (option_projl tp_sx) t"
       using 28
       by (simp, meson)
     hence "\<C> \<turnstile> [Load t tp_sx a off] : ([T_i32] _> [t])"
@@ -776,7 +776,7 @@ proof -
       unfolding to_ct_list_def
       by auto
     moreover
-    have "(memory \<C>) \<and> load_store_t_bounds a tp t"
+    have "length (memory \<C>) \<ge> 1  \<and> load_store_t_bounds a tp t"
       using 29
       by (simp, meson)
     hence "\<C> \<turnstile> [Store t tp a off] : ([T_i32,t] _> [])"
@@ -791,7 +791,7 @@ proof -
     hence "type_update ts [] (Type [T_i32]) = tm'"
       by auto
     moreover
-    have "memory \<C>" 
+    have "length (memory \<C>) \<ge> 1 " 
       using 30
       by (simp, meson)
     hence "\<C> \<turnstile> [Current_memory] : ([] _> [T_i32])"
@@ -808,7 +808,7 @@ proof -
       unfolding to_ct_list_def
       by auto
     moreover
-    have "memory \<C>" 
+    have "length (memory \<C>) \<ge> 1 " 
       using 31
       by (simp, meson)
     hence "\<C> \<turnstile> [Grow_memory] : ([T_i32] _> [T_i32])"

@@ -325,7 +325,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
              (ConstInt32 k)#ves' \<Rightarrow>
                expect (smem_ind s i)
                   (\<lambda>j.
-                    expect (load ((mem s)!j) (nat_of_int k) off (t_length t))
+                    expect (load ((mems s)!j) (nat_of_int k) off (t_length t))
                       (\<lambda>bs. (s, vs, RSNormal (vs_to_es ((wasm_deserialise bs t)#ves'))))
                       (s, vs, RSNormal ((vs_to_es ves')@[Trap])))
                   (s, vs, crash_error)
@@ -336,7 +336,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
              (ConstInt32 k)#ves' \<Rightarrow>
                expect (smem_ind s i)
                   (\<lambda>j.
-                    expect (load_packed sx ((mem s)!j) (nat_of_int k) off (tp_length tp) (t_length t))
+                    expect (load_packed sx ((mems s)!j) (nat_of_int k) off (tp_length tp) (t_length t))
                       (\<lambda>bs. (s, vs, RSNormal (vs_to_es ((wasm_deserialise bs t)#ves'))))
                       (s, vs, RSNormal ((vs_to_es ves')@[Trap])))
                   (s, vs, crash_error)
@@ -349,8 +349,8 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
                  then
                    expect (smem_ind s i)
                       (\<lambda>j.
-                         expect (store ((mem s)!j) (nat_of_int k) off (bits v) (t_length t))
-                           (\<lambda>mem'. (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ves')))
+                         expect (store ((mems s)!j) (nat_of_int k) off (bits v) (t_length t))
+                           (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ves')))
                            (s, vs, RSNormal ((vs_to_es ves')@[Trap])))
                       (s, vs, crash_error)
                  else
@@ -364,8 +364,8 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
                       then
                         expect (smem_ind s i)
                            (\<lambda>j.
-                              expect (store_packed ((mem s)!j) (nat_of_int k) off (bits v) (tp_length tp))
-                                (\<lambda>mem'. (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ves')))
+                              expect (store_packed ((mems s)!j) (nat_of_int k) off (bits v) (tp_length tp))
+                                (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ves')))
                                 (s, vs, RSNormal ((vs_to_es ves')@[Trap])))
                            (s, vs, crash_error)
                       else
@@ -374,7 +374,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
       \<comment> \<open>\<open>CURRENT_MEMORY\<close>\<close>
       | $Current_memory \<Rightarrow>
           expect (smem_ind s i)
-            (\<lambda>j. (s, vs, RSNormal (vs_to_es ((ConstInt32 (int_of_nat (mem_size ((s.mem s)!j))))#ves))))
+            (\<lambda>j. (s, vs, RSNormal (vs_to_es ((ConstInt32 (int_of_nat (mem_size ((s.mems s)!j))))#ves))))
             (s, vs, crash_error)
       \<comment> \<open>\<open>GROW_MEMORY\<close>\<close>
       | $Grow_memory \<Rightarrow>
@@ -382,9 +382,9 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
              (ConstInt32 c)#ves' \<Rightarrow>
                 expect (smem_ind s i)
                   (\<lambda>j.
-                     let l = (mem_size ((s.mem s)!j)) in
-                     (expect (mem_grow_impl ((mem s)!j) (nat_of_int c))
-                        (\<lambda>mem'. (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ((ConstInt32 (int_of_nat l))#ves'))))
+                     let l = (mem_size ((s.mems s)!j)) in
+                     (expect (mem_grow_impl ((mems s)!j) (nat_of_int c))
+                        (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ((ConstInt32 (int_of_nat l))#ves'))))
                         (s, vs, RSNormal (vs_to_es ((ConstInt32 int32_minus_one)#ves')))))
                   (s, vs, crash_error)
            | _ \<Rightarrow> (s, vs, crash_error))

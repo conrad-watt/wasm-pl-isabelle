@@ -312,13 +312,13 @@ definition sglob_val :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v"
   "sglob_val s i j = g_val (sglob s i j)"
 
 definition smem_ind :: "s \<Rightarrow> inst \<Rightarrow> nat option" where
-  "smem_ind s i = (inst.mem i)"
+  "smem_ind s i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
 definition stab_s :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab_s s i j = (let stabinst = ((tab s)!i) in  (if (length (stabinst) > j) then (stabinst!j) else None))"
+  "stab_s s i j = (let stabinst = ((tabs s)!i) in  (if (length (stabinst) > j) then (stabinst!j) else None))"
 
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab s i j = (case (inst.tab i) of Some k => stab_s s k j | None => None)"
+  "stab s i j = (case (inst.tabs i) of (k#_) => stab_s s k j | [] => None)"
 
 definition supdate_glob_s :: "s \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
   "supdate_glob_s s k v = s\<lparr>globs := (globs s)[k:=((globs s)!k)\<lparr>g_val := v\<rparr>]\<rparr>"
@@ -340,8 +340,8 @@ definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" 
 
 inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
 "\<lbrakk>fs = fs'; tclss = tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'\<rbrakk> \<Longrightarrow>
-  store_extension \<lparr>s.funcs = fs, s.tab = tclss, s.mem = bss, s.globs = gs\<rparr>
-                    \<lparr>s.funcs = fs', s.tab = tclss', s.mem = bss', s.globs = gs'\<rparr>"
+  store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs\<rparr>
+                    \<lparr>s.funcs = fs', s.tabs = tclss', s.mems = bss', s.globs = gs'\<rparr>"
 
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
@@ -465,17 +465,17 @@ lemma int_float_disjoint: "is_int_t t = -(is_float_t t)"
 
 lemma stab_unfold:
   assumes "stab s i j = Some cl"
-  shows "\<exists>k. inst.tab i = Some k \<and> length ((tab s)!k) > j \<and>((tab s)!k)!j = Some cl"
+  shows "\<exists>k ks. inst.tabs i = k#ks \<and> length ((tabs s)!k) > j \<and>((tabs s)!k)!j = Some cl"
 proof -
-  obtain k where have_k:"(inst.tab i) = Some k"
+  obtain k ks where have_k:"(inst.tabs i) = k#ks"
     using assms
     unfolding stab_def
-    by fastforce
+    by (fastforce split: list.splits)
   hence s_o:"stab s i j = stab_s s k j"
     using assms
     unfolding stab_def
     by simp
-  then obtain stabinst where stabinst_def:"stabinst = ((tab s)!k)"
+  then obtain stabinst where stabinst_def:"stabinst = ((tabs s)!k)"
     by blast
   hence "stab_s s k j = (stabinst!j) \<and> (length stabinst > j)"
     using assms s_o

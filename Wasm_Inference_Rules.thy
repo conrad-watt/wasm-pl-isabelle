@@ -46,7 +46,7 @@ lemma var_st_eq_intro2:
   assumes "reifies_glob (s.globs s) (inst.globs i) var_st"
           "reifies_loc vs var_st"
           "snd (snd var_st) = lvar_st"
-          "reifies_glob (s.globs (s\<lparr>s.mem := mem'\<rparr>)) (inst.globs i) var_st'"
+          "reifies_glob (s.globs (s\<lparr>s.mems := mem'\<rparr>)) (inst.globs i) var_st'"
           "reifies_loc vs var_st'"
           "snd (snd var_st') = lvar_st"
   shows "var_st = var_st'"
@@ -1425,14 +1425,14 @@ lemma lvar32_zero_pages_from_lvar_len_reifies:
           "heap_disj h hf"
           "reifies_s s i (heap_merge h hf) st (fst \<Gamma>)"
           "smem_ind s i = Some j"
-          "((mem s)!j) = m"
+          "((mems s)!j) = m"
           "mem_size m = n"
           "mem_grow m (nat_of_int c) = mem'"
           "lv_arb \<noteq> lv"
           "lv_arb \<noteq> lv_l"
   shows "\<exists>h'. ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))) [ConstInt32 (int_of_nat n)] h' st
               \<and> heap_disj h' hf
-              \<and> reifies_s (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>) i (heap_merge h' hf) st (fst \<Gamma>)"
+              \<and> reifies_s (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>) i (heap_merge h' hf) st (fst \<Gamma>)"
 proof -
   have 0:"\<exists>n'. var_st_get_lvar st lv_l = Some (V_n n') \<and> h = (Map.empty, Some n')"
          "var_st_get_lvar st lv = Some (V_p (ConstInt32 c))"
@@ -1447,7 +1447,7 @@ proof -
     unfolding smem_ind_def reifies_s_def reifies_heap_def
     by (auto simp add: Option.is_none_def option_disj_def reifies_heap_length_def Ki64_def
                        reifies_heap_contents_def heap_merge_def heap_disj_def mem_size_def
-             split: prod.splits if_splits)
+             split: prod.splits if_splits list.splits)
   obtain h' where h'_def:"lvar32_zero_pages_from_lvar_len lv lv_l h' st"
     using 0 1
     unfolding lvar32_zero_pages_from_lvar_len_def
@@ -1476,17 +1476,16 @@ proof -
   hence "ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))) [ConstInt32 (int_of_nat n)] h' st"
     by fastforce
   moreover
-  have "reifies_heap_contents (mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)) (fst (heap_merge h' hf))"
+  have "reifies_heap_contents (mem_grow (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c)) (fst (heap_merge h' hf))"
        "reifies_heap_length (mem_grow m (Wasm_Base_Defs.nat_of_int c)) (snd (heap_merge h' hf))"
-    using make_pages_reifies[OF 2(3) 1(4,2,5) _ 3]
-    by (metis 1(1) assms(3,4,5) option.sel reifies_heap_def reifies_s_def smem_ind_def)+
+    using make_pages_reifies[OF 2(3) 1(4,2,5) _ 3] 1(1) assms(3,4,5)
+    unfolding reifies_heap_def reifies_s_def smem_ind_def
+    by (fastforce split: list.splits)+
   ultimately
   show ?thesis
-    using 3 assms(3)
-    unfolding reifies_s_def
-    apply simp
-    apply (metis assms(4,5,7) length_list_update nth_list_update_eq option.sel prod.exhaust_sel
-                 reifies_heap_def smem_ind_def)
+    using 3 assms(3,4,5,7)
+    unfolding reifies_s_def reifies_heap_def smem_ind_def
+    apply (fastforce split: list.splits)
     done
 qed
 
@@ -1765,7 +1764,7 @@ proof -
        "reifies_loc locs st"
        "snd (snd st) = lvar_st"
        "heap_disj (heap_merge h_H h_Hf) hf"
-       "reifies_heap (s.mem s) (inst.mem i) (heap_merge (heap_merge h_H h_Hf) hf)"
+       "reifies_heap (s.mems s) (inst.mems i) (heap_merge (heap_merge h_H h_Hf) hf)"
     using assms(2)
     unfolding ass_wf_def reifies_s_def
     by auto
@@ -2055,7 +2054,7 @@ proof -
        "reifies_loc locs st"
        "snd (snd st) = lvar_st"
        "heap_disj (heap_merge h_H h_Hf) hf"
-       "reifies_heap (s.mem s) (inst.mem i) (heap_merge (heap_merge h_H h_Hf) hf)"
+       "reifies_heap (s.mems s) (inst.mems i) (heap_merge (heap_merge h_H h_Hf) hf)"
     using assms(2)
     unfolding ass_wf_def reifies_s_def
     by auto
@@ -3534,7 +3533,7 @@ case (Load \<Gamma> assms lv lvs t off a)
       by auto
     obtain j m where  2:"s = s'" "locs = locs'"
                          "smem_ind s i = Some j"
-                         "s.mem s ! j = m"
+                         "s.mems s ! j = m"
                        "(\<exists>bs. load m (Wasm_Base_Defs.nat_of_int c)
                               off (t_length t) =
                              Some bs \<and>
@@ -3564,7 +3563,7 @@ case (Load \<Gamma> assms lv lvs t off a)
     have 6:"load m (Wasm_Base_Defs.nat_of_int c) off (t_length t) = Some bs"
       using 2(1,2,3,4) make_bs_t_reifies[OF 5(1) 5(2) ass_is(2) _ _ 6] ass_is(3)
       unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
-      by simp
+      by (simp split: list.splits)
     hence 3:"res = RValue (vcsf @ [wasm_deserialise bs t])"
       using 2(5)
       by fastforce
@@ -3613,7 +3612,7 @@ next
       by auto
     obtain j m where  2:"s = s'" "locs = locs'"
                          "smem_ind s i = Some j"
-                         "s.mem s ! j = m"
+                         "s.mems s ! j = m"
                        "((\<exists>bs. load m (Wasm_Base_Defs.nat_of_int c)
                                 off (tp_length tp) =
                                Some bs \<and>
@@ -3646,7 +3645,7 @@ next
     have 6:"load m (Wasm_Base_Defs.nat_of_int c) off (tp_length tp) = Some bs"
       using 2(1,2,3,4) make_bs_t_reifies[OF 5(1) 5(2) ass_is(2) _ _ 6] ass_is(3)
       unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
-      by simp
+      by (simp split: list.splits)
     hence 3:"res = RValue  (vcsf @ [wasm_deserialise (sign_extend sx (t_length t) bs) t])"
       using 2(5)
       by fastforce
@@ -3695,16 +3694,16 @@ next
     obtain j m where  2:"locs = locs'"
                         "types_agree t v"
                         "smem_ind s i = Some j"
-                        "s.mem s ! j = m"
+                        "s.mems s ! j = m"
                                  "(s = s' \<and>
-                                  store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and>
+                                  store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and>
                                   res = RTrap \<or>
                                   (\<exists>mem'.
-                                      store (s.mem s ! j)
+                                      store (s.mems s ! j)
                                        (Wasm_Base_Defs.nat_of_int c) off
                                        (bits v) (t_length t) =
                                       Some mem' \<and>
-                                      s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and>
+                                      s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and>
                                       res = RValue vcsf))"
       using reduce_to_n_store[OF 1]
       by blast
@@ -3727,11 +3726,11 @@ next
                       
       by blast
     have 7:"mem_length m \<ge> ((Wasm_Base_Defs.nat_of_int c) + off) + (t_length t)"
-      using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is
-      unfolding reifies_s_def reifies_heap_def
-      by (metis 2(3,4) option.sel smem_ind_def)
-    have res_is:"store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some m'"
-         "s' = s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>"
+      using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is 2(3,4)
+      unfolding reifies_s_def reifies_heap_def smem_ind_def
+      by (fastforce split: list.splits)
+    have res_is:"store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some m'"
+         "s' = s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>"
          "res = RValue vcsf"
       using 2(4,5) 7 m'_def(1)
       unfolding store_def
@@ -3741,14 +3740,14 @@ next
          "reifies_heap_length m' (snd (heap_merge h' hf))"
       using make_bs_t_store_reifies[OF bs_is(1,2) ass_is(2) _ _ 7 m'_def(1,2)] ass_is(3) 2(2,3,4)
       unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
-      by simp_all
+      by (simp_all split: list.splits)
     have ass_sat_is:"ass_sat ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (t_length t) lv32 off) [] h' st"
       using vcs_is(2,3) ass_is(7) m'_def(2)
       by (simp add: bytes_takefill_def stack_ass_sat_def is_n_locs_from_lvar32_off_lvar_def is_n_locs_from_lvar32_off_def var_st_get_lvar_def split: prod.splits)
     have reifies_s_is:"reifies_s s' i (heap_merge h' hf) st fs"
       using ass_is(3) res_is(1,2) 2(3,4) local_assms(1) h'_is
       unfolding reifies_s_def
-      by (auto simp add: reifies_heap_def Let_def smem_ind_def)
+      by (auto simp add: reifies_heap_def Let_def smem_ind_def split: list.splits)
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (t_length t) lv32 off)"
       using 2(1) local_assms(1) res_is res_wf_intro_value[OF ass_sat_is _ h'_is(1) _ reifies_s_is ass_is(4,7)]
       by simp
@@ -3787,16 +3786,16 @@ next
     obtain j m where  2:"locs = locs'"
                         "types_agree t v"
                         "smem_ind s i = Some j"
-                        "s.mem s ! j = m"
+                        "s.mems s ! j = m"
                                  "(s = s' \<and>
-                                  store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and>
+                                  store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and>
                                   res = RTrap \<or>
                                   (\<exists>mem'.
-                                      store (s.mem s ! j)
+                                      store (s.mems s ! j)
                                        (Wasm_Base_Defs.nat_of_int c) off
                                        (bits v) (tp_length tp) =
                                       Some mem' \<and>
-                                      s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and>
+                                      s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and>
                                       res = RValue vcsf))"
       using reduce_to_n_store_packed[OF 1]
       by blast
@@ -3819,11 +3818,11 @@ next
                       
       by blast
     have 7:"mem_length m \<ge> ((Wasm_Base_Defs.nat_of_int c) + off) + (tp_length tp)"
-      using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is
-      unfolding reifies_s_def reifies_heap_def
-      by (metis 2(3,4) option.sel smem_ind_def)
-    have res_is:"store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some m'"
-         "s' = s\<lparr>s.mem := (s.mem s)[j := m']\<rparr>"
+      using make_bs_t_length[OF bs_is(1,2) _ 6] ass_is(1,3) ass_is 2(3,4)
+      unfolding reifies_s_def reifies_heap_def smem_ind_def
+      by (fastforce split: list.splits)
+    have res_is:"store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some m'"
+         "s' = s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>"
          "res = RValue vcsf"
       using 2(4,5) 7 m'_def(1)
       unfolding store_def
@@ -3833,14 +3832,14 @@ next
          "reifies_heap_length m' (snd (heap_merge h' hf))"
       using make_bs_t_store_reifies[OF bs_is(1,2) ass_is(2) _ _ 7 m'_def(1,2)] ass_is(3) 2(2,3,4)
       unfolding reifies_s_def reifies_heap_def Let_def smem_ind_def
-      by simp_all
+      by (simp_all split: list.splits)
     have ass_sat_is:"ass_sat ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (tp_length tp) lv32 off) [] h' st"
       using vcs_is(2,3) ass_is(7) m'_def(2)
       by (simp add: bytes_takefill_def stack_ass_sat_def is_n_locs_from_lvar32_off_lvar_def is_n_locs_from_lvar32_off_def var_st_get_lvar_def split: prod.splits)
     have reifies_s_is:"reifies_s s' i (heap_merge h' hf) st fs"
       using ass_is(3) res_is(1,2) 2(3,4) local_assms(1) h'_is
       unfolding reifies_s_def
-      by (auto simp add: reifies_heap_def Let_def smem_ind_def)
+      by (auto simp add: reifies_heap_def Let_def smem_ind_def split: list.splits)
     have "res_wf lvar_st \<Gamma> res locs' s' hf vcsf ([] \<^sub>s|\<^sub>h is_n_locs_from_lvar32_off_lvar lv (tp_length tp) lv32 off)"
       using 2(1) local_assms(1) res_is res_wf_intro_value[OF ass_sat_is _ h'_is(1) _ reifies_s_is ass_is(4,7)]
       by simp
@@ -4126,7 +4125,7 @@ next
                        "locs = locs'"
                        "res =  RValue ((vcsf@vcs) @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)])"
                        "smem_ind s i = Some j"
-                       "s.mem s ! j = m \<and> mem_size m = n"
+                       "s.mems s ! j = m \<and> mem_size m = n"
       using reduce_to_n_current_memory local_assms(4)
       by (metis append_assoc map_append)
     have ass_is:"ass_sat ([] \<^sub>s|\<^sub>h is_lvar_len lv_l) vcs h st"
@@ -4146,7 +4145,7 @@ next
       using ass_is(1,3) s_is(4,5)
       by (auto simp add: stack_ass_sat_def is_lvar_len_def pred_option_Some_def reifies_s_def Ki64_def
                          reifies_heap_def reifies_heap_length_def heap_merge_def smem_ind_def mem_size_def
-               split: prod.splits if_splits)
+               split: prod.splits if_splits list.splits)
     hence "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h is_lvar_len lv_l) [ConstInt32 (Wasm_Base_Defs.int_of_nat n)] h st"
       using ass_is(1)
       by (auto simp add: stack_ass_sat_def is_lvar_len_def is_i32_of_lvar_def pred_option_Some_def)
@@ -4199,11 +4198,11 @@ next
         by simp_all
     consider
       (1) "\<exists>n j m.
-           (locs = locs' \<and> smem_ind s i = Some j \<and> s.mem s ! j = m \<and> mem_size m = n) \<and>
+           (locs = locs' \<and> smem_ind s i = Some j \<and> s.mems s ! j = m \<and> mem_size m = n) \<and>
            (s = s' \<and> res = RValue (vcsf @ [ConstInt32 int32_minus_one]))"
     | (2) "\<exists>n j m.
-           (locs = locs' \<and> smem_ind s i = Some j \<and> s.mem s ! j = m \<and> mem_size m = n) \<and>
-           (s' = s\<lparr>s.mem := (s.mem s)[j := mem_grow (s.mem s ! j)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr> \<and>
+           (locs = locs' \<and> smem_ind s i = Some j \<and> s.mems s ! j = m \<and> mem_size m = n) \<and>
+           (s' = s\<lparr>s.mems := (s.mems s)[j := mem_grow (s.mems s ! j)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr> \<and>
             res = RValue (vcsf @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)]))"
       using reduce_to_n_grow_memory[OF 0]
       by fastforce
@@ -4212,7 +4211,7 @@ next
       case 1
       then obtain j_m n_m m_m where mes_iss:"locs = locs'"
                                             "smem_ind s i = Some j_m"
-                                            "s.mem s ! j_m = m_m \<and> mem_size m_m = n_m"
+                                            "s.mems s ! j_m = m_m \<and> mem_size m_m = n_m"
                                             "s = s'"
                                             "res = RValue (vcsf @ [ConstInt32 int32_minus_one])"
         by blast
@@ -4239,9 +4238,9 @@ next
       case 2
       then obtain j_m n_m m_m where mem_iss:"locs = locs'"
                                             "smem_ind s i = Some j_m"
-                                            "s.mem s ! j_m = m_m"
+                                            "s.mems s ! j_m = m_m"
                                             "mem_size m_m = n_m"
-                                            "s' = s\<lparr>s.mem := (s.mem s)[j_m := mem_grow (s.mem s ! j_m)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr>"
+                                            "s' = s\<lparr>s.mems := (s.mems s)[j_m := mem_grow (s.mems s ! j_m)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr>"
                                             "res = RValue (vcsf @ [ConstInt32 (int_of_nat n_m)])"
         by fastforce
       have "\<exists>h''.

@@ -81,13 +81,23 @@ record tg = \<comment> \<open>global types\<close>
 datatype \<comment> \<open>function types\<close>
   tf = Tf "t list" "t list" ("_ '_> _" 60)
 
+record limit_t =
+  l_min :: nat
+  l_max :: "nat option"
+
+type_synonym tab_t = \<comment> \<open>table type\<close>
+  "limit_t"
+
+type_synonym mem_t = \<comment> \<open>memory type\<close>
+  "limit_t"
+
 (* TYPING *)
 record t_context =
   types_t :: "tf list"
   func_t :: "tf list"
   global :: "tg list"
-  table :: bool
-  memory :: bool
+  table :: "tab_t list"
+  memory :: "mem_t list"
   local :: "t list"
   label :: "(t list) list"
   return :: "(t list) option"
@@ -170,8 +180,8 @@ datatype \<comment> \<open>basic instructions\<close>
 record inst = \<comment> \<open>instances\<close>
   types :: "tf list"
   funcs :: "i list"
-  tab :: "i option"
-  mem :: "i option"
+  tabs :: "i list"
+  mems :: "i list"
   globs :: "i list"
 
 datatype cl = \<comment> \<open>function closures\<close>
@@ -186,8 +196,8 @@ record global =
 
 record s = \<comment> \<open>store\<close>
   funcs :: "cl list"
-  tab :: "tabinst list"
-  mem :: "mem list"
+  tabs :: "tabinst list"
+  mems :: "mem list"
   globs :: "global list"
 
 datatype e = \<comment> \<open>administrative instruction\<close>

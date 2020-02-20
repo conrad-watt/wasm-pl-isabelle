@@ -60,23 +60,23 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
   \<comment> \<open>\<open>set_global\<close>\<close>
 | set_global:"supdate_glob s i j v = s' \<Longrightarrow> (s,vs,[$(C v), $(Set_global j)]) \<Down>{(ls,r,i)} (s',vs,RValue [])"
   \<comment> \<open>\<open>load\<close>\<close>
-| load_Some:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load m (nat_of_int k) off (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t None a off)]) \<Down>{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
-| load_None:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load m (nat_of_int k) off (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t None a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
+| load_Some:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t None a off)]) \<Down>{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
+| load_None:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t None a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>load packed\<close>\<close>
-| load_packed_Some:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]) \<Down>{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
-| load_packed_None:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
+| load_packed_Some:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]) \<Down>{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
+| load_packed_None:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_length tp) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>store\<close>\<close>
-| store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t None a off)]) \<Down>{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs,RValue [])"
-| store_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t None a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
+| store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t None a off)]) \<Down>{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs,RValue [])"
+| store_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits v) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t None a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>store packed\<close>\<close> (* take only (tp_length tp) lower order bytes *)
-| store_packed_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]) \<Down>{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs,RValue [])"
-| store_packed_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
+| store_packed_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]) \<Down>{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs,RValue [])"
+| store_packed_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits v) (tp_length tp) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 k), $C v, $(Store t (Some tp) a off)]) \<Down>{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[ $(Current_memory)]) \<Down>{(ls,r,i)} (s,vs,RValue [(ConstInt32 (int_of_nat n))])"
+| current_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[ $(Current_memory)]) \<Down>{(ls,r,i)} (s,vs,RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
+| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
-| grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
+| grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>const_list ves; (s,vs,ves@[Invoke (sfunc s i j)]) \<Down>{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$(Call j)]) \<Down>{(ls,r,i)} (s',vs',res)"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
@@ -160,23 +160,23 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
   \<comment> \<open>\<open>set_global\<close>\<close>
 | set_global:"supdate_glob s i j v = s' \<Longrightarrow> (s,vs,[$(C v), $(Set_global j)]) \<Down>k{(ls,r,i)} (s',vs,RValue [])"
   \<comment> \<open>\<open>load\<close>\<close>
-| load_Some:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load m (nat_of_int n) off (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t None a off)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
-| load_None:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load m (nat_of_int n) off (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t None a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
+| load_Some:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load m (nat_of_int n) off (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t None a off)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
+| load_None:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load m (nat_of_int n) off (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t None a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>load packed\<close>\<close>
-| load_packed_Some:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load_packed sx m (nat_of_int n) off (tp_length tp) (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
-| load_packed_None:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; load_packed sx m (nat_of_int n) off (tp_length tp) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
+| load_packed_Some:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int n) off (tp_length tp) (t_length t) = Some bs\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(wasm_deserialise bs t)])"
+| load_packed_None:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int n) off (tp_length tp) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>store\<close>\<close>
-| store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs,RValue [])"
-| store_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
+| store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs,RValue [])"
+| store_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>store packed\<close>\<close> (* take only (tp_length tp) lower order bytes *)
-| store_packed_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store_packed m (nat_of_int n) off (bits v) (tp_length tp) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t (Some tp) a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs,RValue [])"
-| store_packed_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store_packed m (nat_of_int n) off (bits v) (tp_length tp) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t (Some tp) a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
+| store_packed_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store_packed m (nat_of_int n) off (bits v) (tp_length tp) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t (Some tp) a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs,RValue [])"
+| store_packed_None:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store_packed m (nat_of_int n) off (bits v) (tp_length tp) = None\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t (Some tp) a off)]) \<Down>k{(ls,r,i)} (s,vs,RTrap)"
   \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[ $(Current_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 (int_of_nat n))])"
+| current_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[ $(Current_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>k{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
+| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
-| grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mem s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
+| grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>const_list ves; (s,vs,ves@[Invoke (sfunc s i j)]) \<Down>k{(ls,r,i)} (s',vs',res)\<rbrakk> \<Longrightarrow> (s,vs,ves@[$(Call j)]) \<Down>(Suc k){(ls,r,i)} (s',vs',res)"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
@@ -473,7 +473,7 @@ qed (fastforce intro: reduce_to_n.intros)+
 
 lemma reduce_to_n_current_memory:
   assumes "((s,vs,($$*ves)@[$Current_memory]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "\<exists>n j m. s = s' \<and> vs = vs' \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)]) \<and> smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> mem_size m = n"
+  shows "\<exists>n j m. s = s' \<and> vs = vs' \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)]) \<and> smem_ind s i = Some j \<and> ((mems s)!j) = m \<and> mem_size m = n"
   using assms
 proof (induction "(s,vs,($$*ves)@[$Current_memory])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs s' vs' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
@@ -857,7 +857,7 @@ qed auto
 
 lemma reduce_to_n_load:
   assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $Load t None a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (t_length t) = Some bs \<and> res = RValue (ves@[(wasm_deserialise bs t)])) \<or> (load m (nat_of_int c) off (t_length t) = None \<and> res = RTrap)))"
+  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mems s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (t_length t) = Some bs \<and> res = RValue (ves@[(wasm_deserialise bs t)])) \<or> (load m (nat_of_int c) off (t_length t) = None \<and> res = RTrap)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Load t None a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -901,7 +901,7 @@ qed auto
 (*   "load_packed sx m n off lp l = map_option (sign_extend sx l) (load m n off lp)" *)
 lemma reduce_to_n_load_packed:
   assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (tp_length tp) = Some bs \<and> res = RValue (ves@[(wasm_deserialise (sign_extend sx (t_length t) bs) t)])) \<or> (load m (nat_of_int c) off (tp_length tp) = None \<and> res = RTrap)))"
+  shows "s = s' \<and> vs = vs' \<and> (\<exists>j m. smem_ind s i = Some j \<and> ((mems s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (tp_length tp) = Some bs \<and> res = RValue (ves@[(wasm_deserialise (sign_extend sx (t_length t) bs) t)])) \<or> (load m (nat_of_int c) off (tp_length tp) = None \<and> res = RTrap)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -941,13 +941,13 @@ next
     using consts_app_snoc_1_const_list[OF seq_nonvalue2(5)] seq_nonvalue2(4)
     by (simp add: is_const_def)
 qed (auto simp add: load_packed_def)
-(* | store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mem s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mem:= ((mem s)[j := mem'])\<rparr>,vs,RValue [])"
+(* | store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs,RValue [])"
 *)
 lemma reduce_to_n_store:
   assumes "((s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mem s ! j = m \<and>
-           ((s = s' \<and> store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and> res = RTrap) \<or>
-            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some mem' \<and> s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and> res = RValue ves)))"
+  shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mems s ! j = m \<and>
+           ((s = s' \<and> store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and> res = RTrap) \<or>
+            (\<exists>mem'. store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some mem' \<and> s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and> res = RValue ves)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -997,9 +997,9 @@ qed auto
 
 lemma reduce_to_n_store_packed:
   assumes "((s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mem s ! j = m \<and>
-           ((s = s' \<and> store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and> res = RTrap) \<or>
-            (\<exists>mem'. store (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some mem' \<and> s' = s\<lparr>s.mem := (s.mem s)[j := mem']\<rparr> \<and> res = RValue ves)))"
+  shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s i = Some j \<and> s.mems s ! j = m \<and>
+           ((s = s' \<and> store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and> res = RTrap) \<or>
+            (\<exists>mem'. store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some mem' \<and> s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and> res = RValue ves)))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
@@ -1484,7 +1484,7 @@ lemma no_reduce_to_n_grow_memory:
 
 lemma reduce_to_n_grow_memory:
   assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "\<exists>n j m. (vs = vs' \<and> smem_ind s i = Some j \<and> ((mem s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (s' = s \<lparr>s.mem := (s.mem s)[j := mem_grow (s.mem s ! j) (Wasm_Base_Defs.nat_of_int c)]\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
+  shows "\<exists>n j m. (vs = vs' \<and> smem_ind s i = Some j \<and> ((mems s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (s' = s \<lparr>s.mems := (s.mems s)[j := mem_grow (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c)]\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k vs' res ves ves')
