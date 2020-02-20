@@ -1148,13 +1148,14 @@ lemma make_pages_reifies:
           "mem_length m = n * Ki64"
           "reifies_heap_contents m (fst (heap_merge (Map.empty, Some n) hf))"
           "heap_disj h hf"
-  shows "reifies_heap_contents (mem_grow m c) (fst (heap_merge h hf))"
-        "reifies_heap_length (mem_grow m c) (snd (heap_merge h hf))"
+          "(mem_grow m c) = Some m'"
+  shows "reifies_heap_contents m' (fst (heap_merge h hf))"
+        "reifies_heap_length m' (snd (heap_merge h hf))"
 proof -
-  have 0:"mem_length (mem_grow m c) = (n+c) * Ki64"
-    using assms(4) mem_grow_length
+  have 0:"mem_length m' = (n+c) * Ki64"
+    using assms(4,7) mem_grow_length
     by (metis distrib_right)
-  hence 1:"\<forall>ind\<in>dom (fst (heap_merge h hf)). ind < mem_length (mem_grow m c)"
+  hence 1:"\<forall>ind\<in>dom (fst (heap_merge h hf)). ind < mem_length m'"
     using assms(1,2,4) make_pages_dom_ran[of _ n "n+c"]
     unfolding heap_merge_def
     apply (simp split: prod.splits)
@@ -1168,12 +1169,12 @@ proof -
     by (auto split: prod.splits)
   have "\<forall>ind\<in>dom (fst (heap_merge h hf)).
          fst (heap_merge h hf) ind =
-         Some (byte_at (mem_grow m c) ind)"
+         Some (byte_at m' ind)"
   proof -
     {
       fix ind
       assume local_assms:"ind\<in>dom (fst (heap_merge h hf))"
-      have "fst (heap_merge h hf) ind = Some (byte_at (mem_grow m c) ind)"
+      have "fst (heap_merge h hf) ind = Some (byte_at m' ind)"
       proof (cases "mem_length m > ind")
         case True
         hence"ind\<in>dom (fst hf)"
@@ -1182,14 +1183,14 @@ proof -
           unfolding reifies_heap_contents_def heap_merge_def
           by (auto split: prod.splits)
         thus ?thesis
-          using True assms(5,6)
+          using True assms(5,6,7) mem_grow_byte_at_m
           unfolding heap_disj_def map_disj_def disjnt_def reifies_heap_contents_def
-          by (auto simp add: True mem_grow_byte_at_m heap_merge_def split: prod.splits)
+          by (auto simp add: heap_merge_def split: prod.splits)
       next
         case False
-        hence f1:"byte_at (mem_grow m c) ind = 0"
-          using mem_grow_byte_at_m_n 1 local_assms
-          by auto
+        hence f1:"byte_at m' ind = 0"
+          using mem_grow_byte_at_m_n 1 local_assms assms(7) not_less
+          by blast
         have "ind\<in>dom (fst h)"
              "\<forall>n \<in> ran (fst h). n = (0::byte)"
           using local_assms heap_merge_dom[OF local_assms] False
@@ -1208,11 +1209,11 @@ proof -
     thus ?thesis
       by blast
   qed
-  thus "reifies_heap_contents (mem_grow m c) (fst (heap_merge h hf))"
+  thus "reifies_heap_contents m' (fst (heap_merge h hf))"
     using 1
     unfolding reifies_heap_contents_def
     by blast
-  show "reifies_heap_length (mem_grow m c) (snd (heap_merge h hf))"
+  show "reifies_heap_length m'(snd (heap_merge h hf))"
     unfolding reifies_heap_length_def
     by (simp add: 0 2)
 qed
@@ -1264,17 +1265,17 @@ proof -
     hence "(fst (heap_merge h hf)) (i + k + off) = Some (bs ! i)"
       using assms(3) h_raw_def
       by (simp add: assms(1) heap_disj_merge_maps2 heap_disj_sym heap_merge_disj_sym)
-    hence "Rep_mem m ! (k + off + i) = bs ! i"
+    hence "fst (Rep_mem m) ! (k + off + i) = bs ! i"
       using assms(2,4)
       unfolding reifies_heap_contents_def byte_at_def
-      apply simp
+      apply (simp split:prod.splits)
       apply (metis (no_types, hide_lams) add.commute add.left_commute domIff option.distinct(1) option.sel)
       done
   }
   hence "(map (byte_at m) [(k+off)..<(k+off) + n]) = bs"
     using assms(2,4) make_bs_t_dom_ran[OF h_raw_def assms(2)]
     unfolding list_eq_iff_nth_eq reifies_heap_contents_def byte_at_def
-    by simp
+    by (simp split:prod.splits)
   thus ?thesis
     using 1 2
     unfolding load_def read_bytes_def
@@ -1292,18 +1293,18 @@ proof -
     unfolding store_def
     by simp
   {
-    assume "\<not> j - min (length (Rep_mem m)) k < l"
-    assume a1: "j < length (Rep_mem m)"
+    assume "\<not> j - min (length (fst (Rep_mem m))) k < l"
+    assume a1: "j < length (fst (Rep_mem m))"
     assume "k + l \<le> j"
-    then have "k \<le> length (Rep_mem m)"
+    then have "k \<le> length (fst (Rep_mem m))"
       using a1 by simp
-    then have "Rep_mem m ! (k + j - min (length (Rep_mem m)) k) = Rep_mem m ! j"
+    then have "fst (Rep_mem m) ! (k + j - min (length (fst (Rep_mem m))) k) = fst (Rep_mem m) ! j"
       by (metis (no_types) Nat.diff_diff_right add.left_neutral add_diff_cancel_left' rev_min_pm1 zero_diff)
   }
   thus ?thesis
     using assms
     unfolding write_bytes_def bytes_takefill_def byte_at_def mem_length_def
-    by (auto simp add: Abs_mem_inverse nth_append)
+    by (auto simp add: Abs_mem_inverse nth_append split: prod.splits)
 qed
 
 lemma write_bytes_byte_at_inside:
@@ -1312,14 +1313,14 @@ lemma write_bytes_byte_at_inside:
           "j \<ge> k \<and> j < k+l"
         shows "byte_at m' j = (bytes_takefill 0 l bs)!(j-k)"
 proof -
-  have 0:"min (length (Rep_mem m)) k = k"
+  have 0:"min (length (fst (Rep_mem m))) k = k"
     using assms(1)
     unfolding mem_length_def
-    by simp
+    by (simp split: prod.splits)
   show ?thesis
-    using assms
+    using assms 0
     unfolding mem_length_def write_bytes_def bytes_takefill_def byte_at_def
-    by (auto simp add: Abs_mem_inverse nth_append 0)
+    by (auto simp add: Abs_mem_inverse nth_append split: prod.splits)
 qed
 
 lemma make_bs_t_store_reifies:
@@ -1427,7 +1428,7 @@ lemma lvar32_zero_pages_from_lvar_len_reifies:
           "smem_ind s i = Some j"
           "((mems s)!j) = m"
           "mem_size m = n"
-          "mem_grow m (nat_of_int c) = mem'"
+          "mem_grow m (nat_of_int c) = Some mem'"
           "lv_arb \<noteq> lv"
           "lv_arb \<noteq> lv_l"
   shows "\<exists>h'. ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))) [ConstInt32 (int_of_nat n)] h' st
@@ -1463,7 +1464,7 @@ proof -
     unfolding Ki64_def lvar32_zero_pages_from_lvar_len_def mem_length_def heap_disj_def map_disj_def disjnt_def
     apply (simp add: option_disj_def Option.is_none_def)
     apply safe
-    apply (metis domIff not_less option.distinct(1))
+    apply (metis (no_types) domIff not_None_eq not_less)
     done
   have "ass_sat ([is_i32_of_lvar lv_l] \<^sub>s|\<^sub>h (lvar32_zero_pages_from_lvar_len lv lv_l)) [ConstInt32 (int_of_nat n)] h' st"
     using 2 h'_def 0 1
@@ -1476,9 +1477,9 @@ proof -
   hence "ass_sat (Ex_ass lv_arb ([is_lvar32 lv_arb] \<^sub>s|\<^sub>h (\<lambda>h v_st. ((lvar32_zero_pages_from_lvar_len lv lv_l \<^emph> lvar_is_i32_of_lvar lv_arb lv_l) h v_st) \<or> ((is_lvar32_minus_one lv_arb \<^emph> is_lvar_len lv_l) h v_st)))) [ConstInt32 (int_of_nat n)] h' st"
     by fastforce
   moreover
-  have "reifies_heap_contents (mem_grow (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c)) (fst (heap_merge h' hf))"
-       "reifies_heap_length (mem_grow m (Wasm_Base_Defs.nat_of_int c)) (snd (heap_merge h' hf))"
-    using make_pages_reifies[OF 2(3) 1(4,2,5) _ 3] 1(1) assms(3,4,5)
+  have "reifies_heap_contents mem' (fst (heap_merge h' hf))"
+       "reifies_heap_length mem' (snd (heap_merge h' hf))"
+    using make_pages_reifies[OF 2(3) 1(4,2,5) _ 3] 1(1) assms(3,4,5,7)
     unfolding reifies_heap_def reifies_s_def smem_ind_def
     by (fastforce split: list.splits)+
   ultimately
@@ -4200,9 +4201,10 @@ next
       (1) "\<exists>n j m.
            (locs = locs' \<and> smem_ind s i = Some j \<and> s.mems s ! j = m \<and> mem_size m = n) \<and>
            (s = s' \<and> res = RValue (vcsf @ [ConstInt32 int32_minus_one]))"
-    | (2) "\<exists>n j m.
+    | (2) "\<exists>n j m mem'.
            (locs = locs' \<and> smem_ind s i = Some j \<and> s.mems s ! j = m \<and> mem_size m = n) \<and>
-           (s' = s\<lparr>s.mems := (s.mems s)[j := mem_grow (s.mems s ! j)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr> \<and>
+           mem_grow (s.mems s ! j)(Wasm_Base_Defs.nat_of_int k_g) = Some mem' \<and>
+           (s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and>
             res = RValue (vcsf @ [ConstInt32 (Wasm_Base_Defs.int_of_nat n)]))"
       using reduce_to_n_grow_memory[OF 0]
       by fastforce
@@ -4236,12 +4238,13 @@ next
         done
     next
       case 2
-      then obtain j_m n_m m_m where mem_iss:"locs = locs'"
-                                            "smem_ind s i = Some j_m"
-                                            "s.mems s ! j_m = m_m"
-                                            "mem_size m_m = n_m"
-                                            "s' = s\<lparr>s.mems := (s.mems s)[j_m := mem_grow (s.mems s ! j_m)(Wasm_Base_Defs.nat_of_int k_g)]\<rparr>"
-                                            "res = RValue (vcsf @ [ConstInt32 (int_of_nat n_m)])"
+      then obtain j_m n_m m_m mem' where mem_iss:"locs = locs'"
+                                                 "smem_ind s i = Some j_m"
+                                                 "s.mems s ! j_m = m_m"
+                                                 "mem_size m_m = n_m"
+                                                 "mem_grow (s.mems s ! j_m)(Wasm_Base_Defs.nat_of_int k_g) = Some mem'"
+                                                 "s' = s\<lparr>s.mems := (s.mems s)[j_m := mem']\<rparr>"
+                                                 "res = RValue (vcsf @ [ConstInt32 (int_of_nat n_m)])"
         by fastforce
       have "\<exists>h''.
                              ass_sat Q [ConstInt32 (Wasm_Base_Defs.int_of_nat n_m)] h'' st

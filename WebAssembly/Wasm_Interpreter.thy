@@ -123,11 +123,6 @@ next
       by auto
   qed
 qed
-
-axiomatization 
-  mem_grow_impl:: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
-  mem_grow_impl_correct:"(mem_grow_impl m n = Some m') \<Longrightarrow> (mem_grow m n = m')"
-
 (*
 definition mem_grow_impl:: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow_impl m n = Some (mem_grow m n)"
@@ -383,7 +378,7 @@ and run_one_step :: "depth \<Rightarrow> inst \<Rightarrow> config_one_tuple \<R
                 expect (smem_ind s i)
                   (\<lambda>j.
                      let l = (mem_size ((s.mems s)!j)) in
-                     (expect (mem_grow_impl ((mems s)!j) (nat_of_int c))
+                     (expect (mem_grow ((mems s)!j) (nat_of_int c))
                         (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, vs, RSNormal (vs_to_es ((ConstInt32 (int_of_nat l))#ves'))))
                         (s, vs, RSNormal (vs_to_es ((ConstInt32 int32_minus_one)#ves')))))
                   (s, vs, crash_error)

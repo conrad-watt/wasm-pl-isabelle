@@ -201,7 +201,7 @@ inductive reduce :: "[s, v list, e list, inst, s, v list, e list] \<Rightarrow> 
   \<comment> \<open>\<open>current_memory\<close>\<close>
 | current_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[ $(Current_memory)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
+| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;vs;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;vs;[$C (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto>_i \<lparr>s;vs;[$C (ConstInt32 int32_minus_one)]\<rparr>"
   (* The bad ones. *)

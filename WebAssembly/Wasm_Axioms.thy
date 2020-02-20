@@ -3,40 +3,42 @@ section {* Host Properties *}
 theory Wasm_Axioms imports Wasm begin
 
 lemma old_mem_size_def:
-  shows "mem_size m = length (Rep_mem m) div Ki64"
+  shows "mem_size m = length (fst (Rep_mem m)) div Ki64"
   unfolding mem_size_def mem_length_def
-  by simp
+  by (simp split: prod.splits)
 
 (* these were originally axioms, but memory now has a concrete representation in the model *)
 lemma mem_grow_size:
-  assumes "mem_grow m n = m'"
+  assumes "mem_grow m n = Some m'"
   shows "(mem_size m + n) = mem_size m'"
   using assms Abs_mem_inverse
   unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
-  by (auto simp add: Ki64_def)
+  by (auto simp add: Ki64_def Let_def split: prod.splits if_splits)
 
 lemma mem_grow_length:
-  assumes "mem_grow m n = m'"
+  assumes "mem_grow m n = Some m'"
   shows "(mem_length m + (n * Ki64)) = mem_length m'"
   using assms Abs_mem_inverse
         bytes_replicate_def mem_append.rep_eq mem_length.rep_eq
   unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
-  by auto
+  by (auto simp add: Let_def split: prod.splits if_splits)
 
 lemma mem_grow_byte_at_m:
   assumes "k < mem_length m"
-  shows "byte_at (mem_grow m n) k = byte_at m k"
+          "(mem_grow m n) = Some m'"
+  shows "byte_at m' k = byte_at m k"
   using assms
-  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq
-  by (simp add: nth_append)
+  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq mem_append_def
+  by (auto simp add: Abs_mem_inverse nth_append Let_def split: prod.splits if_splits)
 
 lemma mem_grow_byte_at_m_n:
   assumes "k \<ge> mem_length m"
-          "k < mem_length (mem_grow m n)"
-  shows "byte_at (mem_grow m n) k = (0::byte)"
+          "(mem_grow m n) = Some m'"
+          "k < mem_length m'"
+  shows "byte_at m' k = (0::byte)"
   using assms
-  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate_def
-  by (simp add: nth_append)
+  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate_def mem_append_def
+  by (auto simp add: Abs_mem_inverse nth_append Let_def split: prod.splits if_splits)
 
 lemma load_size:
   "(load m n off l = None) = (mem_length m < (off + n + l))"
@@ -59,14 +61,14 @@ lemma store_size:
   shows "mem_size m = mem_size m'"
   using assms Abs_mem_inverse mem_length.rep_eq
   unfolding store_def write_bytes_def bytes_takefill_def
-  by (cases "n + off + l \<le> mem_length m") (auto simp add: old_mem_size_def)
+  by (cases "n + off + l \<le> mem_length m") (auto simp add: old_mem_size_def split: prod.splits)
 
 lemma store_length:
   assumes "(store m n off v l = Some m')"
   shows "mem_length m = mem_length m'"
   using assms Abs_mem_inverse mem_length.rep_eq
   unfolding store_def write_bytes_def bytes_takefill_def
-  by (cases "n + off + l \<le> mem_length m") auto
+  by (cases "n + off + l \<le> mem_length m") (auto split: prod.splits)
 
 lemma store_packed_size1:
   "(store_packed m n off v l = None) = (mem_length m < (off + n + l))"

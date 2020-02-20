@@ -74,7 +74,7 @@ inductive reduce_to :: "[(s \<times> v list \<times> e list), (nat list \<times>
   \<comment> \<open>\<open>current_memory\<close>\<close>
 | current_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[ $(Current_memory)]) \<Down>{(ls,r,i)} (s,vs,RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
+| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
@@ -174,7 +174,7 @@ inductive reduce_to_n :: "[(s \<times> v list \<times> e list), nat, (nat list \
   \<comment> \<open>\<open>current_memory\<close>\<close>
 | current_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[ $(Current_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
+| grow_memory:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c), $(Grow_memory)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs, RValue [(ConstInt32 (int_of_nat n))])"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind s i = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>k{(ls,r,i)} (s,vs,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
@@ -1484,7 +1484,7 @@ lemma no_reduce_to_n_grow_memory:
 
 lemma reduce_to_n_grow_memory:
   assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory]) \<Down>k{(ls,r,i)} (s',vs',res))"
-  shows "\<exists>n j m. (vs = vs' \<and> smem_ind s i = Some j \<and> ((mems s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (s' = s \<lparr>s.mems := (s.mems s)[j := mem_grow (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c)]\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
+  shows "\<exists>n j m. (vs = vs' \<and> smem_ind s i = Some j \<and> ((mems s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (\<exists>mem'. (mem_grow (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c)) = Some mem' \<and> s' = s \<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
   using assms
 proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory])" k "(ls,r,i)" "(s',vs',res)" arbitrary: s vs vs' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k vs' res ves ves')

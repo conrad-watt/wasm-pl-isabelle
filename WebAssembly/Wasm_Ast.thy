@@ -32,16 +32,18 @@ definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" where
 definition msbyte :: "bytes \<Rightarrow> byte" where
   "msbyte bs = last (bs)"
 
-typedef mem = "UNIV :: (byte list) set" ..
+(* data, max? *)
+typedef mem = "UNIV :: ((byte list) \<times> nat option) set" ..
 setup_lifting type_definition_mem
 declare Quotient_mem[transfer_rule]
 
-lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>m n. m!n)::byte list \<Rightarrow> nat \<Rightarrow> byte" .
-lift_definition mem_length :: "mem \<Rightarrow> nat" is "length" .
+lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>(m,max) n. m!n)::((byte list) \<times> nat option) \<Rightarrow> nat \<Rightarrow> byte" .
+lift_definition mem_length :: "mem \<Rightarrow> nat" is "(\<lambda>(m,max). length m)" .
+lift_definition mem_max :: "mem \<Rightarrow> nat option" is "(\<lambda>(m,max). max)" .
 
-lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. (take l (drop n m))::(byte list))" .
-lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m n bs. ((take n m) @ bs @ (drop (n + length bs) m))::(byte list))" .
-lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>m bs. append m bs::(byte list))" .
+lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>(m,max) n l. (take l (drop n m))::(byte list))" .
+lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>(m,max) n bs. (((take n m) @ bs @ (drop (n + length bs) m)),max)::(byte list \<times> nat option))" .
+lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>(m,max) bs. (append m bs, max)::(byte list \<times> nat option))" .
 
 lemma take_drop_map:
   assumes "ind+n \<le> length bs"
@@ -59,7 +61,7 @@ lemma read_bytes_map:
   shows "read_bytes m ind n = (map (\<lambda>k. byte_at m k) [ind..<ind+n])"
   using assms
   unfolding read_bytes_def byte_at_def mem_length_def
-  by (simp add: take_drop_map)
+  by (simp add: take_drop_map split: prod.splits)
 
 \<comment> \<open>host\<close>
 typedecl host

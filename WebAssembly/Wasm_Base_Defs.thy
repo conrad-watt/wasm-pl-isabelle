@@ -55,8 +55,11 @@ definition Ki64 :: "nat" where
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
 
-definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem" where
-  "mem_grow m n = mem_append m (bytes_replicate (n * Ki64) 0)"
+definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
+  "mem_grow m n = (let len = (mem_size m) + n in
+                   if (len \<le> 2^16 \<and> pred_option (\<lambda>max. len \<le> max) (mem_max m))
+                    then Some (mem_append m (bytes_replicate (n * Ki64) 0))
+                    else None)"
 
 definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> bytes option" where
   "load m n off l = (if (mem_length m \<ge> (n+off+l))

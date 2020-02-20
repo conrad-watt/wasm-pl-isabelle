@@ -605,7 +605,7 @@ proof (cases ves)
     assume "a = ConstInt32 c" and "smem_ind s i = Some a'"
     thus ?thesis
       using assms Cons
-      by (cases "mem_grow_impl (s.mems s ! a') (nat_of_int c)") auto
+      by (cases "mem_grow (s.mems s ! a') (nat_of_int c)") auto
   qed auto
 qed auto
 
@@ -1843,7 +1843,7 @@ proof -
                              progress_L0_left[OF reduce.intros(21)]
                              progress_L0_left[OF reduce.intros(22)]
               is_const_list_vs_to_es_list[of "rev list"] 
-          by (cases "mem_grow_impl (s.mems s ! j) (nat_of_int x1)") (auto simp add: mem_grow_impl_correct is_const_def)
+          by (cases "mem_grow (s.mems s ! j) (nat_of_int x1)") (auto simp add: is_const_def)
       qed auto
     qed auto
   next
