@@ -336,7 +336,10 @@ definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
 definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
-  "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2"
+  "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2 \<and>
+                         (mem_max m1) = (mem_max m2) \<and>
+                         (pred_option (\<lambda>max. (mem_size m1) \<le> max) (mem_max m1) \<longrightarrow>
+                            pred_option (\<lambda>max. (mem_size m2) \<le> max) (mem_max m2))"
 
 definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"

@@ -4256,7 +4256,7 @@ next
               mem_iss ass_wf_is local_assms(1,5)
         by auto
       thus ?thesis
-        using mem_iss(6) local_assms(1)
+        using mem_iss(7) local_assms(1)
         unfolding res_wf_def
         apply simp
         apply (metis eq_snd_iff)

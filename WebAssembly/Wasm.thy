@@ -65,14 +65,13 @@ definition "glob_agree g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_va
 definition "globi_agree gs n g = (n < length gs \<and> glob_agree (gs!n) g)"
 
 definition "tabi_agree ts n tab_t =
-  (n < length ts)"
-
-(*  \<and> (min tab_t) \<ge> (length (ts!n)) \<and> pred_option (\<lambda>max. (length (ts!n)) \<le> max) (max tab_t) *)
+  ((n < length ts) \<and> (l_min tab_t) \<le> (length (ts!n)) \<and> pred_option (\<lambda>max. (length (ts!n)) \<le> max) (l_max tab_t))"
 
 definition "memi_agree ms n mem_t =
-  (n < length ms)"
-
-(*  \<and> (min mem_t) \<ge> (mem_length (ms!n)) \<and> pred_option (\<lambda>max. (mem_length (ms!n)) \<le> max) (max mem_t) *)
+  ((n < length ms) \<and>
+   (l_min mem_t) \<le> (mem_size (ms!n)) \<and>
+   mem_max (ms!n) = l_max mem_t \<and>
+   pred_option (\<lambda>max. (mem_size (ms!n)) \<le> max) (l_max mem_t))"
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 

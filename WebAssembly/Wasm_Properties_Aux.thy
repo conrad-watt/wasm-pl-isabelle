@@ -1399,6 +1399,9 @@ lemma store_extension_refl:
 lemma store_extension_mem_leq:
   assumes "s.mems s ! j = m"
           "mem_size m \<le> mem_size m'"
+          "mem_max m = mem_max m'"
+          "(pred_option (\<lambda>max. (mem_size m) \<le> max) (mem_max m) \<longrightarrow>
+              pred_option (\<lambda>max. (mem_size m') \<le> max) (mem_max m'))"
   shows "store_extension s (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
 proof -
   obtain s' where s'_def:"s' = (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
@@ -1409,7 +1412,7 @@ proof -
     by simp_all
   moreover
   have "mem_extension m m'"
-    using assms(2)
+    using assms(2,3,4)
     unfolding mem_extension_def
     by simp
   hence "list_all2 mem_extension (mems s) (mems s')"
@@ -1485,6 +1488,19 @@ proof -
     using assms
     unfolding inst_typing.simps sglob_def sglob_ind_def list_all2_conv_all_nth
     by (metis globi_agree_def inst.select_convs(5) t_context.select_convs(3))+
+qed
+
+lemma inst_typing_imp_memi_agree:
+  assumes "inst_typing s i \<C>"
+          "(smem_ind s i) = Some k"
+  shows "memi_agree (mems s) k (hd (memory \<C>))"
+proof -
+  show "memi_agree (mems s) k (hd (memory \<C>))"
+    using assms
+    unfolding inst_typing.simps smem_ind_def
+    apply (simp split: list.splits)
+    apply (metis list.sel(1) list_all2_Cons1)
+    done
 qed
 
 lemma store_typing_imp_types_eq:
@@ -1649,6 +1665,14 @@ lemma store_mem_exists:
   unfolding inst_typing.simps memi_agree_def
   by fastforce
 
+lemma mem_agree_store_extension:
+  assumes "list_all2 (memi_agree (mems s)) (inst.mems i) (memory \<C>)"
+          "store_extension s s'"
+  shows "list_all2 (memi_agree (mems s')) (inst.mems i) (memory \<C>)"
+  using assms
+  unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
+  by (metis order.trans s.select_convs(3))
+
 lemma inst_typing_store_extension_inv:
   assumes "inst_typing s i \<C>"
           "store_extension s s'" 
@@ -1681,9 +1705,8 @@ proof -
     by fastforce
   moreover
   have "list_all2 (memi_agree (mems s')) (inst.mems i) (memory \<C>)"
-    using 1(2) assms(2)
-    unfolding memi_agree_def
-    by (auto simp add: list_all2_lengthD store_extension.simps)
+    using 1(2) assms(2) mem_agree_store_extension
+    by blast
   ultimately
   show ?thesis
     using assms(1)

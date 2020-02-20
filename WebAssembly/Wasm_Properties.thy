@@ -51,20 +51,24 @@ next
 next
   case (store_Some t v s i j m k off mem' vs a)
   show ?case
-    using store_size[OF store_Some(4)] store_extension_mem_leq[OF store_Some(3)]
+    using store_size[OF store_Some(4)] store_max[OF store_Some(4)] store_extension_mem_leq[OF store_Some(3), of mem']
     by simp
 next
   case (store_packed_Some t v s i j m k off tp mem' vs a)
   show ?case
-    using store_size store_packed_Some(4) store_extension_mem_leq[OF store_packed_Some(3)]
+    using store_size store_max store_packed_Some(4) store_extension_mem_leq[OF store_packed_Some(3)]
     unfolding store_packed_def
     by simp
 next
   case (grow_memory s i j m n c mem' vs)
-  show ?case
-    using store_extension_mem_leq[OF grow_memory(2)]
-          mem_grow_size[OF grow_memory(4)]
-    by simp
+  have "pred_option ((\<le>) (mem_size m)) (mem_max m)"
+    using inst_typing_imp_memi_agree[OF grow_memory(6,1)]
+    unfolding memi_agree_def
+    by (simp add: grow_memory.hyps(2))
+  thus ?case
+    using store_extension_mem_leq[OF grow_memory(2) _ mem_grow_max1[OF grow_memory(4)]]
+          mem_grow_size[OF grow_memory(4)] mem_grow_max2[OF grow_memory(4)]
+    by auto
 next
   case (label s vs es i s' vs' es' k lholed les les')
   show ?case
