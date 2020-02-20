@@ -55,6 +55,8 @@ definition Ki64 :: "nat" where
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
 
+abbreviation "mem_agree m \<equiv> pred_option ((\<le>) (mem_size m)) (mem_max m)"
+
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow m n = (let len = (mem_size m) + n in
                    if (len \<le> 2^16 \<and> pred_option (\<lambda>max. len \<le> max) (mem_max m))
@@ -318,7 +320,7 @@ definition smem_ind :: "s \<Rightarrow> inst \<Rightarrow> nat option" where
   "smem_ind s i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
 definition stab_s :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab_s s i j = (let stabinst = ((tabs s)!i) in  (if (length (stabinst) > j) then (stabinst!j) else None))"
+  "stab_s s i j = (let stabinst = fst ((tabs s)!i) in (if (length (stabinst) > j) then (stabinst!j) else None))"
 
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_s s k j | [] => None)"
@@ -338,16 +340,16 @@ definition const_list :: "e list \<Rightarrow> bool" where
 definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
   "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2 \<and>
                          (mem_max m1) = (mem_max m2) \<and>
-                         (pred_option (\<lambda>max. (mem_size m1) \<le> max) (mem_max m1) \<longrightarrow>
-                            pred_option (\<lambda>max. (mem_size m2) \<le> max) (mem_max m2))"
+                         (mem_agree m1 \<longrightarrow> mem_agree m2)"
 
 definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"
 
 inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
-"\<lbrakk>fs = fs'; tclss = tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'\<rbrakk> \<Longrightarrow>
+"\<lbrakk>fs = fs'; tclss = tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs';
+  list_all mem_agree bss''\<rbrakk> \<Longrightarrow>
   store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs\<rparr>
-                    \<lparr>s.funcs = fs', s.tabs = tclss', s.mems = bss', s.globs = gs'\<rparr>"
+                    \<lparr>s.funcs = fs', s.tabs = tclss', s.mems = bss'@bss'', s.globs = gs'\<rparr>"
 
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
@@ -471,7 +473,7 @@ lemma int_float_disjoint: "is_int_t t = -(is_float_t t)"
 
 lemma stab_unfold:
   assumes "stab s i j = Some cl"
-  shows "\<exists>k ks. inst.tabs i = k#ks \<and> length ((tabs s)!k) > j \<and>((tabs s)!k)!j = Some cl"
+  shows "\<exists>k ks. inst.tabs i = k#ks \<and> length (fst ((tabs s)!k)) > j \<and>(fst ((tabs s)!k))!j = Some cl"
 proof -
   obtain k ks where have_k:"(inst.tabs i) = k#ks"
     using assms
@@ -483,10 +485,10 @@ proof -
     by simp
   then obtain stabinst where stabinst_def:"stabinst = ((tabs s)!k)"
     by blast
-  hence "stab_s s k j = (stabinst!j) \<and> (length stabinst > j)"
+  hence "stab_s s k j = ((fst stabinst)!j) \<and> (length (fst stabinst) > j)"
     using assms s_o
     unfolding stab_s_def
-    by (cases "(length stabinst > j)", auto)
+    by (auto simp add: Let_def split: if_splits)
   thus ?thesis
     using have_k stabinst_def assms s_o
     by auto

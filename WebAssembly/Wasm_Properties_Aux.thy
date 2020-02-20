@@ -203,7 +203,7 @@ qed auto
 lemma stab_typed_some_imp_member:
   assumes "stab s i c = Some cl"
           "inst_typing s i \<C>"
-        shows "Some cl \<in> set (concat (s.tabs s))"
+        shows "Some cl \<in> set (concat (map fst (s.tabs s)))"
 proof -
   show ?thesis
   proof (cases "inst.tabs i")
@@ -232,19 +232,24 @@ lemma stab_typed_some_imp_cl_typed:
           "store_typing s"
   shows "\<exists>tf. cl_typing s cl tf"
 proof -
-  have "Some cl \<in> set (concat (s.tabs s))"
+  have "Some cl \<in> set (concat (map fst (s.tabs s)))"
     using assms stab_typed_some_imp_member
     by auto
   moreover
-  have "list_all (list_all (tab_agree s)) (tabs s)"
+  have "list_all (tab_agree s) (tabs s)"
     using assms(3)
     unfolding store_typing.simps
     by simp
+  hence "tab_agree s ((tabs s)!(hd (inst.tabs i)))"
+    using assms(1,2)
+    unfolding stab_def inst_typing.simps
+    apply (simp split: list.splits)
+    apply (metis list_all2_Cons1 list_all_length tabi_agree_def)
+    done
   ultimately
-  have "tab_agree s (Some cl)"
-    by (simp, meson Ball_set_list_all)
-  thus ?thesis
-    unfolding tab_agree_def
+  show ?thesis
+    using stab_unfold[OF assms(1)]
+    unfolding tab_agree_def list_all_length
     by fastforce
 qed
 
@@ -1393,15 +1398,14 @@ lemma mem_extension_refl:
 lemma store_extension_refl:
   shows "store_extension s s"
   using global_extension_refl mem_extension_refl
-  unfolding store_extension.simps list_all2_conv_all_nth
-  by (metis (full_types) unit.exhaust s.surjective)
+  unfolding store_extension.simps
+  by (metis (mono_tags) append_Nil2 list.pred_inject(1) list_all2_conv_all_nth s.cases)
 
 lemma store_extension_mem_leq:
   assumes "s.mems s ! j = m"
           "mem_size m \<le> mem_size m'"
           "mem_max m = mem_max m'"
-          "(pred_option (\<lambda>max. (mem_size m) \<le> max) (mem_max m) \<longrightarrow>
-              pred_option (\<lambda>max. (mem_size m') \<le> max) (mem_max m'))"
+          "mem_agree m \<longrightarrow> mem_agree m'"
   shows "store_extension s (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
 proof -
   obtain s' where s'_def:"s' = (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
@@ -1420,8 +1424,8 @@ proof -
     by (simp, metis eq_iff list.rel_refl list_all2_update_cong list_update_id mem_extension_def)
   ultimately
   show ?thesis
-    using s'_def store_extension.intros global_extension_refl
-    by (metis (full_types) list_all2_refl unit.exhaust s.surjective)
+    using s'_def store_extension.intros[of _ _ _ _ _ _ _ _ "[]"] global_extension_refl
+    by (metis (mono_tags) append_Nil2 list.pred_inject(1) list_all2_refl unit.exhaust s.surjective)
 qed
 
 lemma global_extension_update:
@@ -1459,8 +1463,8 @@ proof -
     by auto
   ultimately
   show ?thesis
-    using s'_def store_extension.intros
-    by (metis (full_types) unit.exhaust s.surjective)
+    using s'_def store_extension.intros[of _ _ _ _ _ _ _ _ "[]"]
+    by (metis (mono_tags) append_Nil2 list.pred_inject(1) unit.exhaust s.surjective)
 qed
 
 lemma inst_typing_glob_length:
@@ -1669,9 +1673,21 @@ lemma mem_agree_store_extension:
   assumes "list_all2 (memi_agree (mems s)) (inst.mems i) (memory \<C>)"
           "store_extension s s'"
   shows "list_all2 (memi_agree (mems s')) (inst.mems i) (memory \<C>)"
-  using assms
-  unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
-  by (metis order.trans s.select_convs(3))
+proof -
+  obtain mss' mss'' where 1:"list_all2 mem_extension (mems s) mss'"
+                            "(mems s') = mss'@mss''"
+    using assms(2)
+    unfolding store_extension.simps
+    by auto
+  have "list_all2 (memi_agree mss') (inst.mems i) (memory \<C>)"
+    using assms 1(1)
+    unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
+    by (metis (no_types, lifting) order_trans)
+  thus ?thesis
+    using 1(2) nth_append[of mss' mss'']
+    unfolding list_all2_conv_all_nth memi_agree_def
+    by auto
+qed
 
 lemma inst_typing_store_extension_inv:
   assumes "inst_typing s i \<C>"
@@ -1755,8 +1771,8 @@ lemma tab_agree_store_extension_inv:
   assumes "store_extension s s'"
           "tab_agree s t"
   shows "tab_agree s' t"
-  using assms cl_typing_store_extension_inv
-  unfolding tab_agree_def
+  using assms(2) cl_typing_store_extension_inv[OF assms(1)]
+  unfolding tab_agree_def list_all_length
   by (fastforce split: option.splits)
 
 lemma store_extension_imp_store_typing:
@@ -1770,18 +1786,25 @@ proof -
     unfolding store_extension.simps
     by auto
   moreover
-  have "list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s)"
-       "list_all (list_all (tab_agree s)) (tabs s)"
+  have 2:"list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s)"
+         "list_all (tab_agree s) (tabs s)"
+         "list_all mem_agree (mems s)"
     using assms(2)
     unfolding store_typing.simps
     by auto
-  hence "list_all (list_all (tab_agree s')) (tabs s')"
+  hence "list_all (tab_agree s') (tabs s')"
         "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')"
     using cl_typing_store_extension_inv[OF assms(1)]
           tab_agree_store_extension_inv[OF assms(1)] 1
           assms(1) store_extension.simps
     unfolding list_all_length
-    by fastforce+
+    by (metis (no_types, lifting) s.select_convs(2))+
+  moreover
+  have "list_all mem_agree (mems s')"
+    using 2(3) assms(1)
+    unfolding store_extension.simps
+    by (metis (no_types, lifting) list_all2_conv_all_nth list_all_append
+                                  list_all_length mem_extension_def s.select_convs(3))
   ultimately
   show ?thesis
     using assms(2)

@@ -190,7 +190,10 @@ datatype cl = \<comment> \<open>function closures\<close>
   Func_native inst tf "t list" "b_e list"
 | Func_host tf host
 
-type_synonym tabinst = "(cl option) list"
+type_synonym tabinst = "(cl option) list \<times> nat option"
+
+abbreviation "tab_size (t::tabinst) \<equiv> length (fst t)"
+abbreviation "tab_max (t::tabinst) \<equiv> snd t"
 
 record global =
   g_mut :: mut

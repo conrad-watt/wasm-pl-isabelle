@@ -65,13 +65,12 @@ definition "glob_agree g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_va
 definition "globi_agree gs n g = (n < length gs \<and> glob_agree (gs!n) g)"
 
 definition "tabi_agree ts n tab_t =
-  ((n < length ts) \<and> (l_min tab_t) \<le> (length (ts!n)) \<and> pred_option (\<lambda>max. (length (ts!n)) \<le> max) (l_max tab_t))"
+  ((n < length ts) \<and> (l_min tab_t) \<le> (tab_size (ts!n)) \<and> (tab_max (ts!n)) = l_max tab_t)"
 
 definition "memi_agree ms n mem_t =
   ((n < length ms) \<and>
    (l_min mem_t) \<le> (mem_size (ms!n)) \<and>
-   mem_max (ms!n) = l_max mem_t \<and>
-   pred_option (\<lambda>max. (mem_size (ms!n)) \<le> max) (l_max mem_t))"
+   mem_max (ms!n) = l_max mem_t)"
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
@@ -103,10 +102,15 @@ and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Righ
 (* section: s_typing *)
 | "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile>_i vs;es : ts"
 
-definition "tab_agree s tcl = (case tcl of None \<Rightarrow> True | Some cl \<Rightarrow> \<exists>tf. cl_typing s cl tf)"
+definition "tab_agree s tab =
+  ((list_all (\<lambda>tcl. (case tcl of None \<Rightarrow> True | Some cl \<Rightarrow> \<exists>tf. cl_typing s cl tf)) (fst tab)) \<and>
+   pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
 
 inductive store_typing :: "s \<Rightarrow> bool" where
-  "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s); list_all (list_all (tab_agree s)) (tabs s)\<rbrakk> \<Longrightarrow> store_typing s"
+  "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s);
+    list_all (tab_agree s) (tabs s);
+    list_all mem_agree (mems s)
+    \<rbrakk> \<Longrightarrow> store_typing s"
 
 inductive config_typing :: "[inst, s, v list, e list, t list] \<Rightarrow> bool" ("\<turnstile>'_ _ _;_;_ : _" 60) where
   "\<lbrakk>store_typing s; s\<bullet>None \<tturnstile>_i vs;es : ts\<rbrakk> \<Longrightarrow> \<turnstile>_i s;vs;es : ts"

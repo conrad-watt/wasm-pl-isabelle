@@ -61,10 +61,10 @@ next
     by simp
 next
   case (grow_memory s i j m n c mem' vs)
-  have "pred_option ((\<le>) (mem_size m)) (mem_max m)"
+  have "mem_agree m"
     using inst_typing_imp_memi_agree[OF grow_memory(6,1)]
     unfolding memi_agree_def
-    by (simp add: grow_memory.hyps(2))
+    by (metis grow_memory.hyps(2) grow_memory.prems(1) list_all_length store_typing.simps)
   thus ?case
     using store_extension_mem_leq[OF grow_memory(2) _ mem_grow_max1[OF grow_memory(4)]]
           mem_grow_size[OF grow_memory(4)] mem_grow_max2[OF grow_memory(4)]
