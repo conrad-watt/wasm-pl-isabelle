@@ -20,7 +20,7 @@ lemma reduce_store_extension:
           "inst_typing s i \<C>i"
           "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
           "\<C> = \<C>i\<lparr>local := local \<C>i @ (map typeof vs), label := arb_label, return := arb_return\<rparr>"
-  shows "store_extension s s'"
+  shows "store_extension s s' \<and> store_typing s'"
   using assms
 proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.induct)
   case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
@@ -36,8 +36,8 @@ proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.
           e_type_const_list[OF is_const_list[OF invoke_host_Some(2)] ts''_def(1)]
     by fastforce
   thus ?case
-    using host_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2)
-    by (metis append_Nil e_typing_imp_list_types_agree)
+    using host_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2,7)
+    by blast
 next
   case (set_global s i j v s' vs)
   have "tg_t (global \<C>i ! j) = typeof v"
@@ -46,19 +46,23 @@ next
     using types_preserved_set_global_aux(2,3,4)[OF set_global(4)] set_global(5)
     by simp_all
   thus ?case
-    using update_glob_store_extension[OF set_global(1)]
+    using update_glob_store_extension[OF set_global(2,1)]
     by (metis glob_agree_def set_global.prems(2) sglob_def store_typing_imp_glob_agree(2))
 next
   case (store_Some t v s i j m k off mem' vs a)
   show ?case
-    using store_size[OF store_Some(4)] store_max[OF store_Some(4)] store_extension_mem_leq[OF store_Some(3), of mem']
-    by simp
+    using store_size[OF store_Some(4)] store_max[OF store_Some(4)]
+          store_typing_in_mem_agree store_Some(2,3,5,6)
+          store_extension_mem_leq[OF store_Some(5,3), of mem']
+    by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
 next
   case (store_packed_Some t v s i j m k off tp mem' vs a)
   show ?case
-    using store_size store_max store_packed_Some(4) store_extension_mem_leq[OF store_packed_Some(3)]
+    using store_packed_size[OF store_packed_Some(4)] store_packed_max[OF store_packed_Some(4)]
+          store_typing_in_mem_agree store_packed_Some(2,3,5,6)
+          store_extension_mem_leq[OF store_packed_Some(5,3), of mem']
     unfolding store_packed_def
-    by simp
+    by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
 next
   case (grow_memory s i j m n c mem' vs)
   have "mem_agree m"
@@ -66,7 +70,7 @@ next
     unfolding memi_agree_def
     by (metis grow_memory.hyps(2) grow_memory.prems(1) list_all_length store_typing.simps)
   thus ?case
-    using store_extension_mem_leq[OF grow_memory(2) _ mem_grow_max1[OF grow_memory(4)]]
+    using store_extension_mem_leq[OF grow_memory(5,2) _ _ mem_grow_max1[OF grow_memory(4)]]
           mem_grow_size[OF grow_memory(4)] mem_grow_max2[OF grow_memory(4)]
     by auto
 next
@@ -88,12 +92,11 @@ next
     by force
 qed (auto simp add: store_extension_refl store_extension.intros)
 
-
 lemma store_preserved:
   assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
           "store_typing s"
           "s\<bullet>None \<tturnstile>_i vs;es : ts"
-  shows "store_extension s s'"
+  shows "store_extension s s' \<and> store_typing s'"
 proof -
   obtain \<C>i where \<C>i_def:"inst_typing s i \<C>i"
                          "s\<bullet>(\<C>i\<lparr>local := local \<C>i @ map typeof vs, return := None\<rparr>) \<turnstile> es : ([] _> ts)"
@@ -1567,7 +1570,7 @@ proof -
     by simp
   moreover
   have "inst_typing s' i \<C>i"
-    using defs(2) store_preserved[OF assms] inst_typing_store_extension_inv
+    using defs(2) store_preserved(1)[OF assms] inst_typing_store_extension_inv
     by blast
   ultimately
   show ?thesis

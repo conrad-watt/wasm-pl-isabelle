@@ -75,7 +75,12 @@ definition "memi_agree ms n mem_t =
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
 inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
-  "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs; list_all2 (globi_agree (globs s)) gs tgs; list_all2 (tabi_agree (tabs s)) tbs tabs_t; list_all2 (memi_agree (mems s)) ms mems_t\<rbrakk> \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr> \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
+  "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs;
+    list_all2 (globi_agree (globs s)) gs tgs;
+    list_all2 (tabi_agree (tabs s)) tbs tabs_t;
+    list_all2 (memi_agree (mems s)) ms mems_t\<rbrakk>
+      \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr>
+                        \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
 
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
    "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := (local \<C>) @ t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"

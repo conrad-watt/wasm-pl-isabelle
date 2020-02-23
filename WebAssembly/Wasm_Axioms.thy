@@ -115,6 +115,6 @@ axiomatization where
   wasm_deserialise_type:"typeof (wasm_deserialise bs t) = t"
 
 axiomatization where
-    host_apply_preserve_store:"host_apply s (t1s _> t2s) f vs hs = Some (s', vs') \<Longrightarrow> store_extension s s'"
+    host_apply_preserve_store:"host_apply s (t1s _> t2s) f vs hs = Some (s', vs') \<Longrightarrow> store_typing s \<Longrightarrow> store_extension s s' \<and> store_typing s'"
 and host_apply_respect_type:"list_all2 types_agree t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs = Some (s', vs') \<Longrightarrow> list_all2 types_agree t2s vs'"
 end

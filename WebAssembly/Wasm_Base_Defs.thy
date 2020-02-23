@@ -337,19 +337,21 @@ definition is_const :: "e \<Rightarrow> bool" where
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
+definition tab_extension :: "tabinst \<Rightarrow> tabinst \<Rightarrow> bool" where
+  "tab_extension t1 t2 \<equiv> tab_size t1 \<le> tab_size t2 \<and>
+                         (tab_max t1) = (tab_max t2)"
+
 definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
   "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2 \<and>
-                         (mem_max m1) = (mem_max m2) \<and>
-                         (mem_agree m1 \<longrightarrow> mem_agree m2)"
+                         (mem_max m1) = (mem_max m2)"
 
 definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"
 
 inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
-"\<lbrakk>fs = fs'; tclss = tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs';
-  list_all mem_agree bss''\<rbrakk> \<Longrightarrow>
-  store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs\<rparr>
-                    \<lparr>s.funcs = fs', s.tabs = tclss', s.mems = bss'@bss'', s.globs = gs'\<rparr>"
+"\<lbrakk>fs = fs'; list_all2 tab_extension tclss tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'\<rbrakk>
+  \<Longrightarrow> store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs\<rparr>
+                       \<lparr>s.funcs = fs'@fs'', s.tabs = tclss'@tclss'', s.mems = bss'@bss'', s.globs = gs'@gs''\<rparr>"
 
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"

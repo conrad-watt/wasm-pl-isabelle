@@ -14,7 +14,6 @@ proof -
     using assms(2)
           store_preserved
           types_preserved_e
-          store_extension_imp_store_typing
     by blast+
   thus ?thesis
     using config_typing.intros
