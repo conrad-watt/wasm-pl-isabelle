@@ -53,6 +53,8 @@ inductive const_expr :: "t_context \<Rightarrow> b_e \<Rightarrow> bool" where \
   "const_expr \<C> (C v)"
 | "\<lbrakk>k < length (global \<C>); tg_mut ((global \<C>)!k) = T_immut \<rbrakk> \<Longrightarrow> const_expr \<C> (Get_global k)"
 
+code_pred (modes: i \<Rightarrow> i \<Rightarrow> bool as const_expr_p) const_expr .
+
 abbreviation "const_exprs \<C> es \<equiv> list_all (const_expr \<C>) es"
 
 inductive limit_typing :: "limit_t \<Rightarrow> nat \<Rightarrow> bool" where
@@ -80,7 +82,7 @@ inductive module_elem_typing :: "t_context \<Rightarrow> module_elem \<Rightarro
 inductive module_data_typing :: "t_context \<Rightarrow> module_data \<Rightarrow> bool" where
   "\<lbrakk>const_exprs \<C> es;
     \<C> \<turnstile> es : ([] _> [T_i32]);
-    t < length (memory \<C>)\<rbrakk> \<Longrightarrow> module_data_typing \<C> \<lparr>d_data=d, d_off=es, d_init=bs\<rparr>"
+    d < length (memory \<C>)\<rbrakk> \<Longrightarrow> module_data_typing \<C> \<lparr>d_data=d, d_off=es, d_init=bs\<rparr>"
 
 inductive module_start_typing :: "t_context \<Rightarrow> i \<Rightarrow> bool" where
   "\<lbrakk>i < length (func_t \<C>); (func_t \<C>)!i = ([] _> [])\<rbrakk> \<Longrightarrow> module_start_typing \<C> i"
@@ -95,7 +97,7 @@ inductive module_export_typing :: "t_context \<Rightarrow> exp_desc \<Rightarrow
   "\<lbrakk>i < length (func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_func i) (Te_func tf)"
 | "\<lbrakk>i < length (table \<C>); (table \<C>)!i = tt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_tab i) (Te_tab tt)"
 | "\<lbrakk>i < length (memory \<C>); (memory \<C>)!i = mt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_mem i) (Te_mem mt)"
-| "\<lbrakk>i < length (global \<C>); (global \<C>)!i = gt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_tab i) (Te_glob gt)"
+| "\<lbrakk>i < length (global \<C>); (global \<C>)!i = gt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_glob i) (Te_glob gt)"
 
 record m = \<comment> \<open>module\<close>
   m_types :: "tf list"

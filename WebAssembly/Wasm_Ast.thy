@@ -80,12 +80,20 @@ record tg = \<comment> \<open>global types\<close>
   tg_mut :: mut
   tg_t :: t
 
+free_constructors case_tg_ext for tg_ext
+  using tg.cases_scheme
+  by blast+
+
 datatype \<comment> \<open>function types\<close>
   tf = Tf "t list" "t list" ("_ '_> _" 60)
 
 record limit_t =
   l_min :: nat
   l_max :: "nat option"
+
+free_constructors case_limit_t_ext for limit_t_ext
+  using limit_t.cases_scheme
+  by blast+
 
 type_synonym tab_t = \<comment> \<open>table type\<close>
   "limit_t"

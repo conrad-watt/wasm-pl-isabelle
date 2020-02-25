@@ -1628,8 +1628,8 @@ qed (auto simp add: to_ct_list_def ct_suffix_refl ct_suffix_nil ct_suffix_cons_i
                     ct_suffix_singleton_any)
 
 theorem b_e_typing_equiv_b_e_type_checker:
-  shows "(\<C> \<turnstile> es : (tn _> tm)) = (b_e_type_checker \<C> es (tn _> tm))"
+  shows "(\<C> \<turnstile> es : tf) = (b_e_type_checker \<C> es tf)"
   using b_e_type_checker_sound b_e_type_checker_complete
-  by blast
+  by (metis tf.exhaust)
 
 end
