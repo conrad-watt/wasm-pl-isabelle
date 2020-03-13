@@ -744,7 +744,7 @@ next
     by (metis external_typing.intros(4) length_append nth_append trans_less_add1)
 qed
 
-lemma g_init_type:
+lemma g_init_type_interp:
   assumes "interp_get_v s inst (g_init m_g) = gv"
           "(module_glob_typing \<C>) m_g gt"
           "global \<C> = tgs"
@@ -849,7 +849,7 @@ proof -
       by fastforce
     moreover
     have 111:"list_all2 (\<lambda>v m_g. typeof v = tg_t (g_type m_g)) g_inits (m_globs m)"
-      using s_end_is(3)[symmetric] g_init_type[OF _ _ _ 12, of inst' _ _ \<C>' _ "[]"] m_is(4,16)
+      using s_end_is(3)[symmetric] g_init_type_interp[OF _ _ _ 12, of inst' _ _ \<C>' _ "[]"] m_is(4,16)
       by (auto simp add: list_all2_conv_all_nth)
     have "(gather_m_g_types (m_globs m)) = gts"
       using m_is(4,16)
@@ -1023,11 +1023,71 @@ proof -
     unfolding module_typing.simps
     by blast
 
+  obtain s1 s2 s3 i_fs i_ts i_ms i_gs where inst_is:
+    "inst = \<lparr>types=(m_types m),
+           funcs=(ext_funcs v_imps)@i_fs,
+           tabs=(ext_tabs v_imps)@i_ts,
+           mems=(ext_mems v_imps)@i_ms,
+           globs=(ext_globs v_imps)@i_gs\<rparr>"
+    "alloc_funcs s fs inst = (s1,i_fs)"
+    "alloc_tabs s1 ts = (s2,i_ts)"
+    "alloc_mems s2 ms = (s3,i_ms)"
+    "alloc_globs s3 gs g_inits = (s',i_gs)"
+    "v_exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
+    using s_end_is(3) m_is
+    unfolding alloc_module.simps
+    by fastforce
+
   have 12:"list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (inst.globs inst') (global \<C>')"
     using ext_globs_ind list_all2_external_typing_glob_alloc
     by (simp add: inst'_is m_is_2(13,15) s_end_is(2))
   have 11:"list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst) (global \<C>)"
-    sorry
+  proof -
+    have "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst') (global \<C>')"
+      using alloc_module_external_typing_preserved[OF s_end_is(3)] 12
+      unfolding list_all2_conv_all_nth
+      by fastforce
+    moreover
+    have 111:"list_all2 (\<lambda>v m_g. typeof v = tg_t (g_type m_g)) g_inits gs"
+    proof -
+      { fix i
+        assume local_assms: "i < length gs"
+        have l2:"\<C>' \<turnstile> (g_init (gs ! i)) : ([] _> [tg_t (g_type (gs!i))])"
+                "const_exprs \<C>' (g_init (gs ! i))"
+          using local_assms m_is m_is m_is_2(4,15)
+          unfolding list_all2_conv_all_nth module_glob_typing.simps
+          by auto
+        have l1:"reduce_trans inst (s',[],$*(g_init (gs!i))) (s',[],[$C (g_inits!i)])"
+          using s_end_is(4) local_assms
+          unfolding list_all2_conv_all_nth
+          by blast
+        have "typeof (g_inits!i) = tg_t (g_type (gs!i))"
+          using local_assms const_exprs_reduce_trans[OF l2(2,1) l1 _ 12]
+              alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3)
+          unfolding alloc_module.simps
+          apply simp
+          apply (metis (mono_tags, lifting) inst'_is inst.select_convs(5))
+          done
+      }
+      thus ?thesis
+        using s_end_is(4)
+        unfolding list_all2_conv_all_nth
+        by metis
+    qed
+    have "(gather_m_g_types gs) = gts"
+      using m_is_2(4,15)
+      unfolding list_all2_conv_all_nth module_glob_typing.simps
+      apply simp
+      apply (metis length_map module_glob.select_convs(1) nth_equalityI nth_map)
+      done
+    hence "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) i_gs gts"
+      using alloc_globs_ext_typing[OF inst_is(5) 111]
+      by blast
+    ultimately
+    show ?thesis
+      using list_all2_appendI inst'_is
+      by (fastforce simp add: m_is_2(14,15) inst_is(1) s_end_is(11))
+  qed
 
   have "(module_type_checker m) = Some (t_imps, t_exps)"
     using s_end_is(1) module_typing_equiv_module_type_checker
@@ -1121,4 +1181,9 @@ proof -
     using s_end_is(2,7,8,9,10,11) m_is inst'_is
     by simp
 qed
+
+theorem instantiate_equiv_interp_instantiate:
+  "(instantiate s m v_imps ((s_end, inst, v_exps), start)) = (interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
+  using instantiate_imp_interp_instantiate interp_instantiate_imp_instantiate
+  by blast
 end
