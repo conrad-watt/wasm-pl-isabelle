@@ -200,58 +200,14 @@ next
     by blast
 qed auto
 
-lemma stab_typed_some_imp_member:
-  assumes "stab s i c = Some cl"
-          "inst_typing s i \<C>"
-        shows "Some cl \<in> set (concat (map fst (s.tabs s)))"
-proof -
-  show ?thesis
-  proof (cases "inst.tabs i")
-    case Nil
-    thus ?thesis
-      using assms stab_def
-      by auto
-  next
-    case (Cons a l)
-    hence "a < length (tabs s)"
-      using assms(2) inst_typing.simps
-      unfolding tabi_agree_def
-      by (metis (no_types, lifting) inst.select_convs(3) list_all2_Cons1)
-    thus ?thesis
-      using assms(1) Cons
-      unfolding stab_def stab_s_def
-      apply simp
-      apply (metis (full_types) nth_mem option.distinct(1))
-      done
-  qed
-qed
-
 lemma stab_typed_some_imp_cl_typed:
   assumes "stab s i c = Some cl"
           "inst_typing s i \<C>"
           "store_typing s"
   shows "\<exists>tf. cl_typing s cl tf"
-proof -
-  have "Some cl \<in> set (concat (map fst (s.tabs s)))"
-    using assms stab_typed_some_imp_member
-    by auto
-  moreover
-  have "list_all (tab_agree s) (tabs s)"
-    using assms(3)
-    unfolding store_typing.simps
-    by simp
-  hence "tab_agree s ((tabs s)!(hd (inst.tabs i)))"
-    using assms(1,2)
-    unfolding stab_def inst_typing.simps
-    apply (simp split: list.splits)
-    apply (metis list_all2_Cons1 list_all_length tabi_agree_def)
-    done
-  ultimately
-  show ?thesis
-    using stab_unfold[OF assms(1)]
-    unfolding tab_agree_def list_all_length
-    by fastforce
-qed
+  using stab_unfold[OF assms(1)] assms(3)
+  unfolding store_typing.simps list_all_length
+  by fastforce
 
 lemma b_e_type_empty1[dest]: assumes "\<C> \<turnstile> [] : (ts _> ts')" shows "ts = ts'"
   using assms
@@ -1432,9 +1388,9 @@ lemma store_typing_imp_glob_agree:
   assumes "inst_typing s i \<C>"
           "j < length (global \<C>)"
   shows "(sglob_ind s i j) < length (globs s)"
-        "glob_agree (sglob s i j) ((global \<C>)!j)"
+        "glob_typing (sglob s i j) ((global \<C>)!j)"
 proof -
-  show "glob_agree (sglob s i j) ((global \<C>)!j)"
+  show "glob_typing (sglob s i j) ((global \<C>)!j)"
        "(sglob_ind s i j) < length (globs s)"
     using assms
     unfolding inst_typing.simps sglob_def sglob_ind_def list_all2_conv_all_nth
@@ -1621,9 +1577,9 @@ lemma globi_agree_store_extension:
           "store_extension s s'"
   shows "list_all2 (globi_agree (globs s')) (inst.globs i) (global \<C>)"
 proof -
-  have "\<And>tg i. i < length (globs s) \<Longrightarrow> glob_agree ((globs s)!i) tg \<Longrightarrow> glob_agree ((globs s')!i) tg"
+  have "\<And>tg i. i < length (globs s) \<Longrightarrow> glob_typing ((globs s)!i) tg \<Longrightarrow> glob_typing ((globs s')!i) tg"
     using assms
-    unfolding glob_agree_def store_extension.simps global_extension_def list_all2_conv_all_nth
+    unfolding glob_typing_def store_extension.simps global_extension_def list_all2_conv_all_nth
     by (metis nth_append s.select_convs(4))
   moreover
   have "length (globs s) \<le> length (globs s')"
@@ -1649,7 +1605,7 @@ proof -
     by auto
   have "list_all2 (tabi_agree clss') (inst.tabs i) (table \<C>)"
     using assms 1(1)
-    unfolding store_extension.simps list_all2_conv_all_nth tab_extension_def tabi_agree_def
+    unfolding store_extension.simps list_all2_conv_all_nth tab_extension_def tabi_agree_def tab_typing_def
     by fastforce
   thus ?thesis
     using 1(2) nth_append[of clss' clss'']
@@ -1669,7 +1625,7 @@ proof -
     by auto
   have "list_all2 (memi_agree mss') (inst.mems i) (memory \<C>)"
     using assms 1(1)
-    unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
+    unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def mem_typing_def
     by fastforce
   thus ?thesis
     using 1(2) nth_append[of mss' mss'']
@@ -1749,9 +1705,10 @@ qed (auto simp add: e_typing_s_typing.intros)
 lemma tab_agree_store_extension_inv:
   assumes "store_extension s s'"
           "tab_agree s t"
+          "(tabs s) = (tabs s')"
   shows "tab_agree s' t"
-  using assms(2) cl_typing_store_extension_inv[OF assms(1)]
-  unfolding tab_agree_def list_all_length
+  using assms
+  unfolding tab_agree_def list_all_length store_extension.simps
   by (fastforce split: option.splits)
 
 lemma store_typing_in_mem_agree:
@@ -1800,7 +1757,7 @@ proof -
     by (metis s'_def)
   moreover
   have "list_all (tab_agree s') (s.tabs s')"
-    by (metis s'_def 0(2) sh1 assms(1) list.pred_mono_strong store_typing.cases tab_agree_store_extension_inv)
+    by (metis (no_types, lifting) "0"(2) assms(1) list.pred_mono_strong s'_def sh1 store_typing.cases tab_agree_store_extension_inv)
   ultimately
   show "store_typing (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
     using store_typing.simps tab_agree_store_extension_inv[OF sh1]
@@ -1852,7 +1809,7 @@ proof -
     by fastforce
   moreover
   have "list_all (tab_agree s') (s.tabs s')"
-    by (metis 1(2) sh1 assms(1) list.pred_mono_strong store_typing.cases tab_agree_store_extension_inv)
+    by (metis (no_types, lifting) 1(2) assms(1) list.pred_mono_strong sh1 store_typing.cases tab_agree_store_extension_inv)
   ultimately
   show "store_typing s'"
     using 1(3) assms(1) store_typing.simps

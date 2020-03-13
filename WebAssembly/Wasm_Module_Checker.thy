@@ -20,12 +20,12 @@ abbreviation "module_tab_type_checker \<equiv> module_tab_typing"
 abbreviation "module_mem_type_checker \<equiv> module_mem_typing"
 
 fun module_glob_type_checker :: "t_context \<Rightarrow> module_glob \<Rightarrow> bool" where
-  "module_glob_type_checker \<C> \<lparr>type=tg, init=es\<rparr> =
+  "module_glob_type_checker \<C> \<lparr>g_type=tg, g_init=es\<rparr> =
      (const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [tg_t tg]))"
 
 lemma module_glob_typing_equiv_module_glob_type_checker:
   "module_glob_typing \<C> m_g tg = (module_glob_type_checker \<C> m_g \<and>
-                                   (module_glob.type m_g) = tg)"
+                                   (module_glob.g_type m_g) = tg)"
   apply (cases m_g)
   apply (auto simp add: module_glob_typing.simps b_e_typing_equiv_b_e_type_checker)
   done
@@ -67,10 +67,10 @@ lemma module_import_typing_equiv_module_import_typer:
   done
 
 fun module_export_typer :: "t_context \<Rightarrow> exp_desc \<Rightarrow> extern_t option" where
-  "module_export_typer \<C> (Exp_func i) = (if i < length (func_t \<C>) then Some (Te_func ((func_t \<C>)!i)) else None)"
-| "module_export_typer \<C> (Exp_tab i) = (if i < length (table \<C>) then Some (Te_tab ((table \<C>)!i)) else None)"
-| "module_export_typer \<C> (Exp_mem i) = (if i < length (memory \<C>) then Some (Te_mem ((memory \<C>)!i)) else None)"
-| "module_export_typer \<C> (Exp_glob i) = (if i < length (global \<C>) then Some (Te_glob ((global \<C>)!i)) else None)"
+  "module_export_typer \<C> (Ext_func i) = (if i < length (func_t \<C>) then Some (Te_func ((func_t \<C>)!i)) else None)"
+| "module_export_typer \<C> (Ext_tab i) = (if i < length (table \<C>) then Some (Te_tab ((table \<C>)!i)) else None)"
+| "module_export_typer \<C> (Ext_mem i) = (if i < length (memory \<C>) then Some (Te_mem ((memory \<C>)!i)) else None)"
+| "module_export_typer \<C> (Ext_glob i) = (if i < length (global \<C>) then Some (Te_glob ((global \<C>)!i)) else None)"
 
 lemma module_export_typing_equiv_module_export_typer:
   "(module_export_typing \<C> exp e_t) = (module_export_typer \<C> exp = Some e_t)"
@@ -203,7 +203,7 @@ next
 qed
 
 abbreviation gather_m_g_types :: "module_glob list \<Rightarrow> tg list" where
-  "gather_m_g_types \<equiv> map module_glob.type"
+  "gather_m_g_types \<equiv> map module_glob.g_type"
 
 fun module_type_checker :: "m \<Rightarrow> (extern_t list \<times> extern_t list) option" where
   "module_type_checker \<lparr>m_types = tfs,
@@ -389,4 +389,14 @@ theorem module_typing_equiv_module_type_checker:
   using module_typing_imp_module_type_checker
         module_type_checker_imp_module_typing
   by blast
+
+(*
+lemma[code]: "pred_option P None = True"
+  by auto
+lemmas[code] = option.pred_inject(2)
+
+
+export_code module_type_checker in OCaml
+module_name Example file_prefix "example.ml"
+*)
 end

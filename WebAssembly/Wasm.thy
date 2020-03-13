@@ -60,17 +60,19 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>weakening\<close>\<close>
 | weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
 
-definition "glob_agree g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
+definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
 
-definition "globi_agree gs n g = (n < length gs \<and> glob_agree (gs!n) g)"
+definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
+
+definition "tab_typing t tt = ((l_min tt) \<le> (tab_size (t)) \<and> (tab_max (t)) = l_max tt)"
 
 definition "tabi_agree ts n tab_t =
-  ((n < length ts) \<and> (l_min tab_t) \<le> (tab_size (ts!n)) \<and> (tab_max (ts!n)) = l_max tab_t)"
+  ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
+
+definition "mem_typing m mt = ((l_min mt) \<le> (mem_size m) \<and> mem_max m = l_max mt)"
 
 definition "memi_agree ms n mem_t =
-  ((n < length ms) \<and>
-   (l_min mem_t) \<le> (mem_size (ms!n)) \<and>
-   mem_max (ms!n) = l_max mem_t)"
+  ((n < length ms) \<and> mem_typing (ms!n) mem_t)"
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
@@ -108,7 +110,7 @@ and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Righ
 | "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile>_i vs;es : ts"
 
 definition "tab_agree s tab =
-  ((list_all (\<lambda>tcl. (case tcl of None \<Rightarrow> True | Some cl \<Rightarrow> \<exists>tf. cl_typing s cl tf)) (fst tab)) \<and>
+  ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>
    pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
 
 inductive store_typing :: "s \<Rightarrow> bool" where
@@ -217,5 +219,8 @@ inductive reduce :: "[s, v list, e list, inst, s, v list, e list] \<Rightarrow> 
 | label:"\<lbrakk>\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>; Lfilled k lholed es les; Lfilled k lholed es' les'\<rbrakk> \<Longrightarrow> \<lparr>s;vs;les\<rparr> \<leadsto>_i \<lparr>s';vs';les'\<rparr>"
   \<comment> \<open>\<open>inductive local reduction\<close>\<close>
 | local:"\<lbrakk>\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>\<rbrakk> \<Longrightarrow> \<lparr>s;v0s;[Local n i vs es]\<rparr> \<leadsto>_j \<lparr>s';v0s;[Local n i vs' es']\<rparr>"
+
+definition reduce_trans where
+  "reduce_trans i \<equiv> (\<lambda>(s,vs,es) (s',vs',es'). \<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>)^**"
 
 end

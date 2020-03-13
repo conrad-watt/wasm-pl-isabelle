@@ -1,8 +1,8 @@
 theory Wasm_Module imports Wasm begin
 
 record module_glob =
-  type :: tg
-  init :: "b_e list"
+  g_type :: tg
+  g_init :: "b_e list"
 
 record module_elem =
   e_tab :: i
@@ -23,11 +23,13 @@ datatype imp_desc =
 | Imp_mem mem_t
 | Imp_glob tg
 
-datatype exp_desc =
-  Exp_func i
-| Exp_tab i
-| Exp_mem i
-| Exp_glob i
+datatype v_ext =
+  Ext_func i
+| Ext_tab i
+| Ext_mem i
+| Ext_glob i
+
+type_synonym exp_desc = v_ext
 
 record module_import =
   I_module :: string
@@ -43,6 +45,19 @@ datatype extern_t =
 | Te_tab tab_t
 | Te_mem mem_t
 | Te_glob tg
+
+definition export_get_v_ext :: "inst \<Rightarrow> exp_desc \<Rightarrow> v_ext" where
+  "export_get_v_ext inst exp =
+     (case exp of
+        Ext_func i \<Rightarrow> Ext_func ((inst.funcs inst)!i)
+      | Ext_tab i \<Rightarrow> Ext_tab ((inst.tabs inst)!i)
+      | Ext_mem i \<Rightarrow> Ext_mem ((inst.mems inst)!i)
+      | Ext_glob i \<Rightarrow> Ext_glob ((inst.globs inst)!i))"
+
+abbreviation "ext_funcs \<equiv> List.map_filter (\<lambda>x. case x of Ext_func i \<Rightarrow> Some i | _ \<Rightarrow> None)"
+abbreviation "ext_tabs \<equiv> List.map_filter (\<lambda>x. case x of Ext_tab i \<Rightarrow> Some i | _ \<Rightarrow> None)" 
+abbreviation "ext_mems \<equiv> List.map_filter (\<lambda>x. case x of Ext_mem i \<Rightarrow> Some i | _ \<Rightarrow> None)" 
+abbreviation "ext_globs \<equiv> List.map_filter (\<lambda>x. case x of Ext_glob i \<Rightarrow> Some i | _ \<Rightarrow> None)"
 
 abbreviation "ext_t_funcs \<equiv> List.map_filter (\<lambda>x. case x of Te_func tf \<Rightarrow> Some tf | _ \<Rightarrow> None)"
 abbreviation "ext_t_tabs \<equiv> List.map_filter (\<lambda>x. case x of Te_tab t \<Rightarrow> Some t | _ \<Rightarrow> None)" 
@@ -71,7 +86,7 @@ abbreviation "module_tab_typing t \<equiv> limit_typing t (2^32)"
 abbreviation "module_mem_typing t \<equiv> limit_typing t (2^16)"
 
 inductive module_glob_typing :: "t_context \<Rightarrow> module_glob \<Rightarrow> tg \<Rightarrow> bool" where
-  "\<lbrakk>const_exprs \<C> es; \<C> \<turnstile> es : ([] _> [tg_t tg])\<rbrakk> \<Longrightarrow> module_glob_typing \<C> \<lparr>type=tg, init=es\<rparr> tg"
+  "\<lbrakk>const_exprs \<C> es; \<C> \<turnstile> es : ([] _> [tg_t tg])\<rbrakk> \<Longrightarrow> module_glob_typing \<C> \<lparr>g_type=tg, g_init=es\<rparr> tg"
 
 inductive module_elem_typing :: "t_context \<Rightarrow> module_elem \<Rightarrow> bool" where
   "\<lbrakk>const_exprs \<C> es;
@@ -94,10 +109,16 @@ inductive module_import_typing :: "t_context \<Rightarrow> imp_desc \<Rightarrow
 | "module_import_typing \<C> (Imp_glob gt) (Te_glob gt)"
 
 inductive module_export_typing :: "t_context \<Rightarrow> exp_desc \<Rightarrow> extern_t \<Rightarrow> bool" where
-  "\<lbrakk>i < length (func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_func i) (Te_func tf)"
-| "\<lbrakk>i < length (table \<C>); (table \<C>)!i = tt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_tab i) (Te_tab tt)"
-| "\<lbrakk>i < length (memory \<C>); (memory \<C>)!i = mt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_mem i) (Te_mem mt)"
-| "\<lbrakk>i < length (global \<C>); (global \<C>)!i = gt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Exp_glob i) (Te_glob gt)"
+  "\<lbrakk>i < length (func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Ext_func i) (Te_func tf)"
+| "\<lbrakk>i < length (table \<C>); (table \<C>)!i = tt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Ext_tab i) (Te_tab tt)"
+| "\<lbrakk>i < length (memory \<C>); (memory \<C>)!i = mt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Ext_mem i) (Te_mem mt)"
+| "\<lbrakk>i < length (global \<C>); (global \<C>)!i = gt\<rbrakk> \<Longrightarrow> module_export_typing \<C> (Ext_glob i) (Te_glob gt)"
+
+inductive external_typing :: "s \<Rightarrow> v_ext \<Rightarrow> extern_t \<Rightarrow> bool" where
+  "\<lbrakk>i < length (funcs s); cl_type ((funcs s)!i) = tf\<rbrakk> \<Longrightarrow> external_typing s (Ext_func i) (Te_func tf)"
+| "\<lbrakk>i < length (tabs s); tab_typing ((tabs s)!i) tt\<rbrakk> \<Longrightarrow> external_typing s (Ext_tab i) (Te_tab tt)"
+| "\<lbrakk>i < length (mems s); mem_typing ((mems s)!i) mt\<rbrakk> \<Longrightarrow> external_typing s (Ext_mem i) (Te_mem mt)"
+| "\<lbrakk>i < length (globs s); glob_typing ((globs s)!i) gt\<rbrakk> \<Longrightarrow> external_typing s (Ext_glob i) (Te_glob gt)"
 
 record m = \<comment> \<open>module\<close>
   m_types :: "tf list"

@@ -48,9 +48,6 @@ consts
   wasm_bool :: "bool \<Rightarrow> i32"
   int32_minus_one :: i32
 
-definition Ki64 :: "nat" where
-  "Ki64 = 65536"
-
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
@@ -320,7 +317,14 @@ definition smem_ind :: "s \<Rightarrow> inst \<Rightarrow> nat option" where
   "smem_ind s i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
 definition stab_s :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab_s s i j = (let stabinst = fst ((tabs s)!i) in (if (length (stabinst) > j) then (stabinst!j) else None))"
+  "stab_s s i j = (let stabinst = fst ((tabs s)!i) in
+                   (if ((length stabinst) > j) then
+                      case (stabinst!j) of
+                        Some i_cl \<Rightarrow> if ((length (funcs s)) > i_cl) then
+                                       Some ((funcs s)!i_cl)
+                                     else None
+                      | None \<Rightarrow> None
+                    else None))"
 
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_s s k j | [] => None)"
@@ -475,26 +479,14 @@ lemma int_float_disjoint: "is_int_t t = -(is_float_t t)"
 
 lemma stab_unfold:
   assumes "stab s i j = Some cl"
-  shows "\<exists>k ks. inst.tabs i = k#ks \<and> length (fst ((tabs s)!k)) > j \<and>(fst ((tabs s)!k))!j = Some cl"
-proof -
-  obtain k ks where have_k:"(inst.tabs i) = k#ks"
-    using assms
-    unfolding stab_def
-    by (fastforce split: list.splits)
-  hence s_o:"stab s i j = stab_s s k j"
-    using assms
-    unfolding stab_def
-    by simp
-  then obtain stabinst where stabinst_def:"stabinst = ((tabs s)!k)"
-    by blast
-  hence "stab_s s k j = ((fst stabinst)!j) \<and> (length (fst stabinst) > j)"
-    using assms s_o
-    unfolding stab_s_def
-    by (auto simp add: Let_def split: if_splits)
-  thus ?thesis
-    using have_k stabinst_def assms s_o
-    by auto
-qed
+  shows "\<exists>k ks i_cl. inst.tabs i = k#ks \<and>
+                     length (fst ((tabs s)!k)) > j \<and>
+                     (fst ((tabs s)!k))!j = Some i_cl \<and>
+                     length (funcs s) > i_cl \<and>
+                     (funcs s)!i_cl = cl"
+  using assms
+  unfolding stab_def stab_s_def
+  by (simp add: Let_def split: list.splits if_splits option.splits)
 
 lemma inj_basic: "inj Basic"
   by (meson e.inject(1) injI)

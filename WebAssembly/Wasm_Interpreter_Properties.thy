@@ -48,7 +48,7 @@ thm Lfilled.simps[of _ _ _ "[e]", simplified]
 lemma lfilled_single:
   assumes "Lfilled k lholed es [e]"
           "\<And> a b c. e \<noteq> Label a b c"
-  shows "(es = [e] \<and> lholed = LBase [] []) \<or> es = []"
+  shows "(es = [e] \<and> lholed = LBase [] [] \<and> k = 0) \<or> es = []"
   using assms
 proof (cases rule: Lfilled.cases)
   case (L0 vs es')
@@ -2267,6 +2267,50 @@ proof -
   thus ?thesis
     using assms
     by blast
+qed
+
+theorem run_v_sound:
+  assumes "run_v f d i (s,vs,es) = (s', RValue ves)"
+  shows "\<exists>vs'. reduce_trans i (s,vs,es) (s',vs',$$*ves)"
+  using assms
+proof (induction f d i "(s,vs,es)" arbitrary: s vs es rule: run_v.induct)
+  case (1 n d i s vs es)
+  note outer_1 = 1
+  consider (1) "es_is_trap es" | (2) "const_list es" | (3) "\<not>es_is_trap es" "\<not>const_list es"
+    by blast
+  thus ?case
+  proof cases
+    case 1
+    thus ?thesis
+      using outer_1
+      by simp
+  next
+    case 2
+    hence s_is:"ves = (fst (split_vals_e es))" "s = s'"
+      using outer_1
+      by (simp_all split: if_splits)
+    hence "es = $$*ves"
+      using 2 e_type_const_conv_vs split_vals_e_const_list
+      by fastforce
+    thus ?thesis
+      using s_is
+      by (fastforce simp add: reduce_trans_def)
+  next
+    case 3
+    then obtain s'' vs' res where s''_is:
+      "(run_step d i (s,vs,es)) = (s'',vs',RSNormal res)"
+      "run_v n d i (s'',vs',res) = (s', RValue ves)"
+      using outer_1(2)
+      by (simp del: run_step.simps split: res_step.splits prod.splits)
+    show ?thesis
+      using outer_1(1)[OF 3 s''_is(1)[symmetric] _ _ _ s''_is(2)]
+            reduce_trans_app[OF run_step_sound[OF s''_is(1)]]
+      by fastforce
+  qed
+next
+  case (2 d i s vs es)
+  thus ?case
+    by simp
 qed
 
 end

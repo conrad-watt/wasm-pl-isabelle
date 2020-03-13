@@ -32,10 +32,29 @@ definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" where
 definition msbyte :: "bytes \<Rightarrow> byte" where
   "msbyte bs = last (bs)"
 
+record limit_t =
+  l_min :: nat
+  l_max :: "nat option"
+
+free_constructors case_limit_t_ext for limit_t_ext
+  using limit_t.cases_scheme
+  by blast+
+
+type_synonym tab_t = \<comment> \<open>table type\<close>
+  "limit_t"
+
+type_synonym mem_t = \<comment> \<open>memory type\<close>
+  "limit_t"
+
+definition Ki64 :: "nat" where
+  "Ki64 = 65536"
+
 (* data, max? *)
 typedef mem = "UNIV :: ((byte list) \<times> nat option) set" ..
 setup_lifting type_definition_mem
 declare Quotient_mem[transfer_rule]
+
+lift_definition mem_mk :: "limit_t \<Rightarrow> mem" is "(\<lambda>lim. ((bytes_replicate ((l_min lim) * Ki64) 0), l_max lim))" .
 
 lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>(m,max) n. m!n)::((byte list) \<times> nat option) \<Rightarrow> nat \<Rightarrow> byte" .
 lift_definition mem_length :: "mem \<Rightarrow> nat" is "(\<lambda>(m,max). length m)" .
@@ -86,20 +105,6 @@ free_constructors case_tg_ext for tg_ext
 
 datatype \<comment> \<open>function types\<close>
   tf = Tf "t list" "t list" ("_ '_> _" 60)
-
-record limit_t =
-  l_min :: nat
-  l_max :: "nat option"
-
-free_constructors case_limit_t_ext for limit_t_ext
-  using limit_t.cases_scheme
-  by blast+
-
-type_synonym tab_t = \<comment> \<open>table type\<close>
-  "limit_t"
-
-type_synonym mem_t = \<comment> \<open>memory type\<close>
-  "limit_t"
 
 (* TYPING *)
 record t_context =
@@ -198,7 +203,7 @@ datatype cl = \<comment> \<open>function closures\<close>
   Func_native inst tf "t list" "b_e list"
 | Func_host tf host
 
-type_synonym tabinst = "(cl option) list \<times> nat option"
+type_synonym tabinst = "(i option) list \<times> nat option"
 
 abbreviation "tab_size (t::tabinst) \<equiv> length (fst t)"
 abbreviation "tab_max (t::tabinst) \<equiv> snd t"

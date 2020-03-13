@@ -47,7 +47,7 @@ next
     by simp_all
   thus ?case
     using update_glob_store_extension[OF set_global(2,1)]
-    by (metis glob_agree_def set_global.prems(2) sglob_def store_typing_imp_glob_agree(2))
+    by (metis glob_typing_def set_global.prems(2) sglob_def store_typing_imp_glob_agree(2))
 next
   case (store_Some t v s i j m k off mem' vs a)
   show ?case
@@ -1426,15 +1426,15 @@ next
   have "length (global \<C>) > j"
     using b_e_type_get_global get_global(5) unlift_b_e[of _ _ "[Get_global j]" "(ts _> ts')"]
     by fastforce
-  hence "glob_agree (sglob s i j) ((global \<C>)!j)"
+  hence "glob_typing (sglob s i j) ((global \<C>)!j)"
     using get_global(3,4) store_typing_imp_glob_agree[OF get_global(2)]
     by fastforce
   hence "typeof (g_val (sglob s i j)) = tg_t (global \<C> ! j)"
-    unfolding glob_agree_def
+    unfolding glob_typing_def
     by simp
   thus ?case
     using get_global(5) types_preserved_get_global
-    unfolding glob_agree_def sglob_val_def
+    unfolding glob_typing_def sglob_val_def
     by fastforce
 next
   case (set_global s i j v s' vs)
@@ -3133,5 +3133,202 @@ lemma progress_e3:
   shows "\<exists>a s' vs' es'. \<lparr>s;vs;cs_es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
   using assms progress_e progress_e1 progress_e2
   by fastforce
+
+lemma reduce_trans_app:
+  assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s'';vs'';es''\<rparr>"
+          "reduce_trans i (s'',vs'',es'') (s',vs',es')"
+  shows "reduce_trans i (s,vs,es) (s',vs',es')"
+proof -
+  have 1:"(\<lambda>(s,vs,es) (s',vs',es'). \<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>) (s,vs,es) (s'',vs'',es'')"
+    using assms
+    by auto
+  thus ?thesis
+    using assms converse_rtranclp_into_rtranclp
+    unfolding reduce_trans_def
+    by (metis (no_types, lifting))
+qed
+
+lemma reduce_length_locals:
+  assumes "\<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+  shows "length vs = length vs'"
+  using assms
+  apply (induction rule: reduce.induct)
+  apply auto
+  done
+
+lemma reduce_trans_length_locals:
+  assumes "reduce_trans i (s,vs,es) (s',vs', es')"
+  shows "length vs = length vs'"
+  using assms
+  unfolding reduce_trans_def
+  apply (induction "(s',vs', es')" arbitrary: s' vs' es' rule: rtranclp_induct)
+  apply (auto simp add: reduce_length_locals split: prod.splits)
+  done
+
+lemma reduce_trans_app_end:
+  assumes "\<lparr>s'';vs'';es''\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+          "reduce_trans i (s,vs,es) (s'',vs'',es'')"
+  shows "reduce_trans i (s,vs,es) (s',vs',es')"
+proof -
+  have 1:"(\<lambda>(s,vs,es) (s',vs',es'). \<lparr>s;vs;es\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>) (s'',vs'',es'') (s',vs',es')"
+    using assms
+    by auto
+  thus ?thesis
+    using assms 
+    unfolding reduce_trans_def
+    by (simp add: rtranclp.rtrancl_into_rtrancl)
+qed
+thm rtranclp_induct
+
+lemma reduce_trans_L0:
+  assumes "reduce_trans i (s,vs,es) (s',vs',es')"
+  shows "reduce_trans i (s,vs,($$*ves)@es@es_f) (s',vs',($$*ves)@es'@es_f)"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' rule: rtranclp_induct)
+  case base
+  thus ?case
+    by (auto split: prod.splits)
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  hence "reduce_trans i (s,vs,($$*ves)@es@es_f) (s'',vs'',($$*ves)@es''@es_f)"
+    using step(3)
+    unfolding reduce_trans_def
+    by simp
+  moreover
+  have "\<lparr>s'';vs'';es''\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  hence "\<lparr>s'';vs'';($$*ves)@es''@es_f\<rparr> \<leadsto>_i \<lparr>s';vs';($$*ves)@es'@es_f\<rparr>"
+    using progress_L0 is_const_list
+    by fastforce
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+
+lemma reduce_trans_lfilled:
+  assumes "reduce_trans i (s,vs,es) (s',vs',es')"
+          "Lfilled n lfilled es lfes"
+          "Lfilled n lfilled es' lfes'"
+  shows "reduce_trans i (s,vs,lfes) (s',vs',lfes')"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' lfes' rule: rtranclp_induct)
+  case base
+  thus ?case
+    using lfilled_deterministic
+    by blast
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  then obtain lfes'' where lfes'':"Lfilled n lfilled es'' lfes''"
+                                  "reduce_trans i (s,vs,lfes) (s'',vs'',lfes'')"
+    using step(3,4) progress_LN2
+    unfolding reduce_trans_def
+    by simp metis
+  moreover
+  have 1:"\<lparr>s'';vs'';es''\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  hence "\<lparr>s'';vs'';lfes''\<rparr> \<leadsto>_i \<lparr>s';vs';lfes'\<rparr>"
+    using step(5) lfes''(1) reduce.label
+    by blast
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+
+lemma reduce_trans_label:
+  assumes "reduce_trans i (s,vs,es) (s',vs',es')"
+  shows "reduce_trans i (s,vs,[Label n les es]) (s',vs',[Label n les es'])"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' rule: rtranclp_induct)
+  case base
+  thus ?case
+    by auto
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  hence "reduce_trans i (s,vs,[Label n les es]) (s'',vs'',[Label n les es''])"
+    using step(3)
+    unfolding reduce_trans_def
+    by simp
+  moreover
+  have 1:"\<lparr>s'';vs'';es''\<rparr> \<leadsto>_i \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  have "\<lparr>s'';vs'';[Label n les es'']\<rparr> \<leadsto>_i \<lparr>s';vs';[Label n les es']\<rparr>"
+    using reduce.label[OF 1] Lfilled.intros(2)[of "[]" _ n les "LBase [] []" "[]" 0]
+    apply simp
+    apply (meson Lfilled_exact.L0 Lfilled_exact_imp_Lfilled const_list_def list_all_simps(2))
+    done
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+
+lemma reduce_trans_consts:
+  assumes "reduce_trans inst (s, vs, $$*ves) (s', vs', $$*ves')"
+  shows "s = s' \<and> vs = vs' \<and> ves = ves'"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s, vs, $$*ves)" rule: converse_rtranclp_induct)
+  case base
+  thus ?case
+    using inj_basic_econst
+    by auto
+next
+  case (step y)
+  thus ?case
+    using const_list_no_progress is_const_list
+    by auto
+qed
+
+lemma reduce_trans_local:
+  assumes "reduce_trans j (s,vs,es) (s',vs',es')"
+  shows "reduce_trans i (s,v0s,[Local n j vs es]) (s',v0s,[Local n j vs' es'])"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s',vs',es')" arbitrary: s' vs' es' rule: rtranclp_induct)
+  case base
+  thus ?case
+    by auto
+next
+  case (step y)
+  obtain s'' vs'' es'' where y_is:"y = (s'', vs'',es'')"
+    by (cases y) blast
+  hence "reduce_trans i (s,v0s,[Local n j vs es]) (s'',v0s,[Local n j vs'' es''])"
+    using step(3)
+    unfolding reduce_trans_def
+    by simp
+  moreover
+  have 1:"\<lparr>s'';vs'';es''\<rparr> \<leadsto>_j \<lparr>s';vs';es'\<rparr>"
+    using step(2) y_is
+    by blast
+  have "\<lparr>s'';v0s;[Local n j vs'' es'']\<rparr> \<leadsto>_i \<lparr>s';v0s;[Local n j vs' es']\<rparr>"
+    using reduce.local[OF 1]
+    by blast
+  ultimately
+  show ?case
+    using y_is reduce_trans_app_end reduce_trans_def
+    by auto
+qed
+
+lemma reduce_trans_compose:
+  assumes "reduce_trans i (s,vs,es) (s'',vs'',es'')"
+          "reduce_trans i (s'',vs'',es'') (s',vs',es')"
+  shows "reduce_trans i (s,vs,es) (s',vs',es')"
+  using assms
+  unfolding reduce_trans_def
+  by auto
 
 end
