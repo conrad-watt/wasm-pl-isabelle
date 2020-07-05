@@ -688,8 +688,8 @@ next
     hence 2:"\<forall>gn<length (inst.globs i).
          inst.globs i ! gn
          < length (s.globs s')"
-      using reduce_to_length_globs[OF local_value(1)]
-      by simp
+      using reduce_to_length_globs[OF local_value(1)] less_le_trans
+      by blast
     obtain var_st_l where var_st_l_def:"reifies_glob (s.globs s) (inst.globs i) var_st_l"
                                                 "reifies_loc lls var_st_l"
                                                 "snd (snd var_st_l) = lvar_st"
@@ -717,7 +717,8 @@ next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
   have 1:"reifies_func (s.funcs s'') (inst.funcs i) fs"
     using reduce_to_funcs[OF seq_value(1)] seq_value(7)
-    by simp
+    unfolding reifies_func_def list_all2_conv_all_nth
+    by (metis length_append nth_append trans_less_add1)
   have "\<forall>gn<length (inst.globs i).
        inst.globs i ! gn
        < length (s.globs s)"
@@ -727,8 +728,8 @@ next
   hence "\<forall>gn<length (inst.globs i).
        inst.globs i ! gn
        < length (s.globs s'')"
-    using reduce_to_length_globs[OF seq_value(1)]
-    by simp
+    using reduce_to_length_globs[OF seq_value(1)] less_le_trans
+    by blast
   then obtain var_st'' where var_st''_def:"reifies_glob (s.globs s'') (inst.globs i) var_st''"
                                           "reifies_loc vs'' var_st''"
                                           "snd (snd var_st'') =
@@ -772,8 +773,8 @@ next
     hence 2:"\<forall>gn<length (inst.globs i).
          inst.globs i ! gn
          < length (s.globs s')"
-      using reduce_to_length_globs[OF local_trap(1)]
-      by simp
+      using reduce_to_length_globs[OF local_trap(1)] less_le_trans
+      by blast
     obtain var_st_l where var_st_l_def:"reifies_glob (s.globs s) (inst.globs i) var_st_l"
                                                 "reifies_loc lls var_st_l"
                                                 "snd (snd var_st_l) = lvar_st"
@@ -805,7 +806,8 @@ next
   case (label_break_nil s vs es k n ls r s'' vs'' bvs vcs les s' vs' res)
   have 1:"reifies_func (s.funcs s'') (inst.funcs i) fs"
     using reduce_to_funcs[OF label_break_nil(1)] label_break_nil(5)
-    by simp
+    unfolding reifies_func_def list_all2_conv_all_nth
+    by (metis length_append nth_append trans_less_add1)
   have "\<forall>gn<length (inst.globs i).
        inst.globs i ! gn
        < length (s.globs s)"
@@ -815,8 +817,8 @@ next
   hence "\<forall>gn<length (inst.globs i).
        inst.globs i ! gn
        < length (s.globs s'')"
-    using reduce_to_length_globs[OF label_break_nil(1)]
-    by simp
+    using reduce_to_length_globs[OF label_break_nil(1)] less_le_trans
+    by blast
   then obtain var_st'' where var_st''_def:"reifies_glob (s.globs s'') (inst.globs i) var_st''"
                                           "reifies_loc vs'' var_st''"
                                           "snd (snd var_st'') =
@@ -854,8 +856,8 @@ next
     hence 2:"\<forall>gn<length (inst.globs i).
          inst.globs i ! gn
          < length (s.globs s')"
-      using reduce_to_length_globs[OF local_return(1)]
-      by simp
+      using reduce_to_length_globs[OF local_return(1)] less_le_trans
+      by blast
     obtain var_st_l where var_st_l_def:"reifies_glob (s.globs s) (inst.globs i) var_st_l"
                                                 "reifies_loc lls var_st_l"
                                                 "snd (snd var_st_l) = lvar_st"

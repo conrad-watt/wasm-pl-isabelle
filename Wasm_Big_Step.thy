@@ -2740,34 +2740,45 @@ lemma calln_context: "((s,vs,($$*ves)@[$(Call j)]) \<Down>k{(ls,r,i)} (s',vs',re
 
 lemma reduce_to_length_globs:
   assumes "(s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "length (s.globs s) = length (s.globs s')"
+  shows "length (s.globs s) \<le> length (s.globs s')"
   using assms
 proof (induction "(s,vs,es)" "k" "\<Gamma>" "(s',vs',res)" arbitrary: s s' es res vs vs' rule: reduce_to_n.induct)
   case (set_global s i j v s' vs k ls r)
   thus ?case
-    by (metis length_list_update s.ext_inject s.surjective s.update_convs(4) supdate_glob_def supdate_glob_s_def)
+    unfolding supdate_glob_def Let_def supdate_glob_s_def
+    using length_list_update[of "s.globs s"]
+    by auto
 next
   case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k ls r i)
   show ?case
-    using host_apply_preserve_store[OF invoke_host_Some(6)] list_all2_lengthD
+    using host_apply_preserve_store1[OF invoke_host_Some(6)] list_all2_lengthD
     unfolding store_extension.simps
-    by force
+    by fastforce
 qed auto
 
 lemma reduce_to_funcs:
   assumes "(s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "(s.funcs s) = (s.funcs s')"
+  shows "\<exists>cls. (s.funcs s)@cls = (s.funcs s')"
   using assms
 proof (induction "(s,vs,es)" "k" "\<Gamma>" "(s',vs',res)" arbitrary: s s' es res vs vs' rule: reduce_to_n.induct)
   case (set_global s i j v s' vs k ls r)
   thus ?case
-    by (metis s.ext_inject s.surjective s.update_convs(4) supdate_glob_def supdate_glob_s_def)
+    unfolding supdate_glob_def Let_def supdate_glob_s_def
+    by auto
 next
   case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs k ls r i)
   show ?case
-    using host_apply_preserve_store[OF invoke_host_Some(6)] list_all2_lengthD
+    using host_apply_preserve_store1[OF invoke_host_Some(6)] list_all2_lengthD
     unfolding store_extension.simps
-    by force
+    by fastforce
+next
+  case (label_break_nil s vs es k n ls r i s'' vs'' bvs vcs les s' vs' res)
+  thus ?case
+    by (metis append_assoc)
+next
+  case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
+  thus ?case
+    by (metis append_assoc)
 qed auto
 
 lemma local_value_trap:
