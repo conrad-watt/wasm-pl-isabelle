@@ -90,7 +90,7 @@ inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
-and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>'_ _ _;_ : _" 60) where
+and       s_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
 (* section: e_typing *)
   (* lifting *)
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
@@ -101,13 +101,13 @@ and       s_typing :: "[s, (t list) option, inst, v list, e list, t list] \<Righ
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
   (* local *)
-| "\<lbrakk>\<S>\<bullet>Some ts \<tturnstile>_i vs;es : ts; length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Local n \<lparr> f_locs = vs, f_inst = i \<rparr> es] : ([] _> ts)"
+| "\<lbrakk>\<S>\<bullet>Some ts \<tturnstile> f;es : ts; length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Local n f es] : ([] _> ts)"
   (* invoke *)
 | "\<lbrakk>cl_typing \<S> cl tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke cl] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
 (* section: s_typing *)
-| "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile>_i vs;es : ts"
+| "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> \<lparr> f_locs=vs,f_inst=i\<rparr>;es : ts"
 
 definition "tab_agree s tab =
   ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>
@@ -119,8 +119,8 @@ inductive store_typing :: "s \<Rightarrow> bool" where
     list_all mem_agree (mems s)
     \<rbrakk> \<Longrightarrow> store_typing s"
 
-inductive config_typing :: "[inst, s, v list, e list, t list] \<Rightarrow> bool" ("\<turnstile>'_ _ _;_;_ : _" 60) where
-  "\<lbrakk>store_typing s; s\<bullet>None \<tturnstile>_i vs;es : ts\<rbrakk> \<Longrightarrow> \<turnstile>_i s;vs;es : ts"
+inductive config_typing :: "[s, f, e list, t list] \<Rightarrow> bool" ("\<turnstile> _;_;_ : _" 60) where
+  "\<lbrakk>store_typing s; s\<bullet>None \<tturnstile> f;es : ts\<rbrakk> \<Longrightarrow> \<turnstile> s;f;es : ts"
 
 (* REDUCTION RELATION *)
 

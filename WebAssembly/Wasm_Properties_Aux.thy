@@ -720,11 +720,12 @@ next
 qed
 
 lemma s_type_unfold:
-  assumes "s\<bullet>rs \<tturnstile>_i vs;es : ts"
+  assumes "s\<bullet>rs \<tturnstile> f;es : ts"
   shows "(rs = Some ts) \<or> rs = None"
-        "\<exists>\<C>i. inst_typing s i \<C>i
-              \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof vs), return := rs\<rparr> \<turnstile> es : ([] _> ts))"
-  using assms s_typing.simps
+        "\<exists>\<C>i. inst_typing s (f_inst f) \<C>i
+              \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof (f_locs f)), return := rs\<rparr> \<turnstile> es : ([] _> ts))"
+  using assms
+  unfolding s_typing.simps
   by auto
 
 lemma e_type_local:
@@ -746,7 +747,7 @@ qed (auto simp add: unlift_b_e s_typing.simps)
 
 lemma e_type_local_shallow:
   assumes "\<S>\<bullet>\<C> \<turnstile> [Local n f es] : (ts _> ts')"
-  shows "\<exists>tls. length tls = n \<and> ts' = ts@tls \<and> (\<S>\<bullet>(Some tls) \<tturnstile>_(f_inst f) (f_locs f);es : tls)"
+  shows "\<exists>tls. length tls = n \<and> ts' = ts@tls \<and> (\<S>\<bullet>(Some tls) \<tturnstile> f;es : tls)"
   using assms
 proof (induction "\<S>" "\<C>" "[Local n f es]" "(ts _> ts')" arbitrary: ts ts')
   case (1 \<C> b_es \<S>)
@@ -1687,9 +1688,9 @@ qed
 lemma e_typing_s_typing_store_extension_inv:
   assumes"store_extension s s'"
   shows "s\<bullet>\<C> \<turnstile> es : tf \<Longrightarrow> s'\<bullet>\<C> \<turnstile> es : tf"
-        "s\<bullet>rs \<tturnstile>_i vs;es : ts \<Longrightarrow> s'\<bullet>rs \<tturnstile>_i vs;es : ts"
+        "s\<bullet>rs \<tturnstile> f;es : ts \<Longrightarrow> s'\<bullet>rs \<tturnstile> f;es : ts"
   using assms
-proof (induction s \<C> es tf and s rs i vs es ts rule: e_typing_s_typing.inducts)
+proof (induction s \<C> es tf and s rs f es ts rule: e_typing_s_typing.inducts)
   case (6 s cl tf \<C>)
   thus ?case
     using cl_typing_store_extension_inv e_typing_s_typing.intros(6)

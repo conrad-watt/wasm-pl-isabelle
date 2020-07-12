@@ -3,14 +3,14 @@ section {* Soundness Theorems *}
 theory Wasm_Soundness imports Main Wasm_Properties begin
 
 theorem preservation:
-  assumes "\<turnstile>_(f_inst f) s;(f_locs f);es : ts"
+  assumes "\<turnstile> s;f;es : ts"
           "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-  shows "\<turnstile>_(f_inst f') s';(f_locs f');es' : ts"
+  shows "\<turnstile> s';f';es' : ts"
 proof -
-  have "store_typing s" "s\<bullet>None \<tturnstile>_(f_inst f) (f_locs f);es : ts"
+  have "store_typing s" "s\<bullet>None \<tturnstile> f;es : ts"
     using assms(1) config_typing.simps
     by blast+
-  hence "store_typing s'" "s'\<bullet>None \<tturnstile>_(f_inst f') (f_locs f');es' : ts"
+  hence "store_typing s'" "s'\<bullet>None \<tturnstile> f';es' : ts"
     using assms(2)
           store_preserved
           types_preserved_e
@@ -21,10 +21,10 @@ proof -
 qed
 
 theorem progress:
-  assumes "\<turnstile>_(f_inst f) s;(f_locs f);es : ts"
+  assumes "\<turnstile> s;f;es : ts"
   shows "const_list es \<or> es = [Trap] \<or> (\<exists>a s' f' es'. \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>)"
 proof -
-  have "store_typing s" "s\<bullet>None \<tturnstile>_(f_inst f) (f_locs f);es : ts"
+  have "store_typing s" "s\<bullet>None \<tturnstile> f;es : ts"
     using assms config_typing.simps
     by blast+
   thus ?thesis
