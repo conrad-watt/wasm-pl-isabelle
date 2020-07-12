@@ -218,12 +218,16 @@ record s = \<comment> \<open>store\<close>
   mems :: "mem list"
   globs :: "global list"
 
+record f = \<comment> \<open>frame\<close>
+  f_locs :: "v list"
+  f_inst :: inst
+
 datatype e = \<comment> \<open>administrative instruction\<close>
   Basic b_e ("$_" 60)
   | Trap
   | Invoke cl
   | Label nat "e list" "e list"
-  | Local nat inst "v list" "e list"
+  | Local nat f "e list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>

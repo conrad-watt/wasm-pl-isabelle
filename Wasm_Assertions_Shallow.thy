@@ -271,7 +271,7 @@ definition res_wf where
 definition valid_triple :: "'a triple_context \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_ \<Turnstile> {_}_{_}" 60) where
   "(\<Gamma> \<Turnstile> {P}es{Q}) \<equiv> \<forall>vcs h st s locs labs labsf ret retf lvar_st hf vcsf s' locs' res.
                                       ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P \<and>
-                                      ((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>{(labs@labsf,case_ret ret retf,i)} (s',locs', res))) \<longrightarrow>
+                                      ((s,\<lparr> f_locs=locs, f_inst=i \<rparr>,($$*vcsf)@($$*vcs)@es) \<Down>{(labs@labsf,case_ret ret retf)} (s',\<lparr> f_locs=locs', f_inst=i \<rparr>, res))) \<longrightarrow>
                                       res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q)"
 
 definition valid_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile> _" 60) where
@@ -281,7 +281,7 @@ definition valid_triples :: "'a triple_context \<Rightarrow> 'a triple set \<Rig
 definition valid_triple_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a ass \<Rightarrow> e list \<Rightarrow> 'a ass \<Rightarrow> bool" ("_ \<Turnstile>'_ _ {_}_{_}" 60) where
   "(\<Gamma> \<Turnstile>_k {P}es{Q}) \<equiv> \<forall>vcs h st s locs labs labsf ret retf lvar_st hf vcsf s' locs' res.
                                       ((ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P \<and>
-                                      ((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs@labsf,case_ret ret retf,i)} (s',locs', res))) \<longrightarrow>
+                                      ((s,\<lparr> f_locs=locs, f_inst=i \<rparr>,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs@labsf,case_ret ret retf)} (s',\<lparr> f_locs=locs', f_inst=i \<rparr>, res))) \<longrightarrow>
                                       res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q)"
 
 definition valid_triples_n :: "'a triple_context \<Rightarrow> nat \<Rightarrow> 'a triple set \<Rightarrow> bool" ("_ \<TTurnstile>'_ _ _" 60) where
@@ -329,7 +329,7 @@ lemma ex_ret:"\<exists>rs. ret = map_option ass_stack_len rs"
 lemma res_wf_valid_triple_n_intro:
   assumes "\<Gamma> \<Turnstile>_k {P}es{Q}"
           "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-          "((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs@labsf,case_ret ret retf,i)} (s',locs', res))"
+          "((s,\<lparr> f_locs=locs, f_inst=i \<rparr>,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs@labsf,case_ret ret retf)} (s',\<lparr> f_locs=locs', f_inst=i \<rparr>, res))"
   shows "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
   using assms
   unfolding valid_triple_n_def
@@ -338,7 +338,7 @@ lemma res_wf_valid_triple_n_intro:
 lemma res_wf_valid_triple_n_intro_tight:
   assumes "\<Gamma> \<Turnstile>_k {P}es{Q}"
           "ass_wf lvar_st ret \<Gamma> labs locs s hf st h vcs P"
-          "((s,locs,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs,ret,i)} (s',locs', res))"
+          "((s,\<lparr> f_locs=locs, f_inst=i \<rparr>,($$*vcsf)@($$*vcs)@es) \<Down>k{(labs,ret)} (s',\<lparr> f_locs=locs', f_inst=i \<rparr>, res))"
   shows "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
   using res_wf_valid_triple_n_intro[OF assms(1,2), of vcsf "[]" None] assms(3)
   by fastforce
@@ -358,13 +358,13 @@ proof -
   {
     fix vcs h st s locs labs labsf ret retf lvar_st hf vcsf s' locs' res
     assume local_assms:"ass_wf lvar_st ret (fs, ls', rs') labs locs s hf st h vcs P"
-                       "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Call j]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
+                       "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$* vcsf) @ ($$* vcs) @ [$Call j]) \<Down>n{(labs@labsf, case_ret ret retf)} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
     obtain ret' labs' where "ass_wf lvar_st ret' (fs, ls, rs) labs' locs s hf st h vcs P"
       using local_assms(1) 
       unfolding ass_wf_def reifies_s_def reifies_lab_def reifies_ret_def
       by fastforce
     moreover
-    have "(s, locs, ($$* vcsf) @ ($$* vcs) @ [$Call j]) \<Down>n{(labs'@labsf, case_ret ret' retf, i)} (s', locs', res)"
+    have "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$* vcsf) @ ($$* vcs) @ [$Call j]) \<Down>n{(labs'@labsf, case_ret ret' retf)} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
       by (metis append_assoc calln_context local_assms(2) map_append)
     ultimately
     have "res_wf lvar_st (fs, ls, rs) res locs' s' hf vcsf Q"
@@ -531,7 +531,7 @@ proof -
   {
     fix vcs h st s locs labs' labsf' ret' retf' lvar_st hf vcsf s' locs' res
     assume local_assms:"ass_wf lvar_st ret' (fs,ls',rs') labs' locs s hf st h vcs P"
-                       "(s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs'@labsf', case_ret ret' retf', i)} (s', locs', res)"
+                       "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs'@labsf', case_ret ret' retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
     have "ass_wf lvar_st ret' (fs,ls',rs') labs' locs s hf st h vcs P'"
       using ass_wf_conseq1[OF local_assms(1)] assms(2)
       by blast
@@ -544,7 +544,7 @@ proof -
     have "res_wf lvar_st (fs,ls',rs') res locs' s' hf vcsf Q"
     proof (cases res)
       case (RValue x1)
-      hence "(s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf', i)} (s', locs', res)"
+      hence "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
         using reduce_to_n_not_break_n_return[OF local_assms(2)] labs_def(2)
         by simp
       hence "res_wf lvar_st (fs,ls,rs) res locs' s' hf vcsf Q'"
@@ -560,7 +560,7 @@ proof -
       have 0:"ib < length (labs'@labsf')"
         using local_assms(2) RBreak reduce_to_n_break_n
         by fastforce
-      have b0:"(s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs'@labsf', case_ret ret' retf', i)} (s', locs', RBreak ib vbs)"
+      have b0:"(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs'@labsf', case_ret ret' retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, RBreak ib vbs)"
         using local_assms(2) RBreak
         by simp
       show ?thesis
@@ -576,7 +576,7 @@ proof -
           using True 0 labs_def local_assms(1)
           unfolding list_all2_conv_all_nth ass_wf_def reifies_lab_def
           by fastforce+
-        obtain vbs' where 2:"((s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf', i)} (s', locs', RBreak ib vbs'))"
+        obtain vbs' where 2:"((s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, RBreak ib vbs'))"
           using reduce_to_n_break_n2[OF reduce_to_n_not_return[OF b0] labs_def(4)] 0 1(2)
           by simp (metis True append_Nil2 labs_def(2) nth_append)
         thus ?thesis
@@ -585,7 +585,7 @@ proof -
           by (simp split: res_b.splits) (metis True append_Nil2 labs_def(2) nth_append)
       next
         case False
-        hence "(s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf', i)} (s', locs', res)"
+        hence "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
           using reduce_to_n_not_break_n_return[OF local_assms(2), of "labs@labsf'"] RBreak
                 labs_def(2)
           by simp (metis nth_append)
@@ -627,7 +627,7 @@ proof -
           using r_r'_def local_assms(1)
           unfolding ass_wf_def reifies_ret_def
           by (metis (mono_tags, lifting) ass_wf_def eq_snd_iff labs_def(1) option.inject option.map(2) reifies_ret_def)
-        then obtain vrs' where "((s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf', i)} (s', locs', RReturn vrs'))"
+        then obtain vrs' where "((s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, RReturn vrs'))"
           using local_assms(2) RReturn reduce_to_n_return2 reduce_to_n_not_break_n r_r'_def(1,2)
           by (metis labs_def(4) option.simps(5) res_b.distinct(7))
         thus ?thesis
@@ -641,7 +641,7 @@ proof -
           done
       next
         case False
-        hence "(s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf', i)} (s', locs', res)"
+        hence "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
           using reduce_to_n_not_break_n_return[OF local_assms(2), of "labs@labsf'" "case_ret ret retf'"] RReturn labs_def(2)
           by auto
         hence "res_wf lvar_st (fs,ls,rs) res locs' s' hf vcsf Q'"
@@ -655,7 +655,7 @@ proof -
       qed
     next
       case RTrap
-      hence "(s, locs, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf', i)} (s', locs', res)"
+      hence "(s, \<lparr> f_locs=locs, f_inst=i \<rparr>, ($$*vcsf)@($$*vcs)@es) \<Down>n{(labs@labsf', case_ret ret retf')} (s', \<lparr> f_locs=locs', f_inst=i \<rparr>, res)"
         using reduce_to_n_not_break_n_return[OF local_assms(2)] labs_def(2)
         by auto
       hence "res_wf lvar_st (fs,ls,rs) res locs' s' hf vcsf Q'"

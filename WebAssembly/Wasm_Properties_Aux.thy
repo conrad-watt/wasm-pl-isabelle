@@ -728,13 +728,13 @@ lemma s_type_unfold:
   by auto
 
 lemma e_type_local:
-  assumes "s\<bullet>\<C> \<turnstile> [Local n i vs es] : (ts _> ts')"
-  shows "\<exists>tls \<C>i. inst_typing s i \<C>i
+  assumes "s\<bullet>\<C> \<turnstile> [Local n f es] : (ts _> ts')"
+  shows "\<exists>tls \<C>i. inst_typing s (f_inst f) \<C>i
                 \<and> length tls = n
-                \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof vs), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))
+                \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof (f_locs f)), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))
                 \<and> ts' = ts @ tls"
   using assms
-proof (induction "s" "\<C>" "[Local n i vs es]" "(ts _> ts')" arbitrary: ts ts')
+proof (induction "s" "\<C>" "[Local n f es]" "(ts _> ts')" arbitrary: ts ts')
   case (2 \<S> \<C> es' t1s t2s e t3s)
   have "t1s = t2s"
     using 2 unlift_b_e
@@ -745,18 +745,18 @@ proof (induction "s" "\<C>" "[Local n i vs es]" "(ts _> ts')" arbitrary: ts ts')
 qed (auto simp add: unlift_b_e s_typing.simps)
 
 lemma e_type_local_shallow:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [Local n i vs es] : (ts _> ts')"
-  shows "\<exists>tls. length tls = n \<and> ts' = ts@tls \<and> (\<S>\<bullet>(Some tls) \<tturnstile>_i vs;es : tls)"
+  assumes "\<S>\<bullet>\<C> \<turnstile> [Local n f es] : (ts _> ts')"
+  shows "\<exists>tls. length tls = n \<and> ts' = ts@tls \<and> (\<S>\<bullet>(Some tls) \<tturnstile>_(f_inst f) (f_locs f);es : tls)"
   using assms
-proof (induction "\<S>" "\<C>" "[Local n i vs es]" "(ts _> ts')" arbitrary: ts ts')
+proof (induction "\<S>" "\<C>" "[Local n f es]" "(ts _> ts')" arbitrary: ts ts')
   case (1 \<C> b_es \<S>)
   thus ?case
   by (metis e.distinct(7) map_eq_Cons_D)
 next
   case (2 \<S> \<C> es t1s t2s e t3s)
   thus ?case
-  by simp (metis append_Nil append_eq_append_conv e_type_comp_conc e_type_local)
-qed simp_all
+    by simp (metis append_Nil append_eq_append_conv e_type_comp_conc e_type_local)
+qed auto
 
 (* Some proofs treat (lists of) consts as an opaque (typed) arrangement. *)
 lemma e_type_const_unwrap:
