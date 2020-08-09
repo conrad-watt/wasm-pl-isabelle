@@ -149,17 +149,17 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v2)]\<rparr>"
 | select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v1)]\<rparr>"
   \<comment> \<open>\<open>block\<close>\<close>
-| block:"\<lbrakk>const_list vs; length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>vs @ [$(Block (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label m [] (vs @ ($* es))]\<rparr>"
+| block:"\<lbrakk>length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>($C* vs) @ [$(Block (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label m [] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>loop\<close>\<close>
-| loop:"\<lbrakk>const_list vs; length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>vs @ [$(Loop (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label n [$(Loop (t1s _> t2s) es)] (vs @ ($* es))]\<rparr>"
+| loop:"\<lbrakk>length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>($C* vs) @ [$(Loop (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label n [$(Loop (t1s _> t2s) es)] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
 | if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(If tf e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tf e2s)]\<rparr>"
 | if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(If tf e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tf e1s)]\<rparr>"
   \<comment> \<open>\<open>label\<close>\<close>
-| label_const:"const_list vs \<Longrightarrow> \<lparr>[Label n es vs]\<rparr> \<leadsto> \<lparr>vs\<rparr>"
+| label_const:"\<lparr>[Label n es ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
 | label_trap:"\<lparr>[Label n es [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>const_list vs; length vs = n; Lfilled i lholed (vs @ [$(Br i)]) LI\<rbrakk> \<Longrightarrow> \<lparr>[Label n es LI]\<rparr> \<leadsto> \<lparr>vs @ es\<rparr>"
+| br:"\<lbrakk>length vs = n; Lfilled i lholed (($C* vs) @ [$(Br i)]) LI\<rbrakk> \<Longrightarrow> \<lparr>[Label n es LI]\<rparr> \<leadsto> \<lparr>($C* vs) @ es\<rparr>"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
 | br_if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
@@ -167,12 +167,12 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | br_table:"\<lbrakk>length is > (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br (is!(nat_of_int c)))]\<rparr>"
 | br_table_length:"\<lbrakk>length is \<le> (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
   \<comment> \<open>\<open>local\<close>\<close>
-| local_const:"\<lbrakk>const_list es\<rbrakk> \<Longrightarrow> \<lparr>[Local n f es]\<rparr> \<leadsto> \<lparr>es\<rparr>"
+| local_const:"\<lparr>[Local n f ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
 | local_trap:"\<lparr>[Local n f [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>const_list vs; length vs = n; Lfilled j lholed (vs @ [$Return]) es\<rbrakk>  \<Longrightarrow> \<lparr>[Local n f es]\<rparr> \<leadsto> \<lparr>vs\<rparr>"
+| return:"\<lbrakk>length vs = n; Lfilled j lholed (($C* vs) @ [$Return]) es\<rbrakk>  \<Longrightarrow> \<lparr>[Local n f es]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
   \<comment> \<open>\<open>tee_local\<close>\<close>
-| tee_local:"is_const v \<Longrightarrow> \<lparr>[v, $(Tee_local i)]\<rparr> \<leadsto> \<lparr>[v, v, $(Set_local i)]\<rparr>"
+| tee_local:"\<lparr>[$C v, $(Tee_local i)]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $(Set_local i)]\<rparr>"
 | trap:"\<lbrakk>es \<noteq> [Trap]; Lfilled 0 lholed [Trap] es\<rbrakk> \<Longrightarrow> \<lparr>es\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
 
 (* full reduction rule *)
@@ -185,9 +185,9 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some cl; stypes s i j = tf; cl_type cl = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke cl]\<rparr>"
 | call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some cl \<and> stypes s i j \<noteq> cl_type cl) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Local m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [$(Block ([] _> t2s) es)]]\<rparr>"
-| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s';f;($$* vcs')\<rparr>"
-| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Local m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [$(Block ([] _> t2s) es)]]\<rparr>"
+| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
+| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j; f_locs f = (vi @ [v] @ vs)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Get_local j)]\<rparr> \<leadsto> \<lparr>s;f;[$(C v)]\<rparr>"
   \<comment> \<open>\<open>set_local\<close>\<close>

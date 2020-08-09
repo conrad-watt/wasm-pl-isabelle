@@ -68,12 +68,12 @@ lemma app_conv_split_n:
 lemma split_vals_const_list: "split_vals (map EConst vs) = (vs, [])"
   by (induction vs, simp_all)
 
-lemma split_vals_e_const_list: "split_vals_e ($$* vs) = (vs, [])"
+lemma split_vals_e_const_list: "split_vals_e ($C* vs) = (vs, [])"
   by (induction vs, simp_all)
 
 lemma split_vals_e_conv_app:
   assumes "split_vals_e xs = (as, bs)"
-  shows "xs = ($$* as)@bs"
+  shows "xs = ($C* as)@bs"
   using assms
 proof (induction xs arbitrary: as rule: split_vals_e.induct)
   case (1 v es)
@@ -90,7 +90,7 @@ abbreviation expect :: "'a option \<Rightarrow> ('a \<Rightarrow> 'b) \<Rightarr
                    | None \<Rightarrow> b)"
 
 abbreviation vs_to_es :: " v list \<Rightarrow> e list"
-  where "vs_to_es v \<equiv> $$* (rev v)"
+  where "vs_to_es v \<equiv> $C* (rev v)"
 
 definition e_is_trap :: "e \<Rightarrow> bool" where
   "e_is_trap e = (case e of Trap \<Rightarrow> True | _ \<Rightarrow> False)"
@@ -416,7 +416,7 @@ and run_one_step :: "depth \<Rightarrow> config_one_tuple \<Rightarrow> res_tupl
                      Some (s',rves) \<Rightarrow> 
                        if list_all2 types_agree t2s rves
                          then
-                           (s', f, RSNormal ((vs_to_es ves'') @ ($$* rves)))
+                           (s', f, RSNormal ((vs_to_es ves'') @ ($C* rves)))
                          else
                            (s', f, crash_error)
                    | None \<Rightarrow> (s, f, RSNormal ((vs_to_es ves'')@[Trap]))

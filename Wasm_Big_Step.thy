@@ -40,7 +40,7 @@ inductive reduce_to :: "[(s \<times> f \<times> e list), (nat list \<times> nat 
 | if_false:"\<lbrakk>int_eq n 0; const_list ves; (s,f,ves@[$(Block tf e2s)]) \<Down>{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>{\<Gamma>} (s',f',res)"
 | if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,f,ves@[$(Block tf e1s)]) \<Down>{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>length vcs = n; k < length ls; ls!k = n\<rbrakk> \<Longrightarrow> (s,f,(($$*vcs) @ [$(Br k)])) \<Down>{(ls,r)} (s,f,RBreak k vcs)"
+| br:"\<lbrakk>length vcs = n; k < length ls; ls!k = n\<rbrakk> \<Longrightarrow> (s,f,(($C*vcs) @ [$(Br k)])) \<Down>{(ls,r)} (s,f,RBreak k vcs)"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> (s,f,[$C (ConstInt32 n), $(Br_if k)]) \<Down>{\<Gamma>} (s,f,RValue [])"
 | br_if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,f,ves@[$(Br k)]) \<Down>{\<Gamma>} (s',f',res) \<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 n), $(Br_if k)]) \<Down>{\<Gamma>} (s',f',res)"
@@ -48,7 +48,7 @@ inductive reduce_to :: "[(s \<times> f \<times> e list), (nat list \<times> nat 
 | br_table:"\<lbrakk>length ks > (nat_of_int c); const_list ves; (s,f,ves@[$(Br (ks!(nat_of_int c)))]) \<Down>{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>{\<Gamma>} (s',f',res)"
 | br_table_length:"\<lbrakk>length ks \<le> (nat_of_int c); const_list ves; (s,f,ves@[$(Br k)]) \<Down>{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>length vcs = r\<rbrakk>  \<Longrightarrow> (s,f,($$*vcs) @ [$Return]) \<Down>{(ls,Some r)} (s,f,RReturn vcs)"
+| return:"\<lbrakk>length vcs = r\<rbrakk>  \<Longrightarrow> (s,f,($C*vcs) @ [$Return]) \<Down>{(ls,Some r)} (s,f,RReturn vcs)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> (s,\<lparr> f_locs=(vi @ [v] @ vs), f_inst=inst \<rparr>,[$(Get_local j)]) \<Down>{\<Gamma>} (s,\<lparr> f_locs=(vi @ [v] @ vs), f_inst=inst \<rparr>,RValue [v])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -83,15 +83,15 @@ inductive reduce_to :: "[(s \<times> f \<times> e list), (nat list \<times> nat 
 | call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some cl; stypes s (f_inst f) j = tf; cl_type cl = tf; const_list ves; (s,f,ves@[Invoke cl]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s',f',res)"
 | call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some cl \<and> stypes s (f_inst f) j \<noteq> cl_type cl) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f',res)"
-| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f,RValue vcs')"
-| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s,f,RTrap)"
+| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f',res)"
+| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f,RValue vcs')"
+| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
-| const_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($$*ves)@es) \<Down>{\<Gamma>} (s',f',RValue (ves@res))"
+| const_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($C*ves)@es) \<Down>{\<Gamma>} (s',f',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RValue res)"
 | local_value:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>{\<Gamma>} (s',f,RValue res)"
   \<comment> \<open>\<open>seq congruence\<close>\<close>
-| seq_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s'',f'',RValue res''); (s'',f'',($$* res'') @ es') \<Down>{\<Gamma>} (s',f',res); \<not> const_list es; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>{\<Gamma>} (s',f',res)"
+| seq_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s'',f'',RValue res''); (s'',f'',($C* res'') @ es') \<Down>{\<Gamma>} (s',f',res); \<not> const_list es; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>{\<Gamma>} (s',f',res)"
 | seq_nonvalue1:"\<lbrakk>const_list ves; (s,f,es) \<Down>{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; ves \<noteq> []; es \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,ves @ es) \<Down>{\<Gamma>} (s',f',res)"
 | seq_nonvalue2:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>trap congruence\<close>\<close>
@@ -99,7 +99,7 @@ inductive reduce_to :: "[(s \<times> f \<times> e list), (nat list \<times> nat 
 | local_trap:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>{\<Gamma>} (s',f,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
 | label_break_suc:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RBreak bn bvs)"
-| label_break_nil:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s'',f'',RBreak 0 bvs); (s'',f'',($$*(vcs @ bvs)) @ les) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,($$*vcs)@[Label n les es]) \<Down>{(ls,r)} (s',f',res)"
+| label_break_nil:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s'',f'',RBreak 0 bvs); (s'',f'',($C*(vcs @ bvs)) @ les) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,($C*vcs)@[Label n les es]) \<Down>{(ls,r)} (s',f',res)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RReturn rvs)"
 | local_return:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>{\<Gamma>} (s',f,RValue rvs)"
@@ -140,7 +140,7 @@ inductive reduce_to_n :: "[(s \<times> f \<times> e list), nat, (nat list \<time
 | if_false:"\<lbrakk>int_eq n 0; const_list ves; (s,f,ves@[$(Block tf e2s)]) \<Down>k'{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>k'{\<Gamma>} (s',f',res)"
 | if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,f,ves@[$(Block tf e1s)]) \<Down>k'{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 n), $(If tf e1s e2s)]) \<Down>k'{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>length vcs = n; k < length ls; ls!k = n\<rbrakk> \<Longrightarrow> (s,f,(($$*vcs) @ [$(Br k)])) \<Down>k'{(ls,r)} (s,f,RBreak k vcs)"
+| br:"\<lbrakk>length vcs = n; k < length ls; ls!k = n\<rbrakk> \<Longrightarrow> (s,f,(($C*vcs) @ [$(Br k)])) \<Down>k'{(ls,r)} (s,f,RBreak k vcs)"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> (s,f,[$C (ConstInt32 n), $(Br_if k)]) \<Down>k'{\<Gamma>} (s,f,RValue [])"
 | br_if_true:"\<lbrakk>int_ne n 0; const_list ves; (s,f,ves@[$(Br k)]) \<Down>k'{\<Gamma>} (s',f',res) \<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 n), $(Br_if k)]) \<Down>k'{\<Gamma>} (s',f',res)"
@@ -148,7 +148,7 @@ inductive reduce_to_n :: "[(s \<times> f \<times> e list), nat, (nat list \<time
 | br_table:"\<lbrakk>length ks > (nat_of_int c); const_list ves; (s,f,ves@[$(Br (ks!(nat_of_int c)))]) \<Down>k'{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>k'{\<Gamma>} (s',f',res)"
 | br_table_length:"\<lbrakk>length ks \<le> (nat_of_int c); const_list ves; (s,f,ves@[$(Br k)]) \<Down>k'{\<Gamma>} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Br_table ks k)]) \<Down>k'{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>length vcs = r\<rbrakk>  \<Longrightarrow> (s,f,($$*vcs) @ [$Return]) \<Down>k'{(ls,Some r)} (s,f,RReturn vcs)"
+| return:"\<lbrakk>length vcs = r\<rbrakk>  \<Longrightarrow> (s,f,($C*vcs) @ [$Return]) \<Down>k'{(ls,Some r)} (s,f,RReturn vcs)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> (s,\<lparr> f_locs=(vi @ [v] @ vs), f_inst=inst \<rparr>,[$(Get_local j)]) \<Down>k'{\<Gamma>} (s,\<lparr> f_locs=(vi @ [v] @ vs), f_inst=inst \<rparr>,RValue [v])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -183,15 +183,15 @@ inductive reduce_to_n :: "[(s \<times> f \<times> e list), nat, (nat list \<time
 | call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some cl; stypes s (f_inst f) j = tf; cl_type cl = tf; const_list ves; (s,f,ves@[Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s',f',res)"
 | call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some cl \<and> stypes s (f_inst f) j \<noteq> cl_type cl) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)"
-| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f,RValue vcs')"
-| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s,f,RTrap)"
+| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)"
+| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f,RValue vcs')"
+| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
-| const_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($$*ves)@es) \<Down>k'{\<Gamma>} (s',f',RValue (ves@res))"
+| const_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($C*ves)@es) \<Down>k'{\<Gamma>} (s',f',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RValue res)"
 | local_value:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>k'{\<Gamma>} (s',f,RValue res)"
   \<comment> \<open>\<open>seq congruence\<close>\<close>
-| seq_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s'',f'',RValue res''); (s'',f'',($$* res'') @ es') \<Down>k'{\<Gamma>} (s',f',res); \<not> const_list es; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>k'{\<Gamma>} (s',f',res)"
+| seq_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s'',f'',RValue res''); (s'',f'',($C* res'') @ es') \<Down>k'{\<Gamma>} (s',f',res); \<not> const_list es; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>k'{\<Gamma>} (s',f',res)"
 | seq_nonvalue1:"\<lbrakk>const_list ves; (s,f,es) \<Down>k'{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; ves \<noteq> []; es \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,ves @ es) \<Down>k'{\<Gamma>} (s',f',res)"
 | seq_nonvalue2:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>k'{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>trap congruence\<close>\<close>
@@ -199,7 +199,7 @@ inductive reduce_to_n :: "[(s \<times> f \<times> e list), nat, (nat list \<time
 | local_trap:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>k'{\<Gamma>} (s',f,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
 | label_break_suc:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RBreak bn bvs)"
-| label_break_nil:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s'',f'',RBreak 0 bvs); (s'',f'',($$*(vcs @ bvs)) @ les) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,($$*vcs)@[Label n les es]) \<Down>k'{(ls,r)} (s',f',res)"
+| label_break_nil:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s'',f'',RBreak 0 bvs); (s'',f'',($C*(vcs @ bvs)) @ les) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,($C*vcs)@[Label n les es]) \<Down>k'{(ls,r)} (s',f',res)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RReturn rvs)"
 | local_return:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>k'{\<Gamma>} (s',f,RValue rvs)"
@@ -264,7 +264,7 @@ lemma reduce_to_n_emp:
                   apply auto
   done
 
-lemma reduce_to_n_consts1: "((s,vs,($$*ves)) \<Down>k{\<Gamma>} (s,vs,RValue ves))"
+lemma reduce_to_n_consts1: "((s,vs,($C*ves)) \<Down>k{\<Gamma>} (s,vs,RValue ves))"
   using reduce_to_n.emp reduce_to_n.const_value reduce_to_n.emp
   apply (cases "ves = []")
   apply simp_all
@@ -272,10 +272,10 @@ lemma reduce_to_n_consts1: "((s,vs,($$*ves)) \<Down>k{\<Gamma>} (s,vs,RValue ves
   done
 
 lemma reduce_to_consts:
-  assumes "((s,vs,($$*ves)) \<Down>{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)) \<Down>{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue ves"
   using assms
-proof (induction "(s,vs,($$*ves))""\<Gamma>" "(s',vs',res)" arbitrary: s vs ves s' vs' res rule: reduce_to.induct)
+proof (induction "(s,vs,($C*ves))""\<Gamma>" "(s',vs',res)" arbitrary: s vs ves s' vs' res rule: reduce_to.induct)
   case (block ves n t1s t2s m es \<Gamma>)
   thus ?case
     using consts_cons_last(2) e_type_const_unwrap
@@ -402,7 +402,7 @@ lemma reduce_to_n_return1:
   by (meson reduce_to_n_imp_reduce_to)
 
 lemma reduce_to_single_helper1:
-  assumes "($$*ves)@es = [e]"
+  assumes "($C*ves)@es = [e]"
           "\<not>is_const e"
   shows "ves = []"
   using assms
@@ -435,7 +435,7 @@ next
     done
 qed auto
 
-lemma reduce_to_consts1: "((s,vs,($$*ves)) \<Down>{\<Gamma>} (s,vs,RValue ves))"
+lemma reduce_to_consts1: "((s,vs,($C*ves)) \<Down>{\<Gamma>} (s,vs,RValue ves))"
   using reduce_to.emp reduce_to.const_value reduce_to.emp
   apply (cases "ves = []")
   apply simp_all
@@ -443,15 +443,15 @@ lemma reduce_to_consts1: "((s,vs,($$*ves)) \<Down>{\<Gamma>} (s,vs,RValue ves))"
   done
 
 lemma reduce_to_n_consts:
-  assumes "((s,vs,($$*ves)) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue ves"
   using assms reduce_to_consts reduce_to_n_imp_reduce_to
   by blast
 
-lemma call0: "((s,vs,($$*ves)@[$(Call j)]) \<Down>0{\<Gamma>} (s',vs',res)) \<Longrightarrow> False"
-proof (induction "(s,vs,($$*ves)@[$(Call j)])" "0::nat" \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
+lemma call0: "((s,vs,($C*ves)@[$(Call j)]) \<Down>0{\<Gamma>} (s',vs',res)) \<Longrightarrow> False"
+proof (induction "(s,vs,($C*ves)@[$(Call j)])" "0::nat" \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
   case (const_value s vs es \<Gamma> s' vs' res ves ves')
-  consider (1) "es = []" | (2) "\<exists>ves'. es = ($$* ves') @ [$Call j]"
+  consider (1) "es = []" | (2) "\<exists>ves'. es = ($C* ves') @ [$Call j]"
     using consts_cons_last consts_app_ex const_value(3)
     by (metis const_value.hyps(4) consts_app_snoc)
   thus ?case
@@ -462,7 +462,7 @@ proof (induction "(s,vs,($$*ves)@[$(Call j)])" "0::nat" \<Gamma> "(s',vs',res)" 
     done
 next
   case (seq_value s vs es \<Gamma> s'' vs'' res'' es' s' vs' res)
-  consider (1) "es' = []" | (2) "\<exists>ves'. es' = ($$* ves') @ [$Call j]"
+  consider (1) "es' = []" | (2) "\<exists>ves'. es' = ($C* ves') @ [$Call j]"
     using consts_cons_last consts_app_ex seq_value(7)
     by (metis consts_app_snoc seq_value.hyps(6))
   thus ?case
@@ -482,12 +482,12 @@ next
 qed (fastforce intro: reduce_to_n.intros)+
 
 lemma reduce_to_n_current_memory:
-  assumes "((s,f,($$*ves)@[$Current_memory]) \<Down>k{(ls,r)} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$Current_memory]) \<Down>k{(ls,r)} (s',f',res))"
   shows "\<exists>n j m. s = s' \<and> f = f' \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)]) \<and> smem_ind s (f_inst f) = Some j \<and> ((mems s)!j) = m \<and> mem_size m = n"
   using assms
-proof (induction "(s,f,($$*ves)@[$Current_memory])" k "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$Current_memory])" k "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
-  consider (1) "es = []" | (2) "\<exists>ves'. es = ($$* ves') @ [$Current_memory]"
+  consider (1) "es = []" | (2) "\<exists>ves'. es = ($C* ves') @ [$Current_memory]"
     using consts_app_snoc[OF const_value(4)]
     by fastforce
   thus ?case
@@ -649,10 +649,10 @@ lemma no_reduce_to_n_unop:
   by metis
 
 lemma reduce_to_n_nop:
-  assumes "((s,vs,($$*ves)@[$Nop]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$Nop]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue (ves)"
   using assms
-proof (induction "(s,vs,($$*ves)@[$Nop])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$Nop])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
   thus ?case
     using consts_app_snoc[OF const_value(4)]
@@ -680,10 +680,10 @@ next
 qed auto
 
 lemma reduce_to_n_get_local:
-  assumes "((s,f,($$*ves)@[$Get_local j]) \<Down>k{\<Gamma>} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$Get_local j]) \<Down>k{\<Gamma>} (s',f',res))"
   shows "s = s' \<and> f = f' \<and> j < length (f_locs f) \<and> res = RValue (ves@[(f_locs f)!j])"
   using assms
-proof (induction "(s,f,($$*ves)@[$Get_local j])" k "\<Gamma>" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$Get_local j])" k "\<Gamma>" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
   thus ?case
     using consts_app_snoc[OF const_value(4)]
@@ -715,10 +715,10 @@ next
 qed auto
 
 lemma reduce_to_n_set_local:
-  assumes "((s,f,($$*ves)@[$C v, $Set_local j]) \<Down>k{\<Gamma>} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$C v, $Set_local j]) \<Down>k{\<Gamma>} (s',f',res))"
   shows "s = s' \<and> (f_locs f)[j:= v] = (f_locs f') \<and> j < length (f_locs f) \<and> res = RValue (ves) \<and> f_inst f = f_inst f'"
   using assms
-proof (induction "(s,f,($$*ves)@[$C v, $Set_local j])" k "\<Gamma>" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$C v, $Set_local j])" k "\<Gamma>" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
   thus ?case
     using consts_app_snoc_1[OF const_value(4)]
@@ -732,7 +732,7 @@ next
     by (meson b_e.distinct(589) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves' s vs es k \<Gamma> s' vs' res)
-  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+  obtain vcs' where ves'_is:"ves' = $C* vcs'"
     using seq_nonvalue1 e_type_const_conv_vs
     by blast
   show ?case
@@ -752,10 +752,10 @@ next
 qed auto
 
 lemma reduce_to_n_tee_local:
-  assumes "((s,vs,($$*ves)@[$C v, $Tee_local j]) \<Down>k{\<Gamma>} (s',vs',res))"
-  shows "((s,vs,($$*ves)@[$C v, $C v, $Set_local j]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v, $Tee_local j]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "((s,vs,($C*ves)@[$C v, $C v, $Set_local j]) \<Down>k{\<Gamma>} (s',vs',res))"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v, $Tee_local j])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v, $Tee_local j])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
     using consts_app_snoc_1[OF const_value(4)]
@@ -772,7 +772,7 @@ next
     by (meson b_e.distinct(613) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves' s vs es k \<Gamma> s' vs' res)
-  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+  obtain vcs' where ves'_is:"ves' = $C* vcs'"
     using seq_nonvalue1 e_type_const_conv_vs
     by blast
   show ?case
@@ -795,10 +795,10 @@ next
 qed auto
 
 lemma reduce_to_n_get_global:
-  assumes "((s,f,($$*ves)@[$Get_global j]) \<Down>k{(ls,r)} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$Get_global j]) \<Down>k{(ls,r)} (s',f',res))"
   shows "s = s' \<and> f = f' \<and> res = RValue (ves@[(sglob_val s (f_inst f) j)])"
   using assms
-proof (induction "(s,f,($$*ves)@[$Get_global j])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$Get_global j])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s es k' s' res ves)
   thus ?case
     using consts_app_snoc[OF const_value(4)]
@@ -829,10 +829,10 @@ next
 qed auto
 
 lemma reduce_to_n_set_global:
-  assumes "((s,f,($$*ves)@[$C v, $Set_global j]) \<Down>k{(ls,r)} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$C v, $Set_global j]) \<Down>k{(ls,r)} (s',f',res))"
   shows "(supdate_glob s (f_inst f) j v) = s' \<and> f = f' \<and> res = RValue (ves)"
   using assms
-proof (induction "(s,f,($$*ves)@[$C v, $Set_global j])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$C v, $Set_global j])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
   thus ?case
     using consts_app_snoc_1[OF const_value(4)]
@@ -846,7 +846,7 @@ next
     by (meson b_e.distinct(655) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves' s vs es k s' vs' res)
-  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+  obtain vcs' where ves'_is:"ves' = $C* vcs'"
     using seq_nonvalue1 e_type_const_conv_vs
     by blast
   show ?case
@@ -866,13 +866,13 @@ next
 qed auto
 
 lemma reduce_to_n_load:
-  assumes "((s,f,($$*ves)@[$C ConstInt32 c, $Load t None a off]) \<Down>k{(ls,r)} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$C ConstInt32 c, $Load t None a off]) \<Down>k{(ls,r)} (s',f',res))"
   shows "s = s' \<and> f = f' \<and> (\<exists>j m. smem_ind s (f_inst f) = Some j \<and> ((mems s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (t_length t) = Some bs \<and> res = RValue (ves@[(wasm_deserialise bs t)])) \<or> (load m (nat_of_int c) off (t_length t) = None \<and> res = RTrap)))"
   using assms
-proof (induction "(s,f,($$*ves)@[$C ConstInt32 c, $Load t None a off])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$C ConstInt32 c, $Load t None a off])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
   consider (1) "es = [$Load t None a off] \<and> ves = ves' @ [ConstInt32 c]"
-         | (2) ves'' where "(es = ($$* ves'') @ [$C ConstInt32 c, $Load t None a off] \<and> ves' = ves @ ves'')"
+         | (2) ves'' where "(es = ($C* ves'') @ [$C ConstInt32 c, $Load t None a off] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)]
     by (fastforce simp add: is_const_def)
   thus ?case
@@ -889,7 +889,7 @@ next
     by (metis b_e.simps(695) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves' s vs es k s' vs' res)
-  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+  obtain vcs' where ves'_is:"ves' = $C* vcs'"
     using seq_nonvalue1 e_type_const_conv_vs
     by blast
   show ?case
@@ -910,13 +910,13 @@ qed auto
 
 (*   "load_packed sx m n off lp l = map_option (sign_extend sx l) (load m n off lp)" *)
 lemma reduce_to_n_load_packed:
-  assumes "((s,f,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r)} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)]) \<Down>k{(ls,r)} (s',f',res))"
   shows "s = s' \<and> f = f' \<and> (\<exists>j m. smem_ind s (f_inst f) = Some j \<and> ((mems s)!j) = m \<and> (\<exists>bs. (load m (nat_of_int c) off (tp_length tp) = Some bs \<and> res = RValue (ves@[(wasm_deserialise (sign_extend sx (t_length t) bs) t)])) \<or> (load m (nat_of_int c) off (tp_length tp) = None \<and> res = RTrap)))"
   using assms
-proof (induction "(s,f,($$*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
   consider (1) "es = [$(Load t (Some (tp, sx)) a off)] \<and> ves = ves' @ [ConstInt32 c]"
-         | (2) ves'' where "(es = ($$* ves'') @ [$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)] \<and> ves' = ves @ ves'')"
+         | (2) ves'' where "(es = ($C* ves'') @ [$C ConstInt32 c, $(Load t (Some (tp, sx)) a off)] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)]
     by (fastforce simp add: is_const_def)
   thus ?case
@@ -933,7 +933,7 @@ next
     by (metis b_e.simps(695) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves' s vs es k s' vs' res)
-  obtain vcs' where ves'_is:"ves' = $$* vcs'"
+  obtain vcs' where ves'_is:"ves' = $C* vcs'"
     using seq_nonvalue1 e_type_const_conv_vs
     by blast
   show ?case
@@ -954,16 +954,16 @@ qed (auto simp add: load_packed_def)
 (* | store_Some:"\<lbrakk>types_agree t v; smem_ind s i = Some j; ((mems s)!j) = m; store m (nat_of_int n) off (bits v) (t_length t) = Some mem'\<rbrakk> \<Longrightarrow> (s,vs,[$C (ConstInt32 n), $C v, $(Store t None a off)]) \<Down>k{(ls,r,i)} (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>,vs,RValue [])"
 *)
 lemma reduce_to_n_store:
-  assumes "((s,f,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off]) \<Down>k{(ls,r)} (s',f',res))"
+  assumes "((s,f,($C*ves)@[$C (ConstInt32 c), $C v, $Store t None a off]) \<Down>k{(ls,r)} (s',f',res))"
   shows "f = f' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s (f_inst f) = Some j \<and> s.mems s ! j = m \<and>
            ((s = s' \<and> store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = None \<and> res = RTrap) \<or>
             (\<exists>mem'. store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (t_length t) = Some mem' \<and> s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and> res = RValue ves)))"
   using assms
-proof (induction "(s,f,($$*ves)@[$C (ConstInt32 c), $C v, $Store t None a off])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,f,($C*ves)@[$C (ConstInt32 c), $C v, $Store t None a off])" k "(ls,r)" "(s',f',res)" arbitrary: s f f' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
   consider (1) "(es = [$Store t None a off] \<and> ves = ves' @ [ConstInt32 c, v])"
          | (2) "(es = [$C v, $Store t None a off] \<and> ves = ves'@[ConstInt32 c])"
-         | (3) "(\<exists>ves''. es = ($$*ves'')@[$C ConstInt32 c, $C v, $Store t None a off] \<and> ves' = ves@ves'')"
+         | (3) "(\<exists>ves''. es = ($C*ves'')@[$C ConstInt32 c, $C v, $Store t None a off] \<and> ves' = ves@ves'')"
     using consts_app_snoc_2[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1006,16 +1006,16 @@ next
 qed auto
 
 lemma reduce_to_n_store_packed:
-  assumes "((s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off]) \<Down>k{(ls,r)} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off]) \<Down>k{(ls,r)} (s',vs',res))"
   shows "vs = vs' \<and> types_agree t v \<and> (\<exists>j m. smem_ind s (f_inst vs) = Some j \<and> s.mems s ! j = m \<and>
            ((s = s' \<and> store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = None \<and> res = RTrap) \<or>
             (\<exists>mem'. store (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c) off (bits v) (tp_length tp) = Some mem' \<and> s' = s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and> res = RValue ves)))"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C (ConstInt32 c), $C v, $Store t (Some tp) a off])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves ves')
   consider (1) "(es = [$Store t (Some tp) a off] \<and> ves = ves' @ [ConstInt32 c, v])"
          | (2) "(es = [$C v, $Store t (Some tp) a off] \<and> ves = ves'@[ConstInt32 c])"
-         | (3) "(\<exists>ves''. es = ($$*ves'')@[$C ConstInt32 c, $C v, $Store t (Some tp) a off] \<and> ves' = ves@ves'')"
+         | (3) "(\<exists>ves''. es = ($C*ves'')@[$C ConstInt32 c, $C v, $Store t (Some tp) a off] \<and> ves' = ves@ves'')"
     using consts_app_snoc_2[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1058,12 +1058,12 @@ next
 qed (auto simp add: store_packed_def)
 
 lemma reduce_to_n_drop:
-  assumes "((s,vs,($$*ves)@[$C v, $Drop]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v, $Drop]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue (ves)"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v, $Drop])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v, $Drop])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
-  consider (1) "es = [$Drop] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C v, $Drop] \<and> ves' = ves @ ves'')"
+  consider (1) "es = [$Drop] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($C* ves'') @ [$C v, $Drop] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1074,7 +1074,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Drop])" k "\<Gamma>" "(s',vs',res)" arb
       by metis
   next
     case 2
-    then obtain ves'' where "es = ($$* ves'') @ [$C v, $Drop]"
+    then obtain ves'' where "es = ($C* ves'') @ [$C v, $Drop]"
                             "ves'  = ves @ ves''"
       by blast
     thus ?thesis
@@ -1106,15 +1106,15 @@ next
 qed auto
 
 lemma reduce_to_n_select:
-  assumes "((s,vs,($$*ves)@[$C v1, $C v2, $C ConstInt32 n, $Select]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v1, $C v2, $C ConstInt32 n, $Select]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> ((res = RValue (ves@[v2]) \<and> int_eq n 0) \<or> (res = RValue (ves@[v1]) \<and> int_ne n 0))"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v1, $C v2, $C ConstInt32 n, $Select])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v1, $C v2, $C ConstInt32 n, $Select])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
   consider (1) "es = [$Select] \<and> ves = ves' @ [v1, v2, ConstInt32 n]"
          | (2) "es = [$C ConstInt32 n, $Select] \<and> ves = ves' @ [v1, v2]"
          | (3) "es = [$C v2, $C ConstInt32 n, $Select] \<and>  ves = ves' @ [v1]"
-         | (4) ves'' where "(es = ($$* ves'') @ [$C v1, $C v2, $C ConstInt32 n, $Select] \<and> ves' = ves @ ves'')"
+         | (4) ves'' where "(es = ($C* ves'') @ [$C v1, $C v2, $C ConstInt32 n, $Select] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_3[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1160,12 +1160,12 @@ next
 qed auto
 
 lemma reduce_to_n_unop:
-  assumes "((s,vs,($$*ves)@[$C v, $Unop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v, $Unop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue (ves@[(app_unop op v)])"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v, $Unop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v, $Unop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
-  consider (1) "es = [$Unop t op] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C v, $Unop t op] \<and> ves' = ves @ ves'')"
+  consider (1) "es = [$Unop t op] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($C* ves'') @ [$C v, $Unop t op] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1176,7 +1176,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Unop t op])" k "\<Gamma>" "(s',vs',res)
       by blast
   next
     case 2
-    then obtain ves'' where "es = ($$* ves'') @ [$C v, $Unop t op]"
+    then obtain ves'' where "es = ($C* ves'') @ [$C v, $Unop t op]"
                             "ves'  = ves @ ves''"
       by blast
     thus ?thesis
@@ -1214,12 +1214,12 @@ lemma no_reduce_to_n_testop:
   by metis
 
 lemma reduce_to_n_testop:
-  assumes "((s,vs,($$*ves)@[$C v, $Testop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v, $Testop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue (ves@[(app_testop op v)])"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v, $Testop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v, $Testop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
-  consider (1) "es = [$Testop t op] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C v, $Testop t op] \<and> ves' = ves @ ves'')"
+  consider (1) "es = [$Testop t op] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($C* ves'') @ [$C v, $Testop t op] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1230,7 +1230,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Testop t op])" k "\<Gamma>" "(s',vs',re
       by blast
   next
     case 2
-    then obtain ves'' where "es = ($$* ves'') @ [$C v, $Testop t op]"
+    then obtain ves'' where "es = ($C* ves'') @ [$C v, $Testop t op]"
                             "ves'  = ves @ ves''"
       by blast
     thus ?thesis
@@ -1274,16 +1274,16 @@ lemma no_reduce_to_n2_binop:
   by blast
 
 lemma reduce_to_n_binop:
-  assumes "((s,vs,($$*ves)@[$C v1, $C v2, $Binop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v1, $C v2, $Binop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and>
          ((\<exists>v. (app_binop op v1 v2 = Some v) \<and> res = RValue (ves@[v])) \<or>
             (\<exists>v. (app_binop op v1 v2 = None) \<and> res = RTrap))"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v1, $C v2, $Binop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v1, $C v2, $Binop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
   consider (1) "(es = [$Binop t op] \<and> ves = ves' @ [v1, v2])"
          | (2) "(es = [$C v2, $Binop t op] \<and> ves = ves'@[v1])"
-         | (3) "(\<exists>ves''. es = ($$*ves'')@[$C v1, $C v2, $Binop t op] \<and> ves' = ves@ves'')"
+         | (3) "(\<exists>ves''. es = ($C*ves'')@[$C v1, $C v2, $Binop t op] \<and> ves' = ves@ves'')"
     using consts_app_snoc_2[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1338,14 +1338,14 @@ lemma no_reduce_to_n2_relop:
   by blast
 
 lemma reduce_to_n_relop:
-  assumes "((s,vs,($$*ves)@[$C v1, $C v2, $Relop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v1, $C v2, $Relop t op]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue (ves@[(app_relop op v1 v2)])"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v1, $C v2, $Relop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v1, $C v2, $Relop t op])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
   consider (1) "(es = [$Relop t op] \<and> ves = ves' @ [v1, v2])"
          | (2) "(es = [$C v2, $Relop t op] \<and> ves = ves'@[v1])"
-         | (3) "(\<exists>ves''. es = ($$*ves'')@[$C v1, $C v2, $Relop t op] \<and> ves' = ves@ves'')"
+         | (3) "(\<exists>ves''. es = ($C*ves'')@[$C v1, $C v2, $Relop t op] \<and> ves' = ves@ves'')"
     using consts_app_snoc_2[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1385,14 +1385,14 @@ next
 qed auto
 
 lemma reduce_to_n_convert:
-  assumes "((s,vs,($$*ves)@[$C v, $Cvtop t2 Convert t1 sx]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v, $Cvtop t2 Convert t1 sx]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> types_agree t1 v \<and>
          (\<exists>v'. (res = RValue (ves@[v']) \<and> cvt t2 sx v = (Some v')) \<or> 
           (res = RTrap \<and> cvt t2 sx v = None))"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v, $Cvtop t2 Convert t1 sx])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v, $Cvtop t2 Convert t1 sx])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
-  consider (1) "es = [$Cvtop t2 Convert t1 sx] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C v, $Cvtop t2 Convert t1 sx] \<and> ves' = ves @ ves'')"
+  consider (1) "es = [$Cvtop t2 Convert t1 sx] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($C* ves'') @ [$C v, $Cvtop t2 Convert t1 sx] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1403,7 +1403,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Cvtop t2 Convert t1 sx])" k "\<Gamma>" 
       by metis
   next
     case 2
-    then obtain ves'' where "es = ($$* ves'') @ [$C v, $Cvtop t2 Convert t1 sx]"
+    then obtain ves'' where "es = ($C* ves'') @ [$C v, $Cvtop t2 Convert t1 sx]"
                             "ves'  = ves @ ves''"
       by blast
     thus ?thesis
@@ -1434,12 +1434,12 @@ next
 qed auto
 
 lemma reduce_to_n_reinterpret:
-  assumes "((s,vs,($$*ves)@[$C v, $Cvtop t2 Reinterpret t1 None]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C v, $Cvtop t2 Reinterpret t1 None]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "s = s' \<and> vs = vs' \<and> res = RValue (ves@[(wasm_deserialise (bits v) t2)]) \<and> types_agree t1 v"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C v, $Cvtop t2 Reinterpret t1 None])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C v, $Cvtop t2 Reinterpret t1 None])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs vs' s' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves ves')
-  consider (1) "es = [$Cvtop t2 Reinterpret t1 None] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C v, $Cvtop t2 Reinterpret t1 None] \<and> ves' = ves @ ves'')"
+  consider (1) "es = [$Cvtop t2 Reinterpret t1 None] \<and> ves = ves' @ [v]" | (2) "(\<exists>ves''. es = ($C* ves'') @ [$C v, $Cvtop t2 Reinterpret t1 None] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1450,7 +1450,7 @@ proof (induction "(s,vs,($$*ves)@[$C v, $Cvtop t2 Reinterpret t1 None])" k "\<Ga
       by metis
   next
     case 2
-    then obtain ves'' where "es = ($$* ves'') @ [$C v, $Cvtop t2 Reinterpret t1 None]"
+    then obtain ves'' where "es = ($C* ves'') @ [$C v, $Cvtop t2 Reinterpret t1 None]"
                             "ves'  = ves @ ves''"
       by blast
     thus ?thesis
@@ -1493,12 +1493,12 @@ lemma no_reduce_to_n_grow_memory:
   done
 
 lemma reduce_to_n_grow_memory:
-  assumes "((s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory]) \<Down>k{(ls,r)} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$C ConstInt32 c, $Grow_memory]) \<Down>k{(ls,r)} (s',vs',res))"
   shows "\<exists>n j m. (vs = vs' \<and> smem_ind s (f_inst vs) = Some j \<and> ((mems s)!j) = m \<and> mem_size m = n) \<and> ((s = s' \<and> res = RValue (ves@[ConstInt32 int32_minus_one])) \<or> (\<exists>mem'. (mem_grow (s.mems s ! j) (Wasm_Base_Defs.nat_of_int c)) = Some mem' \<and> s' = s \<lparr>s.mems := (s.mems s)[j := mem']\<rparr> \<and> res = RValue (ves@[ConstInt32 (int_of_nat n)])))"
   using assms
-proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs vs' res ves k rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[$C ConstInt32 c, $Grow_memory])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs vs' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es k vs' res ves ves')
-  consider (1) "es = [$Grow_memory] \<and> ves = ves' @ [ConstInt32 c]" | (2) "(\<exists>ves''. es = ($$* ves'') @ [$C ConstInt32 c, $Grow_memory] \<and> ves' = ves @ ves'')"
+  consider (1) "es = [$Grow_memory] \<and> ves = ves' @ [ConstInt32 c]" | (2) "(\<exists>ves''. es = ($C* ves'') @ [$C ConstInt32 c, $Grow_memory] \<and> ves' = ves @ ves'')"
     using consts_app_snoc_1[OF const_value(4)] is_const_def
     by fastforce
   thus ?case
@@ -1509,7 +1509,7 @@ proof (induction "(s,vs,($$*ves)@[$C ConstInt32 c, $Grow_memory])" k "(ls,r)" "(
       by blast
   next
     case 2
-    then obtain ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $Grow_memory]"
+    then obtain ves'' where "es = ($C* ves'') @ [$C ConstInt32 c, $Grow_memory]"
                             "ves'  = ves @ ves''"
       by blast
     thus ?thesis
@@ -1539,13 +1539,13 @@ next
     by (simp add: is_const_def)
 qed auto
 
-lemma calln_imp: "((s,f,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',f',res)) \<Longrightarrow> ((s,f,($$*ves)@[(Invoke (sfunc s (f_inst f) j))]) \<Down>k{(ls,r)} (s',f',res))"
-proof (induction "(s,f,($$*ves)@[$(Call j)])" "(Suc k)" "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res ves k rule: reduce_to_n.induct)
+lemma calln_imp: "((s,f,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',f',res)) \<Longrightarrow> ((s,f,($C*ves)@[(Invoke (sfunc s (f_inst f) j))]) \<Down>k{(ls,r)} (s',f',res))"
+proof (induction "(s,f,($C*ves)@[$(Call j)])" "(Suc k)" "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es s' vs' res ves ves')
-  consider (1) "($$* ves) = ($$* ves') @ [$Call j] \<and> es = []"
+  consider (1) "($C* ves) = ($C* ves') @ [$Call j] \<and> es = []"
          | (2) "(\<exists>ves'a ves''.
-                  ($$* ves) = ($$* ves'a) \<and>
-                  es = ($$* ves'') @ [$Call j] \<and>
+                  ($C* ves) = ($C* ves'a) \<and>
+                  es = ($C* ves'') @ [$Call j] \<and>
                   ves' = ves'a @ ves'')"
     using consts_app_snoc[OF const_value(4)]
     by fastforce
@@ -1556,8 +1556,8 @@ proof (induction "(s,f,($$*ves)@[$(Call j)])" "(Suc k)" "(ls,r)" "(s',f',res)" a
       by (metis b_e.distinct(505) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
   next
     case 2
-    then obtain ves'a ves'' where ves''_def:"($$* ves) = ($$* ves'a)"
-                                            "es = ($$* ves'') @ [$Call j]"
+    then obtain ves'a ves'' where ves''_def:"($C* ves) = ($C* ves'a)"
+                                            "es = ($C* ves'') @ [$Call j]"
                                             "ves' = ves'a @ ves''"
       by blast
     thus ?thesis
@@ -1568,7 +1568,7 @@ next
   case (seq_value s vs es s'' vs'' res'' es' s' vs' res)
   thus ?case
     using consts_app_snoc[OF seq_value(7)] reduce_to_consts reduce_to_n_imp_reduce_to
-    apply (cases "es = ($$* ves) @ [$Call j] \<and> es' = []")
+    apply (cases "es = ($C* ves) @ [$Call j] \<and> es' = []")
     apply fastforce
     apply blast
     done
@@ -1587,10 +1587,10 @@ next
 qed (fastforce intro: reduce_to_n.intros)+
 
 lemma reduce_to_n_br_imp_length:
-  assumes "(s,f,($$* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',f',res)"
+  assumes "(s,f,($C* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',f',res)"
   shows "length vcs \<ge> (ls!j) \<and> (\<exists>vcs'. res = RBreak j vcs')"
   using assms
-proof (induction "(s,f,($$* vcs) @ [$Br j])" k "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,f,($C* vcs) @ [$Br j])" k "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res vcs rule: reduce_to_n.induct)
   case (br vcs' n j' s vs k)
   hence "j = j'" "vcs = vcs'"
     using inj_basic_econst
@@ -1600,7 +1600,7 @@ proof (induction "(s,f,($$* vcs) @ [$Br j])" k "(ls,r)" "(s',f',res)" arbitrary:
     by simp
 next
   case (const_value s vs es k s' vs' res ves)
-  have "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es = ($$* ves'') @ [$Br j] \<and> vcs = ves' @ ves'')"
+  have "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es = ($C* ves'') @ [$Br j] \<and> vcs = ves' @ ves'')"
     using const_value consts_app_snoc[OF const_value(4)]
     by (metis b_e.simps(387) consts_cons_last(2) e.inject(1) e_type_const_unwrap)
   thus ?case
@@ -1621,12 +1621,12 @@ next
 qed auto
 
 lemma reduce_to_n_br:
-  assumes "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcsf) @ ($C* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',vs',res)"
           "length vcs = (ls!j)"
           "j < length ls"
-  shows "((s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',vs',res)) \<and> s = s' \<and> vs = vs' \<and> (res = RBreak j vcs)"
+  shows "((s,vs,($C* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',vs',res)) \<and> s = s' \<and> vs = vs' \<and> (res = RBreak j vcs)"
   using assms
-proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcsf) @ ($C* vcs) @ [$Br j])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
   case (br vcs' n j' s vs k)
   hence "vcs = vcs' \<and> j = j'"
     using inj_basic_econst
@@ -1638,9 +1638,9 @@ proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Br j])" k "(ls,r)" "(s',vs',r
 next
   case (const_value s vs es k s' vs' res ves)
   then consider
-      (1) "($$* ves) = ($$* vcsf @ vcs) @ [$Br j] \<and> es = []"
-    | (2) ves' ves'' where "ves = ves' \<and> es = ($$* ves'') @ [$Br j] \<and> vcsf @ vcs = ves' @ ves''"
-    using consts_app_snoc[of "($$* ves)" es "vcsf@vcs" "$Br j"] inj_basic_econst
+      (1) "($C* ves) = ($C* vcsf @ vcs) @ [$Br j] \<and> es = []"
+    | (2) ves' ves'' where "ves = ves' \<and> es = ($C* ves'') @ [$Br j] \<and> vcsf @ vcs = ves' @ ves''"
+    using consts_app_snoc[of "($C* ves)" es "vcsf@vcs" "$Br j"] inj_basic_econst
     by fastforce
   thus ?case
   proof cases
@@ -1655,7 +1655,7 @@ next
       then obtain ves''_1  where "ves'' = ves''_1@vcs"
         using const_value(5) 2
         by (metis (no_types, lifting) append_eq_append_conv append_eq_append_conv_if le_antisym length_append pl_pl_rels)
-      hence 3:"es = ($$* ves''_1) @ ($$* vcs) @ [$Br j]"
+      hence 3:"es = ($C* ves''_1) @ ($C* vcs) @ [$Br j]"
         using 2
         by simp
       show ?thesis
@@ -1677,7 +1677,7 @@ next
     done
 next
   case (seq_nonvalue1 ves s vs es k s' vs' res)
-  then obtain ves' ves'' where ves'_def:"ves = ($$* ves') \<and> es = ($$* ves'') @ [$Br j] \<and> vcsf @ vcs = ves' @ ves''"
+  then obtain ves' ves'' where ves'_def:"ves = ($C* ves') \<and> es = ($C* ves'') @ [$Br j] \<and> vcsf @ vcs = ves' @ ves''"
     using consts_app_snoc[of ves es "vcsf@vcs" "$Br j"]
     by fastforce
   show ?case
@@ -1707,12 +1707,12 @@ qed auto
 
 
 lemma reduce_to_n_br_n:
-  assumes "(s,vs,($$* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcs) @ [$Br j]) \<Down>k{(ls,r)} (s',vs',res)"
           "ls!j = n"
           "length vcs = n"
   shows "res = RBreak j vcs"
   using assms
-proof (induction "(s,vs,($$* vcs) @ [$Br j])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [$Br j])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (br vcs n j s vs k)
   thus ?case
     using inj_basic_econst
@@ -1754,10 +1754,10 @@ next
 qed auto
 
 lemma reduce_to_n_return_imp_length:
-  assumes "(s,vs,($$* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "\<exists>r'. r = Some r' \<and> (length vcs \<ge> r') \<and> (\<exists>vcs'. res = RReturn vcs')"
   using assms
-proof (induction "(s,vs,($$* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (return vcs' r' s vs k)
   hence "vcs = vcs' \<and> length vcs = r'"
     using inj_basic_econst
@@ -1767,7 +1767,7 @@ proof (induction "(s,vs,($$* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitr
     by (metis eq_iff)
 next
   case (const_value s vs es k s' vs' res ves)
-  have "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es = ($$* ves'') @ [$Br j] \<and> vcs = ves' @ ves'')"
+  have "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es = ($C* ves'') @ [$Br j] \<and> vcs = ves' @ ves'')"
     using const_value consts_app_snoc[OF const_value(4)]
     by (metis b_e.distinct(473) const_list_cons_last(2) e.inject(1) e_type_const_unwrap is_const_list res_b.distinct(3))
   thus ?case
@@ -1788,11 +1788,11 @@ next
 qed auto
 
 lemma reduce_to_n_return:
-  assumes "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcsf) @ ($C* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)"
           "r = Some (length vcs)"
-  shows "((s,vs,($$* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)) \<and> s = s' \<and> vs = vs' \<and> (res = RReturn vcs)"
+  shows "((s,vs,($C* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)) \<and> s = s' \<and> vs = vs' \<and> (res = RReturn vcs)"
   using assms
-proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcsf) @ ($C* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
   case (return vcs' r' s vs k)
   hence "vcs = vcs' \<and> length vcs = r'"
     using inj_basic_econst
@@ -1804,9 +1804,9 @@ proof (induction "(s,vs,($$* vcsf) @ ($$* vcs) @ [$Return])" k "(ls,r)" "(s',vs'
 next
   case (const_value s vs es k s' vs' res ves)
   then consider
-      (1) "($$* ves) = ($$* vcsf @ vcs) @ [$Return] \<and> es = []"
-    | (2) ves' ves'' where "ves = ves' \<and> es = ($$* ves'') @ [$Return] \<and> vcsf @ vcs = ves' @ ves''"
-    using consts_app_snoc[of "($$* ves)" es "vcsf@vcs" "$Return"] inj_basic_econst
+      (1) "($C* ves) = ($C* vcsf @ vcs) @ [$Return] \<and> es = []"
+    | (2) ves' ves'' where "ves = ves' \<and> es = ($C* ves'') @ [$Return] \<and> vcsf @ vcs = ves' @ ves''"
+    using consts_app_snoc[of "($C* ves)" es "vcsf@vcs" "$Return"] inj_basic_econst
     by fastforce
   thus ?case
   proof cases
@@ -1821,7 +1821,7 @@ next
       then obtain ves''_1  where "ves'' = ves''_1@vcs"
         using const_value(5) 2
         using local.const_value(1) reduce_to_n_return_imp_length by blast
-      hence 3:"es = ($$* ves''_1) @ ($$* vcs) @ [$Return]"
+      hence 3:"es = ($C* ves''_1) @ ($C* vcs) @ [$Return]"
         using 2
         by simp
       show ?thesis
@@ -1843,7 +1843,7 @@ next
     done
 next
   case (seq_nonvalue1 ves s vs es k s' vs' res)
-  then obtain ves' ves'' where ves'_def:"ves = ($$* ves') \<and> es = ($$* ves'') @ [$Return] \<and> vcsf @ vcs = ves' @ ves''"
+  then obtain ves' ves'' where ves'_def:"ves = ($C* ves') \<and> es = ($C* ves'') @ [$Return] \<and> vcsf @ vcs = ves' @ ves''"
     using consts_app_snoc[of ves es "vcsf@vcs" "$Return"]
     by fastforce
   show ?case
@@ -1873,12 +1873,12 @@ next
 qed auto
 
 lemma reduce_to_n_return_n:
-  assumes "(s,vs,($$* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcs) @ [$Return]) \<Down>k{(ls,r)} (s',vs',res)"
           "r = Some n"
           "length vcs = n"
   shows "res = RReturn vcs"
   using assms
-proof (induction "(s,vs,($$* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [$Return])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (return vcs r s vs k)
   thus ?case
     using inj_basic_econst
@@ -1919,15 +1919,15 @@ next
     done
 qed auto
 
-lemma calln: "((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',vs',res)) = ((s,vs,($$*ves)@[(Invoke (sfunc s (f_inst vs) j))]) \<Down>k{(ls,r)} (s',vs',res))"
+lemma calln: "((s,vs,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[(Invoke (sfunc s (f_inst vs) j))]) \<Down>k{(ls,r)} (s',vs',res))"
   using calln_imp reduce_to_n.call
   by (metis is_const_list)
 
 lemma reduce_to_n_block_imp_length:
-  assumes "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "length ($$*vcs) \<ge> length t1s"
+  assumes "(s,vs,($C*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "length ($C*vcs) \<ge> length t1s"
   using assms
-proof (induction "(s,vs,($$*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
     using consts_app_snoc[OF const_value(4)] consts_cons_last[of _ _ ves] is_const_def
@@ -1950,10 +1950,10 @@ next
 qed auto
 
 lemma reduce_to_n_loop_imp_length:
-  assumes "(s,vs,($$*vcs) @ [$(Loop (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "length ($$*vcs) \<ge> length t1s"
+  assumes "(s,vs,($C*vcs) @ [$(Loop (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "length ($C*vcs) \<ge> length t1s"
   using assms
-proof (induction "(s,vs,($$*vcs) @ [$(Loop (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vcs) @ [$(Loop (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
     using consts_app_snoc[OF const_value(4)] consts_cons_last[of _ _ ves] is_const_def
@@ -1976,11 +1976,11 @@ next
 qed auto
 
 lemma reduce_to_n_if:
-  assumes "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "(((s,vs,($$*vcs) @ [$(Block tf es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or>
-         (((s,vs,($$*vcs) @ [$(Block tf es2)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_eq c 0)"
+  assumes "(s,vs,($C*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "(((s,vs,($C*vcs) @ [$(Block tf es1)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or>
+         (((s,vs,($C*vcs) @ [$(Block tf es2)]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_eq c 0)"
   using assms
-proof (induction "(s,vs,($$*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vcs) @ [$C ConstInt32 c, $(If tf es1 es2)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   thus ?case
     using consts_app_snoc_1[OF const_value(4)]
@@ -1997,11 +1997,11 @@ next
     by (metis b_e.distinct(326) e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
-  obtain vesc where ves_is:"ves = $$* vesc"
+  obtain vesc where ves_is:"ves = $C* vesc"
     using e_type_const_conv_vs[OF seq_nonvalue1(1)]
     by blast
   then consider (1) "es = [$If tf es1 es2]" "vesc = vcs @ [ConstInt32 c]"
-              | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $If tf es1 es2]"
+              | (2) ves'' where "es = ($C* ves'') @ [$C ConstInt32 c, $If tf es1 es2]"
                                 "vcs = vesc @ ves''"
     using consts_app_snoc_1[of vesc es vcs "ConstInt32 c" "$(If tf es1 es2)"]
           seq_nonvalue1(7)
@@ -2032,16 +2032,16 @@ next
 qed auto
 
 lemma reduce_to_n_block:
-  assumes "(s,vs,($$*vcsf) @ ($$*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
-          "length ($$*vcs) = n"
+  assumes "(s,vs,($C*vcsf) @ ($C*vcs) @ [$(Block (t1s _> t2s) es)]) \<Down>k{\<Gamma>} (s',vs',res)"
+          "length ($C*vcs) = n"
           "length t1s = n"
           "length t2s = m"
-  shows "(s,vs,($$*vcsf) @ [Label m [] (($$*vcs) @ ($* es))]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "(s,vs,($C*vcsf) @ [Label m [] (($C*vcs) @ ($* es))]) \<Down>k{\<Gamma>} (s',vs',res)"
   using assms
-proof (induction "(s,vs,($$*vcsf) @ ($$*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vcsf) @ ($C*vcs) @ [$(Block (t1s _> t2s) es)])" k "\<Gamma>" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vcsf rule: reduce_to_n.induct)
   case (const_value s vs es' k \<Gamma> s' vs' res ves)
-  consider (1) ves_p1 ves_p2 where "es' = ($$* ves_p2) @ [$Block (t1s _> t2s) es]" "vcs = ves_p1 @ ves_p2" "ves = vcsf @ ves_p1"
-         | (2) ves_p1' ves_p2' where "es' = ($$* ves_p2') @ ($$* vcs) @ [$Block (t1s _> t2s) es]" "vcsf = ves_p1' @ ves_p2'" "ves = ves_p1'"
+  consider (1) ves_p1 ves_p2 where "es' = ($C* ves_p2) @ [$Block (t1s _> t2s) es]" "vcs = ves_p1 @ ves_p2" "ves = vcsf @ ves_p1"
+         | (2) ves_p1' ves_p2' where "es' = ($C* ves_p2') @ ($C* vcs) @ [$Block (t1s _> t2s) es]" "vcsf = ves_p1' @ ves_p2'" "ves = ves_p1'"
     using consts_app_app_consts1[OF const_value(4)]
     by (fastforce simp add: is_const_def)
   thus ?case
@@ -2082,11 +2082,11 @@ next
     done
 next
   case (seq_nonvalue1 ves s vs es' k \<Gamma> s' vs' res)
-  consider (1) ves_p1 ves_p2 where "es' = ($$* ves_p2) @ [$Block (t1s _> t2s) es]"
+  consider (1) ves_p1 ves_p2 where "es' = ($C* ves_p2) @ [$Block (t1s _> t2s) es]"
                                    "vcs = ves_p1 @ ves_p2"
-                                   "ves = ($$* vcsf) @ ($$* ves_p1)"
-          | (2) ves_p1' ves_p2' where "es' = ($$* ves_p2') @ ($$* vcs) @ [$Block (t1s _> t2s) es]"
-                                       "vcsf = ves_p1' @ ves_p2' \<and> ves = $$* ves_p1'"
+                                   "ves = ($C* vcsf) @ ($C* ves_p1)"
+          | (2) ves_p1' ves_p2' where "es' = ($C* ves_p2') @ ($C* vcs) @ [$Block (t1s _> t2s) es]"
+                                       "vcsf = ves_p1' @ ves_p2' \<and> ves = $C* ves_p1'"
     using consts_app_app_consts[OF seq_nonvalue1(7)] seq_nonvalue1
     by (fastforce simp add: is_const_def)
   thus ?case
@@ -2128,16 +2128,16 @@ next
 qed auto
 
 lemma reduce_to_n_label:
-  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m les es]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
          (\<exists>rvs s'' vs'' res' vcs1 vcs2. vcs = vcs1@vcs2 \<and> ((s,vs,es) \<Down>k{(m#ls,r)} (s'',vs'',RBreak 0 rvs)) \<and>
-                         ((s'',vs'',($$*vcs2)@($$*rvs)@les) \<Down>k{(ls,r)} (s',vs',res')) \<and>
+                         ((s'',vs'',($C*vcs2)@($C*rvs)@les) \<Down>k{(ls,r)} (s',vs',res')) \<and>
                          ((\<exists>rvs'. res' = RValue rvs' \<and> res = RValue (vcs1@rvs')) \<or> ((\<nexists>rvs'. res' = RValue rvs') \<and> res = res')))"
   using assms
-proof (induction "(s,vs,($$*vcs)@[Label m les es])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vcs)@[Label m les es])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (label_break_nil s vs es k n s'' vs'' bvs vcs les s' vs' res)
   thus ?case
     apply simp
@@ -2145,8 +2145,8 @@ proof (induction "(s,vs,($$*vcs)@[Label m les es])" k "(ls,r)" "(s',vs',res)" ar
     done
 next
   case (const_value s vs es' k s' vs' res ves)
-  consider (1) "($$* ves) = ($$* vcs) @ [Label m les es]" "es' = []"
-         | (2) ves' ves'' where "($$* ves) = ($$* ves')" "es' = ($$* ves'') @ [Label m les es]" "vcs = ves' @ ves''"
+  consider (1) "($C* ves) = ($C* vcs) @ [Label m les es]" "es' = []"
+         | (2) ves' ves'' where "($C* ves) = ($C* ves')" "es' = ($C* ves'') @ [Label m les es]" "vcs = ves' @ ves''"
     using consts_app_snoc[OF const_value(4)] inj_basic_econst
     by auto
   thus ?case
@@ -2173,8 +2173,8 @@ next
     by auto
 next
   case (seq_nonvalue1 ves s vs es' k s' vs' res)
-  obtain ves' ves'' where ves'_def:"ves = $$* ves'"
-                                   "es' = ($$* ves'') @ [Label m les es]"
+  obtain ves' ves'' where ves'_def:"ves = $C* ves'"
+                                   "es' = ($C* ves'') @ [Label m les es]"
                                    "vcs = ves' @ ves''"
     using consts_app_snoc[OF seq_nonvalue1(7)] seq_nonvalue1(6)
     by blast
@@ -2185,7 +2185,7 @@ next
          | (3) rvs s'' vs'' res' ves1 ves2 where
                                  "ves'' = ves1@ves2"
                                  "((s, vs, es) \<Down>k{(m # ls, r)} (s'', vs'', RBreak 0 rvs))"
-                                 "((s'', vs'',($$*ves2)@($$* rvs) @ les) \<Down>k{(ls, r)} (s', vs', res'))"
+                                 "((s'', vs'',($C*ves2)@($C* rvs) @ les) \<Down>k{(ls, r)} (s', vs', res'))"
                                  "(\<nexists>rvs'. res' = RValue rvs' \<and> res = res')"
     using seq_nonvalue1(3)[OF ves'_def(2)] seq_nonvalue1(4)
     by auto
@@ -2216,16 +2216,16 @@ next
 qed auto
 
 lemma reduce_to_label:
-  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m les es]) \<Down>{(ls,r)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
          (\<exists>rvs s'' vs'' res' vcs1 vcs2. vcs = vcs1@vcs2 \<and> ((s,vs,es) \<Down>{(m#ls,r)} (s'',vs'',RBreak 0 rvs)) \<and>
-                         ((s'',vs'',($$*vcs2)@($$*rvs)@les) \<Down>{(ls,r)} (s',vs',res')) \<and>
+                         ((s'',vs'',($C*vcs2)@($C*rvs)@les) \<Down>{(ls,r)} (s',vs',res')) \<and>
                          ((\<exists>rvs'. res' = RValue rvs' \<and> res = RValue (vcs1@rvs')) \<or> ((\<nexists>rvs'. res' = RValue rvs') \<and> res = res')))"
 proof -
-  obtain k where k_is:"(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r)} (s',vs',res)"
+  obtain k where k_is:"(s,vs,($C*vcs)@[Label m les es]) \<Down>k{(ls,r)} (s',vs',res)"
     using reduce_to_imp_reduce_to_n[OF assms]
     by blast
   show ?thesis
@@ -2234,13 +2234,13 @@ proof -
 qed
 
 lemma reduce_to_n_label_old:
-  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m les es]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
          (\<exists>n rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RBreak (Suc n) rvs)) \<and> res = RBreak n rvs) \<or>
          (\<exists>rvs s'' vs'' res'. ((s,vs,es) \<Down>k{(m#ls,r)} (s'',vs'',RBreak 0 rvs)) \<and>
-                         ((s'',vs'',($$*vcs)@($$*rvs)@les) \<Down>k{(ls,r)} (s',vs',res)))"
+                         ((s'',vs'',($C*vcs)@($C*rvs)@les) \<Down>k{(ls,r)} (s',vs',res)))"
   using reduce_to_n_label[OF assms]
   apply safe
   apply simp_all
@@ -2251,7 +2251,7 @@ lemma reduce_to_n_label_old:
   done
 
 lemma reduce_to_n_label_emp:
-  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m [] es]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
@@ -2265,7 +2265,7 @@ lemma reduce_to_n_label_emp:
   done
 
 lemma reduce_to_n_label_emp1:
-  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m [] es]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "\<exists>res'. ((s,vs,es) \<Down>k{(m#ls,r)} (s',vs',res')) \<and>
          ((res' = RTrap \<and> res = RTrap) \<or>
           (\<exists>rvs. res' = RValue rvs \<and> res = RValue (vcs@rvs)) \<or>
@@ -2276,11 +2276,11 @@ lemma reduce_to_n_label_emp1:
   by auto
 
 lemma invoke_native_imp_local_length:
-  assumes "(s,vs,($$* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
           "cl = Func_native j (t1s _> t2s) ts es"
   shows "length vcs \<ge> length t1s"
   using assms
-proof (induction "(s,vs,($$* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (invoke_native cl j t1s t2s ts es ves vcs n m zs s vs k s' vs' res)
   thus ?case
     using inj_basic_econst
@@ -2308,7 +2308,7 @@ next
 qed auto
 
 lemma invoke_native_imp_local1:
-  assumes "(s,vs,($$* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
           "cl = Func_native j (t1s _> t2s) ts es"
           "length vcs = n"
           "length t1s = n"
@@ -2316,15 +2316,15 @@ lemma invoke_native_imp_local1:
           "(n_zeros ts = zs)"
   shows "(s,vs,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
   using assms
-proof (induction "(s,vs,($$* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (invoke_native cl' j t1s t2s ts es ves' vcs n m zs s vs k s' vs' res)
   thus ?case
     using inj_basic_econst
     by auto
 next
   case (const_value s vs es k s' vs' res ves)
-  consider (1) "($$* ves) = ($$* vcs) @ [Invoke cl]" "es = []"
-         | (2) "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es = ($$* ves'') @ [Invoke cl] \<and> vcs = ves' @ ves'')"
+  consider (1) "($C* ves) = ($C* vcs) @ [Invoke cl]" "es = []"
+         | (2) "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es = ($C* ves'') @ [Invoke cl] \<and> vcs = ves' @ ves'')"
     using consts_app_snoc[OF const_value(4)] inj_basic_econst
     by auto
   thus ?case
@@ -2335,8 +2335,8 @@ next
       by simp
   next
     case 2
-    then obtain ves' ves'' where ves'_def:"($$* ves) = $$* ves'"
-                                           "es = ($$* ves'') @ [Invoke cl]"
+    then obtain ves' ves'' where ves'_def:"($C* ves) = $C* ves'"
+                                           "es = ($C* ves'') @ [Invoke cl]"
                                            "vcs = ves' @ ves''"
       by blast
     show ?thesis
@@ -2369,8 +2369,8 @@ next
   proof -
     {
       fix ves' :: "v list" and ves'' :: "v list"
-      assume a1: "ves = $$* ves'"
-      assume a2: "(s, vs, ($$* ves'') @ [Invoke (Func_native j (t1s _> t2s) ts es)]) \<Down>k{(ls, r)} (s', vs', res)"
+      assume a1: "ves = $C* ves'"
+      assume a2: "(s, vs, ($C* ves'') @ [Invoke (Func_native j (t1s _> t2s) ts es)]) \<Down>k{(ls, r)} (s', vs', res)"
       assume a3: "length t1s = length (ves' @ ves'')"
       have "length t1s \<le> length ves''"
         using a2 by (simp add: invoke_native_imp_local_length)
@@ -2397,11 +2397,11 @@ next
 qed auto
 
 lemma reduce_to_n_local:
-  assumes "(s,vs,($$* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
+  assumes "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
   shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res))) \<and>
          (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',RValue rvs1))))"
   using assms
-proof (induction "(s,vs,($$* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vfs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vfs rule: reduce_to_n.induct)
   case (local_value s lls es k n j s' lls' res vs \<Gamma>)
   thus ?case
     using reduce_to_n.local_value
@@ -2446,7 +2446,7 @@ next
 qed auto
 
 lemma reduce_to_local:
-  assumes "(s,vs,($$* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res)"
+  assumes "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res)"
   shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res))) \<and>
          (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',RValue rvs1))))"
   using reduce_to_n_local assms reduce_to_imp_reduce_to_n[OF assms]
@@ -2455,18 +2455,18 @@ lemma reduce_to_local:
   done
 
 lemma reduce_to_local_nonvalue:
-  assumes "(s,vs,($$* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
+  assumes "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
           "(\<nexists>rvs. res = RValue rvs)"
   shows "((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res))"
   using reduce_to_n_local[OF assms(1)] assms(2)
   by auto
 
 lemma local_imp_body:
-  assumes "(s,vs,($$*vfs)@[Local m fl les]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vfs)@[Local m fl les]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "\<exists>fl' lres. ((s,fl,les) \<Down>k{([],Some m)} (s',fl',lres)) \<and> vs = vs' \<and>
          ((lres = RTrap \<and> res = RTrap) \<or> (\<exists>rvs. ((lres = RValue rvs \<or> lres = RReturn rvs) \<and> res = RValue (vfs@rvs))))"
   using assms
-proof (induction "(s,vs,($$*vfs)@[Local m fl les])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res les vfs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vfs)@[Local m fl les])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res les vfs rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
   thus ?case
     using consts_app_snoc[OF const_value(4)]
@@ -2477,8 +2477,8 @@ proof (induction "(s,vs,($$*vfs)@[Local m fl les])" k "(ls,r)" "(s',vs',res)" ar
     done
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
-  consider (1) "es = ($$* vfs) @ [Local m fl les]" "es' = []"
-         | (2) "(\<exists>ves' ves''. es = ($$* ves') \<and> es' = ($$* ves'') @ [Local m fl les] \<and> vfs = ves' @ ves'')"
+  consider (1) "es = ($C* vfs) @ [Local m fl les]" "es' = []"
+         | (2) "(\<exists>ves' ves''. es = ($C* ves') \<and> es' = ($C* ves'') @ [Local m fl les] \<and> vfs = ves' @ ves'')"
     using consts_app_snoc[OF seq_value(7)]
     by blast
   thus ?case
@@ -2489,8 +2489,8 @@ next
   next
     case 2
     then obtain ves' ves'' where
-     "es = $$* ves'"
-     "es' = ($$* ves'') @ [Local m fl les] \<and> vfs = ves' @ ves''"
+     "es = $C* ves'"
+     "es' = ($C* ves'') @ [Local m fl les] \<and> vfs = ves' @ ves''"
       by blast
     thus ?thesis
       using seq_value
@@ -2508,25 +2508,25 @@ next
 qed auto
 
 lemma invoke_native_imp_local:
-  assumes "(s,vs,($$* vfs) @ ($$* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
           "cl = Func_native j (t1s _> t2s) ts es"
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
-  shows "(s,vs,($$* vfs)@[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
+  shows "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
   using assms
-proof (induction "(s,vs,($$* vfs) @ ($$* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vfs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vfs rule: reduce_to_n.induct)
   case (invoke_native cl j' t1s t2s' ts es' ves vcs' n k' m' zs' s f k s' f' res)
    thus ?case
    proof -
      {
-       have "($$* vfs) = []"
+       have "($C* vfs) = []"
          using invoke_native
          apply simp
          apply (metis append.left_neutral append_eq_append_conv length_map map_append)
          done
-       hence "(s, f, ($$* vfs) @ [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', f', res)"
+       hence "(s, f, ($C* vfs) @ [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', f', res)"
          using invoke_native
          apply simp
          apply (metis reduce_to_consts reduce_to_consts1 res_b.inject(1))
@@ -2538,9 +2538,9 @@ proof (induction "(s,vs,($$* vfs) @ ($$* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs
    qed
 next
   case (const_value s vs es' k s' vs' res ves vcs)
-  consider (1) "($$* ves) = ($$*vfs @ vcs) @ [Invoke cl]" "es' = []"
-         | (2) "(\<exists>ves' ves''. ($$* ves) = ($$* ves') \<and> es' = ($$* ves'') @ [Invoke cl] \<and> vfs @ vcs = ves' @ ves'')"
-    using consts_app_snoc[of "$$*ves" es' "vfs@vcs" "Invoke cl"] inj_basic_econst const_value(4)
+  consider (1) "($C* ves) = ($C*vfs @ vcs) @ [Invoke cl]" "es' = []"
+         | (2) "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es' = ($C* ves'') @ [Invoke cl] \<and> vfs @ vcs = ves' @ ves'')"
+    using consts_app_snoc[of "$C*ves" es' "vfs@vcs" "Invoke cl"] inj_basic_econst const_value(4)
     by auto
   thus ?case
   proof cases
@@ -2550,8 +2550,8 @@ next
       by simp
   next
     case 2
-    then obtain ves' ves'' where ves'_def:"($$* ves) = $$* ves'"
-                                           "es' = ($$* ves'') @ [Invoke cl]"
+    then obtain ves' ves'' where ves'_def:"($C* ves) = $C* ves'"
+                                           "es' = ($C* ves'') @ [Invoke cl]"
                                            "vfs @ vcs = ves' @ ves''"
       by blast
     thus ?thesis
@@ -2563,7 +2563,7 @@ next
       hence 0:"ves_l' = vcs"
         using ves'_def const_value(6)
         by (metis append.assoc append_eq_append_conv const_value.prems(3))
-      hence 1:"(s, vs, ($$* ves_l) @ [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', vs', RValue res)"
+      hence 1:"(s, vs, ($C* ves_l) @ [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', vs', RValue res)"
         by (simp add: const_value.hyps(2) const_value.prems(1) const_value.prems(2) const_value.prems(3) const_value.prems(4) const_value.prems(5) ves'_def(2) ves_l_def(1))
       thus ?thesis
         using reduce_to_n.const_value[OF 1] ves_l_def ves'_def 0 inj_basic_econst 
@@ -2585,10 +2585,10 @@ next
     done
 next
   case (seq_nonvalue1 ves s vs es k s' vs' res)
-  consider (1) "ves = ($$* vfs @ vcs) @ [Invoke cl] \<and> es = []"
+  consider (1) "ves = ($C* vfs @ vcs) @ [Invoke cl] \<and> es = []"
          | (2) "(\<exists>ves' ves''.
-                ves = ($$* ves') \<and>
-                es = ($$* ves'') @ [Invoke cl] \<and>
+                ves = ($C* ves') \<and>
+                es = ($C* ves'') @ [Invoke cl] \<and>
                 vfs @ vcs = ves' @ ves'')"
     using consts_app_snoc[of ves es "vfs@vcs" "Invoke cl"] seq_nonvalue1(7)
     by fastforce
@@ -2600,8 +2600,8 @@ next
       by blast
   next
     case 2
-    then obtain ves' ves'' where ves'_def:"ves = ($$* ves')"
-                                          "es = ($$* ves'') @ [Invoke cl]"
+    then obtain ves' ves'' where ves'_def:"ves = ($C* ves')"
+                                          "es = ($C* ves'') @ [Invoke cl]"
                                           "vfs @ vcs = ves' @ ves''"
       by blast
     show ?thesis
@@ -2616,7 +2616,7 @@ next
       thus ?thesis
         using ves''_is ves'_def  seq_nonvalue1.hyps(1)
               seq_nonvalue1(3)[OF _ seq_nonvalue1(8,9,10,11,12), of ves''_1]
-              reduce_to_n.seq_nonvalue1[OF _ _ seq_nonvalue1(4) , of "$$* (ves')"]
+              reduce_to_n.seq_nonvalue1[OF _ _ seq_nonvalue1(4) , of "$C* (ves')"]
         apply (cases ves')
         apply simp_all
         done
@@ -2645,7 +2645,7 @@ lemma invoke_native_equiv_local:
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
-  shows "((s,vs,($$* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res))"
+  shows "((s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res))"
   using invoke_native_imp_local1[OF _ assms] reduce_to_n.invoke_native[OF assms(1) _ assms(2) _ assms(3,4)] assms(5)
   by blast
 
@@ -2656,7 +2656,7 @@ lemma local_context:
 proof (induction "(s,vs,[Local n f es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
   case (const_value s vs es' k \<Gamma> s' vs' res ves)
   thus ?case
-    using consts_app_snoc[of "($$* ves)" "es" "[]" "Local n f es"]
+    using consts_app_snoc[of "($C* ves)" "es" "[]" "Local n f es"]
           consts_cons_last[of "[]" "Local n f es" ves]
     apply (simp add: is_const_def)
     apply (metis (no_types, lifting) Cons_eq_append_conv Nil_is_append_conv append_self_conv inj_basic_econst map_append map_injective)
@@ -2699,10 +2699,10 @@ next
 qed auto
 
 lemma invoke_context:
-  assumes "((s,vs,($$*ves)@[(Invoke cl)]) \<Down>k{\<Gamma>} (s',vs',res))"
-  shows "((s,vs,($$*ves)@[(Invoke cl)]) \<Down>k{\<Gamma>'} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[(Invoke cl)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "((s,vs,($C*ves)@[(Invoke cl)]) \<Down>k{\<Gamma>'} (s',vs',res))"
   using assms
-proof (induction "(s,vs,($$*ves)@[(Invoke cl)])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[(Invoke cl)])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
   case (invoke_native cl j t1s t2s ts es ves' vcs n m zs s vs k ls r i s' vs' res)
   show ?case
     using local_context invoke_native(7) reduce_to_n.invoke_native invoke_native(1,2,3,4,5,6)
@@ -2744,7 +2744,7 @@ next
     by (metis consts_app_snoc reduce_to_consts reduce_to_n_imp_reduce_to)
 qed auto
 
-lemma calln_context: "((s,vs,($$*ves)@[$(Call j)]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,($$*ves)@[$(Call j)]) \<Down>k{(ls',r')} (s',vs',res))"
+lemma calln_context: "((s,vs,($C*ves)@[$(Call j)]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[$(Call j)]) \<Down>k{(ls',r')} (s',vs',res))"
   apply (cases k)
   apply(metis call0)
   apply (metis invoke_context calln)
@@ -2818,13 +2818,13 @@ next
 qed auto
 
 lemma reduce_to_n_br_if:
-  assumes "((s,vs,($$*vesf)@[$C ConstInt32 c, $Br_if j]) \<Down>k{\<Gamma>} (s',vs',res))"
-  shows "(((s,vs,($$*vesf)@[$Br j]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or> (s = s' \<and> vs = vs' \<and> int_eq c 0 \<and> res = RValue vesf)"
+  assumes "((s,vs,($C*vesf)@[$C ConstInt32 c, $Br_if j]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "(((s,vs,($C*vesf)@[$Br j]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> int_ne c 0) \<or> (s = s' \<and> vs = vs' \<and> int_eq c 0 \<and> res = RValue vesf)"
   using assms
-proof (induction "(s,vs,($$*vesf)@[$C ConstInt32 c, $Br_if j])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vesf rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vesf)@[$C ConstInt32 c, $Br_if j])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vesf rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   consider (1) "es = [$Br_if j]" "ves = vesf @ [ConstInt32 c]"
-         | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $Br_if j]" "vesf = ves @ ves''"
+         | (2) ves'' where "es = ($C* ves'') @ [$C ConstInt32 c, $Br_if j]" "vesf = ves @ ves''"
     using consts_app_snoc_1[OF const_value(4)]
     by (fastforce simp add: is_const_def)
   thus ?case
@@ -2844,11 +2844,11 @@ next
     by (metis b_e.distinct(403) consts_app_snoc_1_const_list e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
-  obtain vcs where ves_is:"ves = $$*vcs"
+  obtain vcs where ves_is:"ves = $C*vcs"
     using seq_nonvalue1(1)
     by (metis e_type_const_conv_vs)
   then consider (1) "es = [$Br_if j] \<and> vcs = vesf @ [ConstInt32 c]"
-              | (2) ves'' where"es = ($$* ves'') @ [$C ConstInt32 c, $Br_if j]" "vesf = vcs @ ves''"
+              | (2) ves'' where"es = ($C* ves'') @ [$C ConstInt32 c, $Br_if j]" "vesf = vcs @ ves''"
     using consts_app_snoc_1[of vcs es vesf "ConstInt32 c" "$Br_if j"] seq_nonvalue1(7)
     by (metis b_e.distinct(403) e.inject(1) e_type_const_unwrap)
   thus ?case
@@ -2875,14 +2875,14 @@ next
 qed auto
 
 lemma reduce_to_n_br_table:
-  assumes "((s,vs,($$*vesf)@[$C ConstInt32 c, $Br_table js j]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*vesf)@[$C ConstInt32 c, $Br_table js j]) \<Down>k{\<Gamma>} (s',vs',res))"
           "(nat_of_int c) = c'"
-  shows "(((s,vs,($$*vesf)@[$Br (js!c')]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> c' < length js) \<or> (((s,vs,($$*vesf)@[$Br j]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> c' \<ge> length js)"
+  shows "(((s,vs,($C*vesf)@[$Br (js!c')]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> c' < length js) \<or> (((s,vs,($C*vesf)@[$Br j]) \<Down>k{\<Gamma>} (s',vs',res)) \<and> c' \<ge> length js)"
   using assms
-proof (induction "(s,vs,($$*vesf)@[$C ConstInt32 c, $Br_table js j])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vesf rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vesf)@[$C ConstInt32 c, $Br_table js j])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vesf rule: reduce_to_n.induct)
   case (const_value s vs es k \<Gamma> s' vs' res ves)
   consider (1) "es = [$Br_table js j]" "ves = vesf @ [ConstInt32 c]"
-         | (2) ves'' where "es = ($$* ves'') @ [$C ConstInt32 c, $Br_table js j]" "vesf = ves @ ves''"
+         | (2) ves'' where "es = ($C* ves'') @ [$C ConstInt32 c, $Br_table js j]" "vesf = ves @ ves''"
     using consts_app_snoc_1[OF const_value(4)]
     by (fastforce simp add: is_const_def)
   thus ?case
@@ -2905,11 +2905,11 @@ next
     by (metis b_e.distinct(439) consts_app_snoc_1_const_list e.inject(1) e_type_const_unwrap)
 next
   case (seq_nonvalue1 ves s vs es k \<Gamma> s' vs' res)
-  obtain vcs where ves_is:"ves = $$*vcs"
+  obtain vcs where ves_is:"ves = $C*vcs"
     using seq_nonvalue1(1)
     by (metis e_type_const_conv_vs)
   then consider (1) "es = [$Br_table js j] \<and> vcs = vesf @ [ConstInt32 c]"
-              | (2) ves'' where"es = ($$* ves'') @ [$C ConstInt32 c, $Br_table js j]" "vesf = vcs @ ves''"
+              | (2) ves'' where"es = ($C* ves'') @ [$C ConstInt32 c, $Br_table js j]" "vesf = vcs @ ves''"
     using consts_app_snoc_1[of vcs es vesf "ConstInt32 c" "$Br_table js j"] seq_nonvalue1(7)
     by (metis b_e.distinct(439) e.inject(1) e_type_const_unwrap)
   thus ?case
@@ -2936,10 +2936,10 @@ next
 qed auto
 
 lemma invoke_value_trap:
-  assumes "((s,vs,($$*ves)@[(Invoke cl)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[(Invoke cl)]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "\<exists>vrs. res = RValue vrs \<or> res = RTrap"
   using assms
-proof (induction "(s,vs,($$*ves)@[(Invoke cl)])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*ves)@[(Invoke cl)])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res ves rule: reduce_to_n.induct)
   case (invoke_native cl j t1s t2s ts es ves vcs n m zs s vs k ls r i s' vs' res)
   thus ?case
     using local_value_trap
@@ -2963,7 +2963,7 @@ next
 qed auto
 
 lemma call_value_trap:
-  assumes "((s,vs,($$*ves)@[$(Call j)]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,($C*ves)@[$(Call j)]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "\<exists>vrs. res = RValue vrs \<or> res = RTrap"
 proof (cases k)
   case 0
@@ -2981,11 +2981,11 @@ qed
 
 lemma reduce_to_apps:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
-          "($$*ves') @ [e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+          "($C*ves') @ [e] = es@es'"
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
-  consider (1) "es = es@es'" | (2) "\<exists>ves. es = $$* ves"
+  consider (1) "es = es@es'" | (2) "\<exists>ves. es = $C* ves"
     using consts_app_snoc[of es es' ves' e] assms(2)
     by fastforce
   thus ?thesis
@@ -3005,7 +3005,7 @@ qed
 lemma reduce_to_app0:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[]"]
   by auto
@@ -3013,7 +3013,7 @@ lemma reduce_to_app0:
 lemma reduce_to_app1:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[$C v, e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[v]"]
   by fastforce
@@ -3021,7 +3021,7 @@ lemma reduce_to_app1:
 lemma reduce_to_app2:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[$C v, $C v', e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[v,v']"]
   by fastforce
@@ -3029,7 +3029,7 @@ lemma reduce_to_app2:
 lemma reduce_to_app3:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "[$C v, $C v', $C v'', e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms(2) reduce_to_apps[OF assms(1), of "[v,v',v'']"]
   by fastforce
@@ -3038,10 +3038,10 @@ lemma reduce_to_apps_const_list:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "const_list ves'"
           "(ves') @ [e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
-  consider (1) "es = es@es'" | (2) "\<exists>ves. es = $$* ves"
+  consider (1) "es = es@es'" | (2) "\<exists>ves. es = $C* ves"
     using consts_app_snoc[of es es' _ e]  e_type_const_conv_vs[OF assms(2)]
     by (metis assms(3))
   thus ?thesis
@@ -3062,19 +3062,19 @@ lemma reduce_to_apps_const_list_v:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
           "const_list ves'"
           "(ves') @ [$C v, e] = es@es'"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
-  obtain ves where "($$* ves) = (ves') @ [$C v]"
+  obtain ves where "($C* ves) = (ves') @ [$C v]"
   proof -
-    assume a1: "\<And>ves. ($$* ves) = ves' @ [$C v] \<Longrightarrow> thesis"
+    assume a1: "\<And>ves. ($C* ves) = ves' @ [$C v] \<Longrightarrow> thesis"
     obtain vvs :: "v list" where
-      "\<forall>vs. ves' @ ($$* vs) = $$* vvs @ vs"
+      "\<forall>vs. ves' @ ($C* vs) = $C* vvs @ vs"
       using e_type_const_conv_vs[OF assms(2)] by moura
     then show ?thesis
       using a1 by (metis (no_types) list.simps(8) list.simps(9))
   qed
-  then consider (1) "es' = []" | (2) "\<exists>ves. es = $$* ves"
+  then consider (1) "es' = []" | (2) "\<exists>ves. es = $C* ves"
     using consts_app_snoc[of es es' ves e] assms(3)
     by fastforce
   thus ?thesis
@@ -3097,10 +3097,10 @@ lemma reduce_to_app_disj:
            [$C v, e] = es@es' \<or>
            [$C v, $C v', e] = es@es' \<or>
            [$C v, $C v', $C v'', e] = es@es' \<or>
-           ($$*ves') @ [e] = es@es' \<or>
+           ($C*ves') @ [e] = es@es' \<or>
            (const_list ves'' \<and> (ves'') @ [e] = es@es') \<or>
            (const_list ves''' \<and> (ves''') @ [$C v''', e] = es@es')"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms
   apply safe
@@ -3115,7 +3115,7 @@ lemma reduce_to_app_disj:
 
 lemma reduce_to_n_app:
   assumes "(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>k{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>k{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
   using assms assms
 proof (induction "(s,vs,es@es')" "k" "\<Gamma>" "(s',vs',res)" arbitrary: s vs es es' s' vs' res rule: reduce_to_n.induct)
@@ -3140,11 +3140,11 @@ next
 next
   case (const_value s vs es'' k \<Gamma> s' vs' res ves es)
   consider (1) "(\<exists>ves' ves''.
-                  es = ($$* ves') \<and>
-                  es' = ($$* ves'') @ es'' \<and>
+                  es = ($C* ves') \<and>
+                  es' = ($C* ves'') @ es'' \<and>
                   ves = ves' @ ves'')"
     | (2) "(\<exists>es_1 es_2.
-              es = ($$* ves) @ es_1 \<and>
+              es = ($C* ves) @ es_1 \<and>
               es' = es_2 \<and>
               es'' = es_1 @ es_2)"
     using consts_app[OF const_value(4)[symmetric]]
@@ -3157,18 +3157,18 @@ next
       by blast
   next
     case 2
-    then obtain es_1 es_2 where es_1_def:"es = ($$* ves) @ es_1"
+    then obtain es_1 es_2 where es_1_def:"es = ($C* ves) @ es_1"
                                           "es' = es_2"
                                           "es'' = es_1 @ es_2"
       by blast
     obtain s'' vs'' res' where s''_def:"((s, vs, es_1) \<Down>k{\<Gamma>} (s'', vs'', RValue res'))"
-                               "(s'', vs'', ($$* res') @ es_2) \<Down>k{\<Gamma>} (s', vs', RValue res)"
+                               "(s'', vs'', ($C* res') @ es_2) \<Down>k{\<Gamma>} (s', vs', RValue res)"
       using const_value(1) const_value(2)[OF es_1_def(3)] es_1_def(3)
       by blast
-    hence "((s'', vs'', ($$* res') @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue res))"
+    hence "((s'', vs'', ($C* res') @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue res))"
       using s''_def
       by blast
-    hence "((s'', vs'', ($$* ves) @ ($$* res') @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue (ves@res)))"
+    hence "((s'', vs'', ($C* ves) @ ($C* res') @  es_2) \<Down>k{\<Gamma>} (s', vs', RValue (ves@res)))"
       by (simp add: const_value.hyps(3) reduce_to_n.const_value)
     moreover
     have "(s, vs, es) \<Down>k{\<Gamma>} (s'', vs'', RValue (ves@res'))"
@@ -3192,7 +3192,7 @@ next
       by blast
     consider (1) "(\<exists>s''a vs''a rvs.
                     ((s, vs, es) \<Down>k{\<Gamma>} (s''a, vs''a, RValue rvs)) \<and>
-                    ((s''a, vs''a, ($$* rvs) @ us) \<Down>k{\<Gamma>} (s'', vs'', RValue res'')))"
+                    ((s''a, vs''a, ($C* rvs) @ us) \<Down>k{\<Gamma>} (s'', vs'', RValue res'')))"
       | (2) "((s, vs, es) \<Down>k{\<Gamma>} (s'', vs'', RValue res''))"
             "(\<nexists>rvs. RValue res'' = RValue rvs)"
       using seq_value(2)[OF us_def(1)] seq_value.hyps(1) us_def(1)
@@ -3202,9 +3202,9 @@ next
       case 1
       then obtain s''a vs''a rvs where s''a_def:
        "((s, vs, es) \<Down>k{\<Gamma>} (s''a, vs''a, RValue rvs))"
-       "((s''a, vs''a, ($$* rvs) @ us) \<Down>k{\<Gamma>} (s'', vs'', RValue res''))"
+       "((s''a, vs''a, ($C* rvs) @ us) \<Down>k{\<Gamma>} (s'', vs'', RValue res''))"
         by blast
-      have "(s''a, vs''a, (($$* rvs) @ us) @ es''') \<Down>k{\<Gamma>} (s', vs', res)"
+      have "(s''a, vs''a, (($C* rvs) @ us) @ es''') \<Down>k{\<Gamma>} (s', vs', res)"
         using reduce_to_n.seq_value[OF s''a_def(2) seq_value(3)]
         by (metis e_type_const_conv_vs reduce_to_consts reduce_to_n_imp_reduce_to res_b.inject(1) s''a_def(2) seq_value.hyps(3,6))
       thus ?thesis
@@ -3220,10 +3220,10 @@ next
     then obtain us where us_def:"es'' @ us = es"
                                 "es''' = us @ es'"
       by blast
-    consider (1) "\<exists>s''a vs''a rvs. (((s'', vs'', ($$* res'') @ us) \<Down>k{\<Gamma>} (s''a, vs''a,  RValue rvs)) \<and>
-           ((s''a, vs''a, ($$* rvs) @ es') \<Down>k{\<Gamma>} (s', vs', res)))"
-      | (2) "((s'', vs'', ($$* res'') @ us) \<Down>k{\<Gamma>} (s', vs', res)) \<and> (\<nexists>rvs. res = RValue rvs)"
-      using seq_value(4)[of "($$* res'') @ us" "es'"] seq_value.hyps(3) us_def(2)
+    consider (1) "\<exists>s''a vs''a rvs. (((s'', vs'', ($C* res'') @ us) \<Down>k{\<Gamma>} (s''a, vs''a,  RValue rvs)) \<and>
+           ((s''a, vs''a, ($C* rvs) @ es') \<Down>k{\<Gamma>} (s', vs', res)))"
+      | (2) "((s'', vs'', ($C* res'') @ us) \<Down>k{\<Gamma>} (s', vs', res)) \<and> (\<nexists>rvs. res = RValue rvs)"
+      using seq_value(4)[of "($C* res'') @ us" "es'"] seq_value.hyps(3) us_def(2)
       by auto
     thus ?thesis
       using reduce_to_n.seq_value seq_value.hyps(1) us_def(1)
@@ -3248,21 +3248,21 @@ next
     then obtain us where us_def:"ves @ us = es" "es'' = us @ es'"
       by blast
     consider
-      (1) s'' vs'' rvs where "(((s, vs, us) \<Down>k{\<Gamma>} (s'', vs'', RValue rvs)) \<and> ((s'', vs'', ($$* rvs) @ es') \<Down>k{\<Gamma>} (s', vs', res)))"
+      (1) s'' vs'' rvs where "(((s, vs, us) \<Down>k{\<Gamma>} (s'', vs'', RValue rvs)) \<and> ((s'', vs'', ($C* rvs) @ es') \<Down>k{\<Gamma>} (s', vs', res)))"
     | (2) "(((s, vs, us) \<Down>k{\<Gamma>} (s', vs', res)) \<and> (\<nexists>rvs. res = RValue rvs))"
       using seq_nonvalue1(3)[OF us_def(2)] seq_nonvalue1(2) us_def(2)
       by fastforce
     thus ?thesis
     proof (cases)
       case 1
-      obtain vcs where ves_is:"ves = $$* vcs"
+      obtain vcs where ves_is:"ves = $C* vcs"
         using e_type_const_conv_vs seq_nonvalue1.hyps(1)
         by blast
       hence "((s, vs, ves@us) \<Down>k{\<Gamma>} (s'', vs'', RValue (vcs@rvs)))"
         using "1" reduce_to_n.const_value seq_nonvalue1.hyps(5)
         by auto
       moreover
-      have "((s'', vs'', ($$* (vcs@rvs)) @ es') \<Down>k{\<Gamma>} (s', vs', res))"
+      have "((s'', vs'', ($C* (vcs@rvs)) @ es') \<Down>k{\<Gamma>} (s', vs', res))"
         using 1 reduce_to_n.seq_nonvalue1[OF _ _ seq_nonvalue1(4), of ves] ves_is
         by (metis append_assoc map_append reduce_to_n_emp seq_nonvalue1.hyps(1,4,5))
       ultimately
@@ -3289,11 +3289,11 @@ next
 qed (insert reduce_to_app_disj, (fast+))
 (* terminal method long-running *)
 
-lemma reduce_to_call: "((s,vs,($$*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res)) = ((s,vs,($$*ves)@[(Invoke (sfunc s (f_inst vs) j))]) \<Down>{(ls,r)} (s',vs',res))"
+lemma reduce_to_call: "((s,vs,($C*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[(Invoke (sfunc s (f_inst vs) j))]) \<Down>{(ls,r)} (s',vs',res))"
 proof -
   {
-    assume local_assms:"((s,vs,($$*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res))"
-    have "\<exists>k. ((s,vs,($$*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',vs',res))"
+    assume local_assms:"((s,vs,($C*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res))"
+    have "\<exists>k. ((s,vs,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',vs',res))"
       using call0 reduce_to_imp_reduce_to_n[OF local_assms]
       by (metis not0_implies_Suc)
   }
@@ -3304,7 +3304,7 @@ qed
 
 lemma reduce_to_app:
   assumes "(s,vs,es@es') \<Down>{\<Gamma>} (s',vs',res)"
-  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($$*rvs)@es') \<Down>{\<Gamma>} (s',vs',res))) \<or>
+  shows "(\<exists>s'' vs'' rvs. ((s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue rvs)) \<and> ((s'',vs'',($C*rvs)@es') \<Down>{\<Gamma>} (s',vs',res))) \<or>
          (((s,vs,es) \<Down>{\<Gamma>} (s',vs',res)) \<and> (\<nexists>rvs. res = RValue rvs))"
 proof -
   obtain k where k_is:"(s,vs,es@es') \<Down>k{\<Gamma>} (s',vs',res)"
@@ -3317,7 +3317,7 @@ qed
 
 lemma reduce_to_n_seq_value_all:
   assumes "(s,vs,es) \<Down>k{\<Gamma>} (s'',vs'',RValue res'')"
-          "(s'',vs'',($$* res'') @ es') \<Down>k{\<Gamma>} (s',vs',res)"
+          "(s'',vs'',($C* res'') @ es') \<Down>k{\<Gamma>} (s',vs',res)"
   shows "(s,vs,es @ es') \<Down>k{\<Gamma>} (s',vs',res)"
 proof (cases "es' = []")
   case True
@@ -3341,7 +3341,7 @@ qed
 
 lemma reduce_to_seq_value_all:
   assumes "(s,vs,es) \<Down>{\<Gamma>} (s'',vs'',RValue res'')"
-          "(s'',vs'',($$* res'') @ es') \<Down>{\<Gamma>} (s',vs',res)"
+          "(s'',vs'',($C* res'') @ es') \<Down>{\<Gamma>} (s',vs',res)"
   shows "(s,vs,es @ es') \<Down>{\<Gamma>} (s',vs',res)"
   using assms reduce_to_n_seq_value_all
   by (metis (no_types, lifting) append_Nil2 e_type_const_conv_vs reduce_to.seq_value
@@ -3368,7 +3368,7 @@ qed
 
 lemma reduce_to_L0_consts_left:
   assumes "(s,vs,es) \<Down>{\<Gamma>} (s',vs',RValue rvs)"
-  shows "(s,vs,($$*vcs)@es) \<Down>{\<Gamma>} (s',vs',RValue (vcs@rvs))"
+  shows "(s,vs,($C*vcs)@es) \<Down>{\<Gamma>} (s',vs',RValue (vcs@rvs))"
 proof -
   show ?thesis
   proof (cases "vcs = []")
@@ -3381,7 +3381,7 @@ qed
 
 lemma reduce_to_L0_consts_left_trap:
   assumes "(s,vs,es) \<Down>{\<Gamma>} (s',vs',RTrap)"
-  shows "(s,vs,($$*vcs)@es) \<Down>{\<Gamma>} (s',vs',RTrap)"
+  shows "(s,vs,($C*vcs)@es) \<Down>{\<Gamma>} (s',vs',RTrap)"
 proof -
   show ?thesis
   proof (cases "vcs = []")
@@ -3393,10 +3393,10 @@ proof -
 qed
 
 lemma reduce_to_trap_L0_left:
-  assumes "((s, vs, ($$* vcsf) @ [Trap]) \<Down>{\<Gamma>} (s', vs', res))"
+  assumes "((s, vs, ($C* vcsf) @ [Trap]) \<Down>{\<Gamma>} (s', vs', res))"
   shows "((s, vs, [Trap]) \<Down>{\<Gamma>} (s', vs', res))"
   using assms
-proof (induction "(s, vs, ($$* vcsf) @ [Trap])" \<Gamma> "(s', vs', res)" arbitrary: s vs s' vs' res vcsf rule: reduce_to.induct)
+proof (induction "(s, vs, ($C* vcsf) @ [Trap])" \<Gamma> "(s', vs', res)" arbitrary: s vs s' vs' res vcsf rule: reduce_to.induct)
   case (const_value s vs es \<Gamma> s' vs' res ves)
   thus ?case
     by (metis (no_types, lifting) const_list_cons_last(2) consts_app_snoc e.distinct(1) e_type_const_unwrap is_const_list reduce_to_trap res_b.distinct(5))
@@ -3423,7 +3423,7 @@ next
 qed auto
 
 lemma reduce_to_label_emp:
-  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m [] es]) \<Down>{(ls,r)} (s',vs',res)"
   shows "(((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>{(m#ls,r)} (s',vs',RValue rvs)) \<and> res = RValue (vcs@rvs)) \<or>
@@ -3436,7 +3436,7 @@ lemma reduce_to_label_emp:
   done
 
 lemma reduce_to_label_emp1:
-  assumes "(s,vs,($$*vcs)@[Label m [] es]) \<Down>{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m [] es]) \<Down>{(ls,r)} (s',vs',res)"
   shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Label m [] es]) \<Down>{(ls,r)} (s',vs',res))) \<and>
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcs@rvs' \<and> ((s,vs,[Label m [] es]) \<Down>{(ls,r)} (s',vs',RValue rvs')))))"
   using reduce_to_label_emp[OF assms]
@@ -3454,10 +3454,10 @@ lemma reduce_to_label_emp1:
   done
 (*
 lemma reduce_to_label_loop:
-  assumes "(s,locs,($$*vcsf) @ es) \<Down>{(ls, r, i)} (s',locs',res)"
-          "es = ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
-           es = [(Label n [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
-          "length ($$*vcs) = n"
+  assumes "(s,locs,($C*vcsf) @ es) \<Down>{(ls, r, i)} (s',locs',res)"
+          "es = ($C*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
+           es = [(Label n [$(Loop (t1s _> t2s) b_es)] (($C*vcs)@ ($*b_es)))]"
+          "length ($C*vcs) = n"
           "length t1s = n"
   shows "(((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RTrap)) \<and> res = RTrap) \<or>
          (\<exists>rvs. ((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RReturn rvs)) \<and> res = RReturn rvs) \<or>
@@ -3466,22 +3466,22 @@ lemma reduce_to_label_loop:
          (\<exists>rvs. ((s,vs,es) \<Down>{(n#ls,r,i)} (s',vs',RBreak 0 rvs)) \<and> res = RValue (vcs@rvs))"
 *)
 lemma reduce_to_label_loop1:
-  assumes "(s,locs,($$*vcsf) @ es) \<Down>{(ls, r)} (s',locs',res)"
-          "es = ($$*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
-           es = [(Label n [$(Loop (t1s _> t2s) b_es)] (($$*vcs)@ ($*b_es)))]"
-          "length ($$*vcs) = n"
+  assumes "(s,locs,($C*vcsf) @ es) \<Down>{(ls, r)} (s',locs',res)"
+          "es = ($C*vcs) @ [$(Loop (t1s _> t2s) b_es)] \<or>
+           es = [(Label n [$(Loop (t1s _> t2s) b_es)] (($C*vcs)@ ($*b_es)))]"
+          "length ($C*vcs) = n"
           "length t1s = n"
   shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,locs,es) \<Down>{(ls,r)} (s',locs',res))) \<and>
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcsf@rvs' \<and> ((s,locs,es) \<Down>{(ls,r)} (s',locs',RValue rvs')))))"
   using assms
-proof (induction "(s,locs,($$*vcsf) @ es)" "(ls, r)" "(s',locs',res)"  arbitrary: s locs s' locs' res vcs vcsf ls es rule: reduce_to.induct)
+proof (induction "(s,locs,($C*vcsf) @ es)" "(ls, r)" "(s',locs',res)"  arbitrary: s locs s' locs' res vcs vcsf ls es rule: reduce_to.induct)
   case (loop ves n t1s t2s m s vs es s' vs' res)
   thus ?case
     by (auto simp add: reduce_to.loop)
 next
   case (const_value s vs es' s' vs' res ves)
-  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
-         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+  consider (loop) "es = ($C* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))]"
     using const_value(5)
     by blast
   thus ?case
@@ -3500,7 +3500,7 @@ next
   next
     case label
     thus ?thesis
-      using consts_app_snoc[of "($$* ves)" es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+      using consts_app_snoc[of "($C* ves)" es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))"]
             const_value(2,4) inj_basic_econst
       apply simp
       apply safe
@@ -3516,8 +3516,8 @@ next
     by auto
 next
   case (seq_value s vs es_e s'' vs'' res'' es' s' vs' res)
-  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
-         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+  consider (loop) "es = ($C* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))]"
     using seq_value(8)
     by blast
   thus ?case
@@ -3533,7 +3533,7 @@ next
   next
     case label
     thus ?thesis
-      using consts_app_snoc[of es_e es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+      using consts_app_snoc[of es_e es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))"]
             seq_value(2,4,5,6,7) inj_basic_econst
       apply simp
       apply (metis is_const_list)
@@ -3541,16 +3541,16 @@ next
   qed
 next
   case (seq_nonvalue1 ves s vs es_e s' vs' res)
-  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
-         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+  consider (loop) "es = ($C* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))]"
     using seq_nonvalue1(8)
     by blast
   thus ?case
   proof (cases)
     case loop
     consider
-        (1) ves' ves'' where "ves = $$* ves'" "es_e = ($$* ves'') @ es" "vcsf = ves' @ ves''"
-      | (2) es_1 es_2 where "ves = ($$* vcsf) @ es_1" "es_e = es_2" "es = es_1 @ es_2"
+        (1) ves' ves'' where "ves = $C* ves'" "es_e = ($C* ves'') @ es" "vcsf = ves' @ ves''"
+      | (2) es_1 es_2 where "ves = ($C* vcsf) @ es_1" "es_e = es_2" "es = es_1 @ es_2"
       using consts_app[OF seq_nonvalue1(7)]
       by blast
     thus ?thesis
@@ -3567,14 +3567,14 @@ next
   next
     case label
     thus ?thesis
-      using consts_app_snoc[of ves es_e vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+      using consts_app_snoc[of ves es_e vcsf "Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))"]
             seq_nonvalue1 inj_basic_econst
       by auto
   qed
 next
   case (seq_nonvalue2 s vs es_e s' vs' res es')
-  consider (loop) "es = ($$* vcs) @ [$Loop (t1s _> t2s) b_es]"
-         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
+  consider (loop) "es = ($C* vcs) @ [$Loop (t1s _> t2s) b_es]"
+         | (label) "es = [Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))]"
     using seq_nonvalue2(6)
     by blast
   thus ?case
@@ -3593,7 +3593,7 @@ next
   next
     case label
     thus ?thesis
-      using consts_app_snoc[of es_e es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))"]
+      using consts_app_snoc[of es_e es' vcsf "Label n [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))"]
             seq_nonvalue2 inj_basic_econst
       apply simp
       apply (metis reduce_to_consts)
@@ -3612,8 +3612,8 @@ next
 next
   case (label_break_nil s vs es_e n' ls s'' vs'' bvs vcs_v les s' vs' res)
   hence es_is:"n = n'"
-              "es = [Label (length vcs) [$Loop (t1s _> t2s) b_es] (($$* vcs) @ ($* b_es))]"
-              "es_e = ($$* vcs) @ ($* b_es)"
+              "es = [Label (length vcs) [$Loop (t1s _> t2s) b_es] (($C* vcs) @ ($* b_es))]"
+              "es_e = ($C* vcs) @ ($* b_es)"
               "les = [$Loop (t1s _> t2s) b_es]"
               "vcs_v = vcsf"
     using consts_app_snoc[OF label_break_nil(5)[symmetric]] inj_basic_econst
@@ -3622,7 +3622,7 @@ next
     using reduce_to_break_n[OF label_break_nil(1)]
     by auto
   thus ?case
-    using label_break_nil(4)[of vcs_v "($$*bvs) @ les" bvs] es_is label_break_nil(1,3,4,5,6,7,8) inj_basic_econst
+    using label_break_nil(4)[of vcs_v "($C*bvs) @ les" bvs] es_is label_break_nil(1,3,4,5,6,7,8) inj_basic_econst
           reduce_to.label_break_nil[OF label_break_nil(1), of "[]"]
     by simp fastforce
 next
@@ -3633,7 +3633,7 @@ next
 qed auto
 
 lemma reduce_to_label_loop2:
-  assumes "(s,locs,($$*vcsf) @ [(Label n [$(Loop (t1s _> t2s) b_es)] (vs @ ($*b_es)))]) \<Down>{(ls, r)} (s',locs',res)"
+  assumes "(s,locs,($C*vcsf) @ [(Label n [$(Loop (t1s _> t2s) b_es)] (vs @ ($*b_es)))]) \<Down>{(ls, r)} (s',locs',res)"
           "length vs = n"
           "length t1s = n"
           "const_list vs"
@@ -3723,7 +3723,7 @@ proof (induction "(s,vs,es)" k "(ls,r)" "(s',vs', RBreak n vrs)" arbitrary: s vs
     using br
     by (metis append_take_drop_id diff_diff_cancel length_drop)
   thus ?case
-    using reduce_to_n.seq_nonvalue1[of "$$*vrsf"]
+    using reduce_to_n.seq_nonvalue1[of "$C*vrsf"]
           is_const_list reduce_to_n.br br.hyps(2) br.prems(1)
     by fastforce
 next
@@ -3759,7 +3759,7 @@ proof (induction "(s,vs,es)" k "(ls,Some r_r)" "(s',vs',RReturn vrs)" arbitrary:
     using return
     by (metis append_take_drop_id diff_diff_cancel length_drop)
   thus ?case
-    using reduce_to_n.seq_nonvalue1[of "$$*vrsf"]
+    using reduce_to_n.seq_nonvalue1[of "$C*vrsf"]
           is_const_list reduce_to_n.return
     by fastforce
 next
@@ -3792,11 +3792,11 @@ lemma reduce_to_n_inst_is:
 
 (*
 lemma reduce_to_label_label:
-  assumes "(s,vs,($$*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"
+  assumes "(s,vs,($C*vcs)@[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res)"
   shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Label m les es]) \<Down>{(ls,r,i)} (s',vs',res))) \<and>
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> (\<exists>rvs'. rvs = vcs@rvs' \<and> ((s,vs,[Label m les es]) \<Down>{(ls,r,i)} (s',vs',RValue rvs')))))"
 proof -
-  obtain k where k_is:"(s,vs,($$*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
+  obtain k where k_is:"(s,vs,($C*vcs)@[Label m les es]) \<Down>k{(ls,r,i)} (s',vs',res)"
     using reduce_to_imp_reduce_to_n assms
     by fastforce
   thus ?thesis

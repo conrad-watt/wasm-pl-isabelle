@@ -231,8 +231,8 @@ datatype e = \<comment> \<open>administrative instruction\<close>
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>
-    LBase "e list" "e list"
+    LBase "v list" "e list"
     \<comment> \<open>L(i+1) = v* (label n {e* } Li) e*\<close>
-    | LRec "e list" nat "e list" Lholed "e list"
+    | LRec "v list" nat "e list" Lholed "e list"
 
 end

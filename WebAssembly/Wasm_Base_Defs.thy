@@ -360,22 +360,22 @@ inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
 
-abbreviation v_to_e_list :: "v list \<Rightarrow> e list" ("$$* _" 60) where
+abbreviation v_to_e_list :: "v list \<Rightarrow> e list" ("$C* _" 60) where
   "v_to_e_list ves \<equiv> map (\<lambda>v. $C v) ves"
 
   (* Lfilled depth thing-to-fill fill-with result *)
 inductive Lfilled :: "nat \<Rightarrow> Lholed \<Rightarrow> e list \<Rightarrow> e list \<Rightarrow> bool" where
   (* "Lfill (LBase vs es') es = vs @ es @ es'" *)
-  L0:"\<lbrakk>const_list vs; lholed = (LBase vs es')\<rbrakk> \<Longrightarrow> Lfilled 0 lholed es (vs @ es @ es')"
+  L0:"\<lbrakk>lholed = (LBase vs es')\<rbrakk> \<Longrightarrow> Lfilled 0 lholed es (($C* vs) @ es @ es')"
   (* "Lfill (LRec vs ts es' l es'') es = vs @ [Label ts es' (Lfill l es)] @ es''" *)
-| LN:"\<lbrakk>const_list vs; lholed = (LRec vs n es' l es''); Lfilled k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled (k+1) lholed es (vs @ [Label n es' lfilledk] @ es'')"
+| LN:"\<lbrakk>lholed = (LRec vs n es' l es''); Lfilled k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled (k+1) lholed es (($C* vs) @ [Label n es' lfilledk] @ es'')"
 
   (* Lfilled depth thing-to-fill fill-with result *)
 inductive Lfilled_exact :: "nat \<Rightarrow> Lholed \<Rightarrow> e list \<Rightarrow> e list \<Rightarrow> bool" where
   (* "Lfill (LBase vs es') es = vs @ es @ es'" *)
   L0:"\<lbrakk>lholed = (LBase [] [])\<rbrakk> \<Longrightarrow> Lfilled_exact 0 lholed es es"
   (* "Lfill (LRec vs ts es' l es'') es = vs @ [Label ts es' (Lfill l es)] @ es''" *)
-| LN:"\<lbrakk>const_list vs; lholed = (LRec vs n es' l es''); Lfilled_exact k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled_exact (k+1) lholed es (vs @ [Label n es' lfilledk] @ es'')"
+| LN:"\<lbrakk>lholed = (LRec vs n es' l es''); Lfilled_exact k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled_exact (k+1) lholed es (($C* vs) @ [Label n es' lfilledk] @ es'')"
 
 definition load_store_t_bounds :: "a \<Rightarrow> tp option \<Rightarrow> t \<Rightarrow> bool" where
   "load_store_t_bounds a tp t = (case tp of
@@ -503,7 +503,7 @@ lemma to_e_list_2:"[$ a, $ b] = $* [a, b]"
 lemma to_e_list_3:"[$ a, $ b, $ c] = $* [a, b, c]"
   by simp
 
-lemma v_exists_b_e:"\<exists>ves. ($$*vs) = ($*ves)"
+lemma v_exists_b_e:"\<exists>ves. ($C*vs) = ($*ves)"
 proof (induction vs)
   case (Cons a vs)
   thus ?case
@@ -527,15 +527,14 @@ next
 qed
 
 lemma Lfilled_exact_app_imp_exists_Lfilled:
-  assumes "const_list ves"
-          "Lfilled_exact n lholed (ves@es) LI"
+  assumes "Lfilled_exact n lholed (($C* vs)@es) LI"
   shows "\<exists>lholed'. Lfilled n lholed' es LI"
-  using assms(2,1)
-proof (induction "(ves@es)" LI rule: Lfilled_exact.induct)
+  using assms
+proof (induction "(($C* vs)@es)" LI rule: Lfilled_exact.induct)
   case (L0 lholed)
-  show ?case
-    using Lfilled.intros(1)[OF L0(2), of _ "[]"]
-    by fastforce
+  thus ?case
+    using Lfilled.intros(1)
+    by force
 next
   case (LN vs lholed n es' l es'' k lfilledk)
   thus ?case
@@ -545,7 +544,7 @@ qed
 
 lemma Lfilled_imp_exists_Lfilled_exact:
   assumes "Lfilled n lholed es LI"
-  shows "\<exists>lholed' ves es_c. const_list ves \<and> Lfilled_exact n lholed' (ves@es@es_c) LI"
+  shows "\<exists>lholed' vs es_c. Lfilled_exact n lholed' (($C* vs)@es@es_c) LI"
   using assms Lfilled_exact.intros
   by (induction rule: Lfilled.induct) fastforce+
 
