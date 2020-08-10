@@ -227,7 +227,7 @@ datatype e = \<comment> \<open>administrative instruction\<close>
   | Trap
   | Invoke cl
   | Label nat "e list" "e list"
-  | Local nat f "e list"
+  | Frame nat f "e list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>

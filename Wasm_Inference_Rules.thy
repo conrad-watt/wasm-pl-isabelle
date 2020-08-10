@@ -146,9 +146,9 @@ inductive modifies :: "cl list \<Rightarrow> e list \<Rightarrow> var \<Rightarr
 | "\<lbrakk>(modifies fs [Invoke (fs!j)] v)\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
 | "\<lbrakk>j \<ge> length fs\<rbrakk> \<Longrightarrow> modifies fs [$Call j] v"
 | "\<lbrakk>(modifies fs les v) \<or> (modifies fs es v)\<rbrakk> \<Longrightarrow> modifies fs [Label _ les es] v"
-| "\<lbrakk>(modifies fs es v); (f_inst f) = i\<rbrakk> \<Longrightarrow> modifies fs [Local _ f es] v"
-| "\<lbrakk>(f_inst f) \<noteq> i\<rbrakk> \<Longrightarrow> modifies fs [Local _ f es] v"
-| "\<lbrakk>cl = Func_native j _ _ b_es; (modifies fs [Local _ f [$Block _ b_es]] v); (f_inst f) = j\<rbrakk> \<Longrightarrow> modifies fs [Invoke cl] v"
+| "\<lbrakk>(modifies fs es v); (f_inst f) = i\<rbrakk> \<Longrightarrow> modifies fs [Frame _ f es] v"
+| "\<lbrakk>(f_inst f) \<noteq> i\<rbrakk> \<Longrightarrow> modifies fs [Frame _ f es] v"
+| "\<lbrakk>cl = Func_native j _ _ b_es; (modifies fs [Frame _ f [$Block _ b_es]] v); (f_inst f) = j\<rbrakk> \<Longrightarrow> modifies fs [Invoke cl] v"
 | "\<lbrakk>cl = Func_host _ _\<rbrakk> \<Longrightarrow> modifies fs [Invoke cl] v"
 | "modifies fs [$Call_indirect k] v"
 
@@ -352,11 +352,11 @@ lemma modset_br: "modset fs ([$Br j]) = {}"
   by auto
 
 lemma modset_local:
-  assumes "v \<in> modset fs [Local m f es]"
+  assumes "v \<in> modset fs [Frame m f es]"
           "f_inst f = i"
   shows "v \<in> modset fs es"
   using assms
-  apply (induction fs "[Local m f es]" v rule: modset_induct)
+  apply (induction fs "[Frame m f es]" v rule: modset_induct)
     apply (metis modset_emp)
    apply metis+
   done
@@ -391,7 +391,7 @@ lemma modset_set_global:
 lemma modset_invoke_native1:
   assumes "v \<in> modset fs [Invoke cl]"
           "cl = Func_native j tf ts b_es"
-  shows "v \<in> modset fs [Local m \<lparr> f_locs=vls, f_inst=j \<rparr> [$Block tf' b_es]]"
+  shows "v \<in> modset fs [Frame m \<lparr> f_locs=vls, f_inst=j \<rparr> [$Block tf' b_es]]"
   using assms
 proof (induction fs "[Invoke cl]" v arbitrary: rule: modset_induct)
   case (14 j' vc vd b_es' fs ve vf vg v)
@@ -414,7 +414,7 @@ qed (auto dest: modset_emp)
 
 lemma modset_invoke_native:
   assumes "cl = Func_native j tf ts b_es"    
-  shows "modset fs [Local m \<lparr> f_locs=vls, f_inst=j \<rparr> [$Block tf' b_es]] = modset fs [Invoke cl]"
+  shows "modset fs [Frame m \<lparr> f_locs=vls, f_inst=j \<rparr> [$Block tf' b_es]] = modset fs [Invoke cl]"
   using assms modset_invoke_native1 modset_intros(14)
   by (metis f.select_convs(2) modset_implies subset_antisym)
 
@@ -669,7 +669,7 @@ next
     by (meson modset_arb_app modset_intros(1,16) var_st_differ_on_def)
 next
   case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s k' ls r s' res)
-  hence "var_st_differ_on var_st (modset fs [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) var_st'"
+  hence "var_st_differ_on var_st (modset fs [Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) var_st'"
     by blast
   hence "var_st_differ_on var_st (modset fs ([Invoke cl])) var_st'"
     using modset_invoke_native[OF invoke_native(1)]
@@ -4332,7 +4332,7 @@ next
       using Function(2) local_assms(3) list_all2_lengthD
       unfolding ass_wf_def
       by (fastforce simp add: stack_ass_sat_def)
-    hence 1:"(s, \<lparr>f_locs = locs, f_inst = i\<rparr>, ($C* vcsf) @ [Local (length tm) \<lparr> f_locs=(vcs @ n_zeros tls), f_inst=i \<rparr> [$Block ([] _> tm) es]]) \<Down>n{(labs@labsf, case_ret ret retf)} (s', \<lparr>f_locs = locs', f_inst = i\<rparr>, res)"
+    hence 1:"(s, \<lparr>f_locs = locs, f_inst = i\<rparr>, ($C* vcsf) @ [Frame (length tm) \<lparr> f_locs=(vcs @ n_zeros tls), f_inst=i \<rparr> [$Block ([] _> tm) es]]) \<Down>n{(labs@labsf, case_ret ret retf)} (s', \<lparr>f_locs = locs', f_inst = i\<rparr>, res)"
       using invoke_native_imp_local[OF _ Function(1)] local_assms(4)
       by blast
     obtain lf' lres lrvs where lres_def:

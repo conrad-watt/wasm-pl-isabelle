@@ -721,13 +721,13 @@ lemma s_type_unfold:
   by auto
 
 lemma e_type_local:
-  assumes "s\<bullet>\<C> \<turnstile> [Local n f es] : (ts _> ts')"
+  assumes "s\<bullet>\<C> \<turnstile> [Frame n f es] : (ts _> ts')"
   shows "\<exists>tls \<C>i. inst_typing s (f_inst f) \<C>i
                 \<and> length tls = n
                 \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof (f_locs f)), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))
                 \<and> ts' = ts @ tls"
   using assms
-proof (induction "s" "\<C>" "[Local n f es]" "(ts _> ts')" arbitrary: ts ts')
+proof (induction "s" "\<C>" "[Frame n f es]" "(ts _> ts')" arbitrary: ts ts')
   case (2 \<S> \<C> es' t1s t2s e t3s)
   have "t1s = t2s"
     using 2 unlift_b_e
@@ -738,10 +738,10 @@ proof (induction "s" "\<C>" "[Local n f es]" "(ts _> ts')" arbitrary: ts ts')
 qed (auto simp add: unlift_b_e s_typing.simps)
 
 lemma e_type_local_shallow:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [Local n f es] : (ts _> ts')"
+  assumes "\<S>\<bullet>\<C> \<turnstile> [Frame n f es] : (ts _> ts')"
   shows "\<exists>tls. length tls = n \<and> ts' = ts@tls \<and> (\<S>\<bullet>(Some tls) \<tturnstile> f;es : tls)"
   using assms
-proof (induction "\<S>" "\<C>" "[Local n f es]" "(ts _> ts')" arbitrary: ts ts')
+proof (induction "\<S>" "\<C>" "[Frame n f es]" "(ts _> ts')" arbitrary: ts ts')
   case (1 \<C> b_es \<S>)
   thus ?case
   by (metis e.distinct(7) map_eq_Cons_D)

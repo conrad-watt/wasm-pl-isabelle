@@ -32,9 +32,9 @@ proof -
     by fastforce
 qed
 
-lemma neq_local_nested:"[Local n f es] \<noteq> es"
+lemma neq_local_nested:"[Frame n f es] \<noteq> es"
 proof -
-  have "size_list size [Local n f es] > size_list size es"
+  have "size_list size [Frame n f es] > size_list size es"
     by simp
   thus ?thesis
     by fastforce
@@ -111,7 +111,7 @@ next
     by auto
 next
   case (return vs n j lholed es f)
-  hence "size_list size [Local n f es] > size_list size ($C*vs)"
+  hence "size_list size [Frame n f es] > size_list size ($C*vs)"
         using lfilled_size[OF return(2)]
     by simp
   thus ?case
@@ -730,7 +730,7 @@ lemma run_one_step_label_result:
   by (cases res) auto
 
 lemma run_one_step_local_result:
-  assumes "run_one_step d (s,f,ves,Local x51 fl x54) = (s', f', res)"
+  assumes "run_one_step d (s,f,ves,Frame x51 fl x54) = (s', f', res)"
   shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases "x54 = [Trap]")
@@ -924,7 +924,7 @@ next
   thus ?thesis
     by auto
 next
-  case (Local x51 fl x54)
+  case (Frame x51 fl x54)
   thus ?thesis
     using assms run_one_step_local_result
     by fastforce
@@ -1092,7 +1092,7 @@ next
   thus ?thesis
     by auto
 next
-  case (Local x51 f x54)
+  case (Frame x51 f x54)
   thus ?thesis
     using assms run_one_step_local_result
     by fastforce
@@ -2002,12 +2002,12 @@ proof -
         show ?thesis
         proof (cases cl)
           case (Func_native i' tf fts fes)
-          hence "s' = s" "f' = f" "es' = (vs_to_es ves'' @ [Local (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])"
+          hence "s' = s" "f' = f" "es' = (vs_to_es ves'' @ [Frame (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])"
             using 2(3) Invoke local_defs outer_True true_defs
             unfolding cl_type_def
             by auto
           moreover
-          have "\<lparr>s;f;(vs_to_es ves')@[Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;([Local (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])\<rparr>"
+          have "\<lparr>s;f;(vs_to_es ves')@[Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;([Frame (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])\<rparr>"
             using reduce.intros(5) local_defs(1,2) Func_native ves'_length
             unfolding cl_type_def
             by fastforce
@@ -2174,13 +2174,13 @@ proof -
         qed
       qed
     next
-      case (Local ln fl es)
+      case (Frame ln fl es)
       thus ?thesis
       proof (cases "es_is_trap es")
         case True
         thus ?thesis
           using 2(3) is_const_list_vs_to_es_list
-                Local progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(26)]]
+                Frame progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(26)]]
             by fastforce
       next
         case False
@@ -2193,17 +2193,17 @@ proof -
           proof (cases "length es = ln")
             case True
             hence "s = s'" "f = f'" "vs_to_es ves @ es = es'"
-              using 2(3) Local outer_true outer_outer_false
+              using 2(3) Frame outer_true outer_outer_false
               by simp_all
             thus ?thesis
-              using 2(3) Local outer_true outer_outer_false is_const_list_vs_to_es_list[of "rev ves"]
+              using 2(3) Frame outer_true outer_outer_false is_const_list_vs_to_es_list[of "rev ves"]
                   reduce.intros(1)[OF reduce_simple.intros(27)]
                   progress_L0[where ?es_c="[]"] basic local_const
               by (metis (no_types, lifting) case_prodI e_type_const_conv_vs progress_L0_left)
           next
             case False
             thus ?thesis
-              using 2(3) Local outer_outer_false outer_true is_const_list_vs_to_es_list[of "rev ves"]
+              using 2(3) Frame outer_outer_false outer_true is_const_list_vs_to_es_list[of "rev ves"]
               by auto
           qed
         next
@@ -2212,7 +2212,7 @@ proof -
           proof (cases d)
             case 0
             thus ?thesis
-              using 2(3) Local outer_outer_false False is_const_list_vs_to_es_list[of "rev ves"]
+              using 2(3) Frame outer_outer_false False is_const_list_vs_to_es_list[of "rev ves"]
               by auto
           next
             case (Suc d')
@@ -2222,17 +2222,17 @@ proof -
             proof (cases les')
               case RSCrash
               thus ?thesis
-                using outer_outer_false False run_step_is Local 2(3) Suc
+                using outer_outer_false False run_step_is Frame 2(3) Suc
                   by auto
             next
               case (RSBreak x21 x22)
               thus ?thesis
-                using outer_outer_false False run_step_is Local 2(3) Suc
+                using outer_outer_false False run_step_is Frame 2(3) Suc
                   by auto
             next
               case (RSReturn x3)
               hence es'_def:"es' = (vs_to_es ((take ln x3)@ves)) \<and> s' = s'' \<and> f = f' \<and> ln \<le> length x3"
-                using outer_outer_false False run_step_is Local 2(3) Suc
+                using outer_outer_false False run_step_is Frame 2(3) Suc
                 by (cases "ln \<le> length x3") auto
               then obtain n lfilled es_c where local_eqs:"s=s'" "f=f'" "ln \<le> length x3" "Lfilled_exact n lfilled ((vs_to_es x3) @ [$Return] @ es_c) es"
                 using run_step_is run_step_return_imp_lfilled RSReturn
@@ -2243,15 +2243,15 @@ proof -
               obtain lfilled'' where "Lfilled n lfilled'' ((drop (length x3 - ln) (vs_to_es x3)) @ [$Return]) es"
                 using lfilled_collapse1[OF lfilled_int] is_const_list_vs_to_es_list[of "rev x3"] local_eqs(3)
                 by (metis drop_map length_rev)
-              hence "\<lparr>[Local ln fl es]\<rparr> \<leadsto> \<lparr>(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
+              hence "\<lparr>[Frame ln fl es]\<rparr> \<leadsto> \<lparr>(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
                 using reduce_simple.intros(27) local_eqs(3) is_const_list_vs_to_es_list
                 unfolding drop_map
                 by fastforce
-              hence 1:"\<lparr>s;f;[Local ln fl es]\<rparr> \<leadsto> \<lparr>s';f';(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
+              hence 1:"\<lparr>s;f;[Frame ln fl es]\<rparr> \<leadsto> \<lparr>s';f';(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
                 using reduce.intros(1) local_eqs(1,2)
                 by fastforce
               have "\<lparr>s;f;(vs_to_es ves)@[e]\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es ves)@(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
-                using Local "1" progress_L0_left
+                using Frame "1" progress_L0_left
                 by blast
               thus ?thesis
                 using es'_def
@@ -2260,10 +2260,10 @@ proof -
             next
               case (RSNormal x4)
               hence inner_reduce:"\<lparr>s;fl;es\<rparr> \<leadsto> \<lparr>s'';fl';x4\<rparr>"
-                using 2(2)[OF Local outer_outer_false False] run_step_is Suc
+                using 2(2)[OF Frame outer_outer_false False] run_step_is Suc
                 by auto
               thus ?thesis
-                using Local 2(3) Local outer_outer_false False run_step_is Suc
+                using Frame 2(3) Frame outer_outer_false False run_step_is Suc
                       reduce.intros(24)[OF inner_reduce] RSNormal
                       progress_L0_left is_const_list_vs_to_es_list[of "rev ves"]
                 by (auto simp del: run_step.simps)

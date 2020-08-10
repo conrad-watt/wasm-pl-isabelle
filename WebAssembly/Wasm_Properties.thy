@@ -554,8 +554,8 @@ proof -
 qed
 
 lemma types_preserved_local_const:
-  assumes "\<lparr>[Local n f ($C*vs)]\<rparr> \<leadsto> \<lparr>($C*vs)\<rparr>"
-          "s\<bullet>\<C> \<turnstile> [Local n f ($C*vs)] : (ts _> ts')"
+  assumes "\<lparr>[Frame n f ($C*vs)]\<rparr> \<leadsto> \<lparr>($C*vs)\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [Frame n f ($C*vs)] : (ts _> ts')"
   shows "s\<bullet>\<C> \<turnstile> ($C*vs): (ts _> ts')"
 proof -
   obtain tls \<C>i where "(s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof (f_locs f)), return := Some tls\<rparr> \<turnstile> ($C*vs) : ([] _> tls))"
@@ -667,7 +667,7 @@ lemma types_preserved_invoke_native:
           "length t2s = m"
           "n_zeros tfs = zs"
           "store_typing s"
-  shows "s\<bullet>\<C> \<turnstile> [Local m \<lparr>f_locs = (vs @ zs), f_inst = i\<rparr> [$Block ([] _> t2s) es]] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [Frame m \<lparr>f_locs = (vs @ zs), f_inst = i\<rparr> [$Block ([] _> t2s) es]] : (ts _> ts')"
 proof -
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ves : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [Invoke cl] : (ts'' _> ts')"
   using assms(1) e_type_comp
@@ -827,8 +827,8 @@ next
 qed
 
 lemma types_preserved_return:
-  assumes "\<lparr>[Local n f LI]\<rparr> \<leadsto> \<lparr>($C*vs)\<rparr>"
-          "s\<bullet>\<C> \<turnstile> [Local n f LI] : (ts _> ts')"
+  assumes "\<lparr>[Frame n f LI]\<rparr> \<leadsto> \<lparr>($C*vs)\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [Frame n f LI] : (ts _> ts')"
           "length vs = n"
           "Lfilled j lholed (($C*vs) @ [$Return]) LI"
   shows "s\<bullet>\<C> \<turnstile> ($C*vs) : (ts _> ts')"
@@ -2739,7 +2739,7 @@ proof -
                                                    "s\<bullet>\<C>' \<turnstile> ($C*vs') : ([] _> ts)"
         using progress_LN_return[OF local_assms, of s _ ts ts] s_type_unfold[OF 5(1)]
         by fastforce
-      hence temp1:"\<exists>a. \<lparr>[Local n fa es]\<rparr> \<leadsto> \<lparr>($C*vs')\<rparr>"
+      hence temp1:"\<exists>a. \<lparr>[Frame n fa es]\<rparr> \<leadsto> \<lparr>($C*vs')\<rparr>"
         using reduce_simple.return[OF _ lholed'_def(1)]
               e_type_consts[OF lholed'_def(2)] 5(2,3)
         by fastforce
@@ -2750,7 +2750,7 @@ proof -
       case 3
       then consider (1) "const_list es" | (2) "es = [Trap]"
         by blast
-      hence temp1:"\<exists>a. \<lparr>s;f;[Local n fa es]\<rparr> \<leadsto> \<lparr>s;f;es\<rparr>"
+      hence temp1:"\<exists>a. \<lparr>s;f;[Frame n fa es]\<rparr> \<leadsto> \<lparr>s;f;es\<rparr>"
       proof (cases)
         case 1
         have "length es = length ts"
@@ -3192,7 +3192,7 @@ qed
 
 lemma reduce_trans_local:
   assumes "reduce_trans (s,f,es) (s',f',es')"
-  shows "reduce_trans (s,f0,[Local n f es]) (s',f0,[Local n f' es'])"
+  shows "reduce_trans (s,f0,[Frame n f es]) (s',f0,[Frame n f' es'])"
   using assms
   unfolding reduce_trans_def
 proof (induction "(s',f',es')" arbitrary: s' f' es' rule: rtranclp_induct)
@@ -3203,7 +3203,7 @@ next
   case (step y)
   obtain s'' f'' es'' where y_is:"y = (s'', f'',es'')"
     by (cases y) blast
-  hence "reduce_trans (s,f0,[Local n f es]) (s'',f0,[Local n f'' es''])"
+  hence "reduce_trans (s,f0,[Frame n f es]) (s'',f0,[Frame n f'' es''])"
     using step(3)
     unfolding reduce_trans_def
     by simp
@@ -3211,7 +3211,7 @@ next
   have 1:"\<lparr>s'';f'';es''\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
     using step(2) y_is
     by blast
-  have "\<lparr>s'';f0;[Local n f'' es'']\<rparr> \<leadsto> \<lparr>s';f0;[Local n f' es']\<rparr>"
+  have "\<lparr>s'';f0;[Frame n f'' es'']\<rparr> \<leadsto> \<lparr>s';f0;[Frame n f' es']\<rparr>"
     using reduce.local[OF 1]
     by blast
   ultimately

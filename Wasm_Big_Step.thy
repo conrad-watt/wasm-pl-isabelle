@@ -83,26 +83,26 @@ inductive reduce_to :: "[(s \<times> f \<times> e list), (nat list \<times> nat 
 | call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some cl; stypes s (f_inst f) j = tf; cl_type cl = tf; const_list ves; (s,f,ves@[Invoke cl]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s',f',res)"
 | call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some cl \<and> stypes s (f_inst f) j \<noteq> cl_type cl) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f',res)"
+| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f',res)"
 | invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f,RValue vcs')"
 | invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
 | const_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($C*ves)@es) \<Down>{\<Gamma>} (s',f',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RValue res)"
-| local_value:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>{\<Gamma>} (s',f,RValue res)"
+| local_value:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Frame n fl es]) \<Down>{\<Gamma>} (s',f,RValue res)"
   \<comment> \<open>\<open>seq congruence\<close>\<close>
 | seq_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s'',f'',RValue res''); (s'',f'',($C* res'') @ es') \<Down>{\<Gamma>} (s',f',res); \<not> const_list es; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>{\<Gamma>} (s',f',res)"
 | seq_nonvalue1:"\<lbrakk>const_list ves; (s,f,es) \<Down>{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; ves \<noteq> []; es \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,ves @ es) \<Down>{\<Gamma>} (s',f',res)"
 | seq_nonvalue2:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>trap congruence\<close>\<close>
 | label_trap:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RTrap)"
-| local_trap:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>{\<Gamma>} (s',f,RTrap)"
+| local_trap:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Frame n fl es]) \<Down>{\<Gamma>} (s',f,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
 | label_break_suc:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RBreak bn bvs)"
 | label_break_nil:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s'',f'',RBreak 0 bvs); (s'',f'',($C*(vcs @ bvs)) @ les) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,($C*vcs)@[Label n les es]) \<Down>{(ls,r)} (s',f',res)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RReturn rvs)"
-| local_return:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>{\<Gamma>} (s',f,RValue rvs)"
+| local_return:"\<lbrakk>(s,fl,es) \<Down>{([],Some n)} (s',fl',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Frame n fl es]) \<Down>{\<Gamma>} (s',f,RValue rvs)"
   \<comment> \<open>\<open>trap\<close>\<close>
 | trap:"(s,f,[Trap]) \<Down>{\<Gamma>} (s,f,RTrap)"
 
@@ -183,26 +183,26 @@ inductive reduce_to_n :: "[(s \<times> f \<times> e list), nat, (nat list \<time
 | call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some cl; stypes s (f_inst f) j = tf; cl_type cl = tf; const_list ves; (s,f,ves@[Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s',f',res)"
 | call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some cl \<and> stypes s (f_inst f) j \<noteq> cl_type cl) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)"
+| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)"
 | invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f,RValue vcs')"
 | invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
 | const_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($C*ves)@es) \<Down>k'{\<Gamma>} (s',f',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RValue res)"
-| local_value:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>k'{\<Gamma>} (s',f,RValue res)"
+| local_value:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Frame n fl es]) \<Down>k'{\<Gamma>} (s',f,RValue res)"
   \<comment> \<open>\<open>seq congruence\<close>\<close>
 | seq_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s'',f'',RValue res''); (s'',f'',($C* res'') @ es') \<Down>k'{\<Gamma>} (s',f',res); \<not> const_list es; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>k'{\<Gamma>} (s',f',res)"
 | seq_nonvalue1:"\<lbrakk>const_list ves; (s,f,es) \<Down>k'{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; ves \<noteq> []; es \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,ves @ es) \<Down>k'{\<Gamma>} (s',f',res)"
 | seq_nonvalue2:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s',f',res); \<nexists>rvs. res = RValue rvs; es' \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,es @ es') \<Down>k'{\<Gamma>} (s',f',res)"
   \<comment> \<open>\<open>trap congruence\<close>\<close>
 | label_trap:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RTrap)"
-| local_trap:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>k'{\<Gamma>} (s',f,RTrap)"
+| local_trap:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RTrap)\<rbrakk> \<Longrightarrow> (s,f,[Frame n fl es]) \<Down>k'{\<Gamma>} (s',f,RTrap)"
   \<comment> \<open>\<open>break congruence\<close>\<close>
 | label_break_suc:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RBreak (Suc bn) bvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RBreak bn bvs)"
 | label_break_nil:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s'',f'',RBreak 0 bvs); (s'',f'',($C*(vcs @ bvs)) @ les) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,($C*vcs)@[Label n les es]) \<Down>k'{(ls,r)} (s',f',res)"
   \<comment> \<open>\<open>return congruence\<close>\<close>
 | label_return:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RReturn rvs)"
-| local_return:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Local n fl es]) \<Down>k'{\<Gamma>} (s',f,RValue rvs)"
+| local_return:"\<lbrakk>(s,fl,es) \<Down>k'{([],Some n)} (s',fl',RReturn rvs)\<rbrakk> \<Longrightarrow> (s,f,[Frame n fl es]) \<Down>k'{\<Gamma>} (s',f,RValue rvs)"
   \<comment> \<open>\<open>trap\<close>\<close>
 | trap:"(s,f,[Trap]) \<Down>k'{\<Gamma>} (s,f,RTrap)"
 
@@ -2314,7 +2314,7 @@ lemma invoke_native_imp_local1:
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
-  shows "(s,vs,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
+  shows "(s,vs,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
   using assms
 proof (induction "(s,vs,($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (invoke_native cl' j t1s t2s ts es ves' vcs n m zs s vs k s' vs' res)
@@ -2397,11 +2397,11 @@ next
 qed auto
 
 lemma reduce_to_n_local:
-  assumes "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
-  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res))) \<and>
-         (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',RValue rvs1))))"
+  assumes "(s,vs,($C* vfs)@[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res))) \<and>
+         (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',RValue rvs1))))"
   using assms
-proof (induction "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vfs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vfs)@[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res vfs rule: reduce_to_n.induct)
   case (local_value s lls es k n j s' lls' res vs \<Gamma>)
   thus ?case
     using reduce_to_n.local_value
@@ -2446,27 +2446,27 @@ next
 qed auto
 
 lemma reduce_to_local:
-  assumes "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res)"
-  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res))) \<and>
-         (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',RValue rvs1))))"
+  assumes "(s,vs,($C* vfs)@[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res)"
+  shows "((\<nexists>rvs. res = RValue rvs) \<longrightarrow> ((s,vs,[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',res))) \<and>
+         (\<forall>rvs. res = RValue rvs \<longrightarrow> (\<exists>rvs1. rvs = vfs@rvs1 \<and> ((s,vs,[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>{\<Gamma>} (s',vs',RValue rvs1))))"
   using reduce_to_n_local assms reduce_to_imp_reduce_to_n[OF assms]
   apply simp
   apply (metis reduce_to_n_imp_reduce_to reduce_to_n_local)
   done
 
 lemma reduce_to_local_nonvalue:
-  assumes "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
+  assumes "(s,vs,($C* vfs)@[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res)"
           "(\<nexists>rvs. res = RValue rvs)"
-  shows "((s,vs,[Local m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "((s,vs,[Frame m \<lparr> f_locs=vcs, f_inst=j \<rparr> es]) \<Down>k{\<Gamma>} (s',vs',res))"
   using reduce_to_n_local[OF assms(1)] assms(2)
   by auto
 
 lemma local_imp_body:
-  assumes "(s,vs,($C*vfs)@[Local m fl les]) \<Down>k{(ls,r)} (s',vs',res)"
+  assumes "(s,vs,($C*vfs)@[Frame m fl les]) \<Down>k{(ls,r)} (s',vs',res)"
   shows "\<exists>fl' lres. ((s,fl,les) \<Down>k{([],Some m)} (s',fl',lres)) \<and> vs = vs' \<and>
          ((lres = RTrap \<and> res = RTrap) \<or> (\<exists>rvs. ((lres = RValue rvs \<or> lres = RReturn rvs) \<and> res = RValue (vfs@rvs))))"
   using assms
-proof (induction "(s,vs,($C*vfs)@[Local m fl les])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res les vfs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C*vfs)@[Frame m fl les])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res les vfs rule: reduce_to_n.induct)
   case (const_value s vs es k s' vs' res ves)
   thus ?case
     using consts_app_snoc[OF const_value(4)]
@@ -2477,8 +2477,8 @@ proof (induction "(s,vs,($C*vfs)@[Local m fl les])" k "(ls,r)" "(s',vs',res)" ar
     done
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
-  consider (1) "es = ($C* vfs) @ [Local m fl les]" "es' = []"
-         | (2) "(\<exists>ves' ves''. es = ($C* ves') \<and> es' = ($C* ves'') @ [Local m fl les] \<and> vfs = ves' @ ves'')"
+  consider (1) "es = ($C* vfs) @ [Frame m fl les]" "es' = []"
+         | (2) "(\<exists>ves' ves''. es = ($C* ves') \<and> es' = ($C* ves'') @ [Frame m fl les] \<and> vfs = ves' @ ves'')"
     using consts_app_snoc[OF seq_value(7)]
     by blast
   thus ?case
@@ -2490,7 +2490,7 @@ next
     case 2
     then obtain ves' ves'' where
      "es = $C* ves'"
-     "es' = ($C* ves'') @ [Local m fl les] \<and> vfs = ves' @ ves''"
+     "es' = ($C* ves'') @ [Frame m fl les] \<and> vfs = ves' @ ves''"
       by blast
     thus ?thesis
       using seq_value
@@ -2514,7 +2514,7 @@ lemma invoke_native_imp_local:
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
-  shows "(s,vs,($C* vfs)@[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
+  shows "(s,vs,($C* vfs)@[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
   using assms
 proof (induction "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vfs rule: reduce_to_n.induct)
   case (invoke_native cl j' t1s t2s' ts es' ves vcs' n k' m' zs' s f k s' f' res)
@@ -2526,7 +2526,7 @@ proof (induction "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs
          apply simp
          apply (metis append.left_neutral append_eq_append_conv length_map map_append)
          done
-       hence "(s, f, ($C* vfs) @ [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', f', res)"
+       hence "(s, f, ($C* vfs) @ [Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', f', res)"
          using invoke_native
          apply simp
          apply (metis reduce_to_consts reduce_to_consts1 res_b.inject(1))
@@ -2563,7 +2563,7 @@ next
       hence 0:"ves_l' = vcs"
         using ves'_def const_value(6)
         by (metis append.assoc append_eq_append_conv const_value.prems(3))
-      hence 1:"(s, vs, ($C* ves_l) @ [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', vs', RValue res)"
+      hence 1:"(s, vs, ($C* ves_l) @ [Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]) \<Down>k{(ls, r)} (s', vs', RValue res)"
         by (simp add: const_value.hyps(2) const_value.prems(1) const_value.prems(2) const_value.prems(3) const_value.prems(4) const_value.prems(5) ves'_def(2) ves_l_def(1))
       thus ?thesis
         using reduce_to_n.const_value[OF 1] ves_l_def ves'_def 0 inj_basic_econst 
@@ -2645,19 +2645,19 @@ lemma invoke_native_equiv_local:
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
-  shows "((s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,[Local m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res))"
+  shows "((s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res))"
   using invoke_native_imp_local1[OF _ assms] reduce_to_n.invoke_native[OF assms(1) _ assms(2) _ assms(3,4)] assms(5)
   by blast
 
 lemma local_context:
-  assumes "((s,vs,[Local n f es]) \<Down>k{\<Gamma>} (s',vs',res))"
-  shows "((s,vs,[Local n f es]) \<Down>k{\<Gamma>'} (s',vs',res))"
+  assumes "((s,vs,[Frame n f es]) \<Down>k{\<Gamma>} (s',vs',res))"
+  shows "((s,vs,[Frame n f es]) \<Down>k{\<Gamma>'} (s',vs',res))"
   using assms
-proof (induction "(s,vs,[Local n f es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
+proof (induction "(s,vs,[Frame n f es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
   case (const_value s vs es' k \<Gamma> s' vs' res ves)
   thus ?case
-    using consts_app_snoc[of "($C* ves)" "es" "[]" "Local n f es"]
-          consts_cons_last[of "[]" "Local n f es" ves]
+    using consts_app_snoc[of "($C* ves)" "es" "[]" "Frame n f es"]
+          consts_cons_last[of "[]" "Frame n f es" ves]
     apply (simp add: is_const_def)
     apply (metis (no_types, lifting) Cons_eq_append_conv Nil_is_append_conv append_self_conv inj_basic_econst map_append map_injective)
     done
@@ -2668,7 +2668,7 @@ next
     by blast
 next
   case (seq_value s vs es' k \<Gamma> s'' vs'' res'' es'' s' vs' res)
-  consider (1) "es' = [Local n f es]" "es'' = []" | (2) "es' = []" "es'' = [Local n f es]"
+  consider (1) "es' = [Frame n f es]" "es'' = []" | (2) "es' = []" "es'' = [Frame n f es]"
     using seq_value(7)
     unfolding append_eq_Cons_conv
     by fastforce
@@ -2794,10 +2794,10 @@ next
 qed auto
 
 lemma local_value_trap:
-  assumes "((s,vs,[Local n f es]) \<Down>k{\<Gamma>} (s',vs',res))"
+  assumes "((s,vs,[Frame n f es]) \<Down>k{\<Gamma>} (s',vs',res))"
   shows "\<exists>vrs. res = RValue vrs \<or> res = RTrap"
   using assms
-proof (induction "(s,vs,[Local n f es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
+proof (induction "(s,vs,[Frame n f es])" k \<Gamma> "(s',vs',res)" arbitrary: s vs s' vs' res rule: reduce_to_n.induct)
   case (seq_value s vs es k \<Gamma> s'' vs'' res'' es' s' vs' res)
   consider (1) "es = []" | (2) "es' = []"
     using seq_value(7)

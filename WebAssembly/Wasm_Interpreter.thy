@@ -403,7 +403,7 @@ and run_one_step :: "depth \<Rightarrow> config_one_tuple \<Rightarrow> res_tupl
                  then
                    let (ves', ves'') = split_n ves n in
                    let zs = n_zeros ts in
-                     (s, f, RSNormal ((vs_to_es ves'') @ ([Local m \<lparr> f_locs = ((rev ves')@zs), f_inst = i'\<rparr> [$(Block ([] _> t2s) es)]])))
+                     (s, f, RSNormal ((vs_to_es ves'') @ ([Frame m \<lparr> f_locs = ((rev ves')@zs), f_inst = i'\<rparr> [$(Block ([] _> t2s) es)]])))
                  else
                    (s, f, crash_error)
            | Func_host (t1s _> t2s) h \<Rightarrow>
@@ -446,7 +446,7 @@ and run_one_step :: "depth \<Rightarrow> config_one_tuple \<Rightarrow> res_tupl
                          (s', f', RSNormal ((vs_to_es ves)@[Label ln les es']))
                      | _ \<Rightarrow> (s', f', crash_error)))
      \<comment> \<open>\<open>LOCAL\<close>\<close>
-     | Local ln fls es \<Rightarrow>
+     | Frame ln fls es \<Rightarrow>
           if es_is_trap es
             then
               (s, f, RSNormal ((vs_to_es ves)@[Trap]))
@@ -467,7 +467,7 @@ and run_one_step :: "depth \<Rightarrow> config_one_tuple \<Rightarrow> res_tupl
                                then (s', f, RSNormal (vs_to_es ((take ln rvs)@ves)))
                                else (s', f, crash_error)
                          | RSNormal es' \<Rightarrow>
-                             (s', f, RSNormal ((vs_to_es ves)@[Local ln fls' es']))
+                             (s', f, RSNormal ((vs_to_es ves)@[Frame ln fls' es']))
                          | _ \<Rightarrow> (s', f, RSCrash CExhaustion)))
      \<comment> \<open>\<open>TRAP\<close> - should not be executed\<close>
      | Trap \<Rightarrow> (s, f, crash_error))"

@@ -29,7 +29,7 @@ qed
 lemma lfilled_local_forward_helper:
   assumes "Lfilled na lholed es lfes"
           "\<lparr>s;vs;es\<rparr> \<leadsto> \<lparr>s';vs';es'\<rparr>"
-  shows "\<exists>lfes'. Lfilled na lholed es' lfes' \<and> \<lparr>s;v0s;[Local n vs lfes]\<rparr> \<leadsto> \<lparr>s';v0s;[Local n vs' lfes']\<rparr>"
+  shows "\<exists>lfes'. Lfilled na lholed es' lfes' \<and> \<lparr>s;v0s;[Frame n vs lfes]\<rparr> \<leadsto> \<lparr>s';v0s;[Frame n vs' lfes']\<rparr>"
 proof -
   obtain lfes' where "Lfilled na lholed es' lfes'"
     using assms(1) progress_LN2
@@ -44,7 +44,7 @@ lemma reduce_to_imp_reduce_trans:
   shows "(res = RTrap \<longrightarrow> reduce_trans (s,vs,es) (s',vs',[Trap])) \<and>
          (\<forall>rvs. (res = RValue rvs \<longrightarrow> reduce_trans (s,vs,es) (s',vs',$C*rvs))) \<and>
          (\<forall>n rvs lholed lfes les. (res = RBreak n rvs \<longrightarrow> (Lfilled n lholed es lfes \<longrightarrow> (ls!n = length rvs \<and> reduce_trans (s,vs,[Label (ls!n) les lfes]) (s',vs',($C*rvs)@les))))) \<and>
-         (\<forall>n rvs lholed lfes v0s. (res = RReturn rvs \<longrightarrow> (Lfilled n lholed es lfes \<longrightarrow> (r = Some (length rvs) \<and> reduce_trans (s,v0s,[Local (length rvs) vs lfes]) (s',v0s,$C*rvs)))))"
+         (\<forall>n rvs lholed lfes v0s. (res = RReturn rvs \<longrightarrow> (Lfilled n lholed es lfes \<longrightarrow> (r = Some (length rvs) \<and> reduce_trans (s,v0s,[Frame (length rvs) vs lfes]) (s',v0s,$C*rvs)))))"
   using assms
 proof (induction "(s,vs,es)" "(ls,r)" "(s',vs',res)" arbitrary: s vs vs' s' es res ls r rule: reduce_to.induct)
   case (emp s vs)
@@ -522,7 +522,7 @@ next
     by auto
 next
   case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s f ls r s' f' res)
-  have 1:"\<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]\<rparr>"
+  have 1:"\<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]\<rparr>"
     using reduce.invoke_native[OF invoke_native(1,2,3,4,5,6,7)]
     by fastforce
   show ?case
@@ -580,11 +580,11 @@ next
   case (local_value s fl es n s' fl' res f)
   hence 1:"reduce_trans (s, fl, es) (s', fl', $C* res)"
     by simp
-  have "reduce_trans (s, f, [Local n fl es]) (s', f, [Local n fl' ($C* res)])"
+  have "reduce_trans (s, f, [Frame n fl es]) (s', f, [Frame n fl' ($C* res)])"
     using reduce_trans_local[OF 1]
     by blast
   moreover
-  have "\<lparr>s'; f; [Local n fl' ($C* res)]\<rparr> \<leadsto> \<lparr>s'; f; ($C* res)\<rparr>"
+  have "\<lparr>s'; f; [Frame n fl' ($C* res)]\<rparr> \<leadsto> \<lparr>s'; f; ($C* res)\<rparr>"
     using reduce.basic[OF reduce_simple.local_const] is_const_list
     by fastforce
   ultimately
@@ -740,11 +740,11 @@ next
   case (local_trap s lls es n s' lls' vs)
   hence 1:"reduce_trans (s, lls, es) (s', lls', [Trap])"
     by simp
-  have "reduce_trans (s, vs, [Local n lls es]) (s', vs, [Local n lls' [Trap]])"
+  have "reduce_trans (s, vs, [Frame n lls es]) (s', vs, [Frame n lls' [Trap]])"
     using reduce_trans_local[OF 1]
     by blast
   moreover
-  have "\<lparr>s'; vs; [Local n lls' [Trap]]\<rparr> \<leadsto> \<lparr>s'; vs; [Trap]\<rparr>"
+  have "\<lparr>s'; vs; [Frame n lls' [Trap]]\<rparr> \<leadsto> \<lparr>s'; vs; [Trap]\<rparr>"
     using reduce.basic[OF reduce_simple.local_trap] is_const_list
     by fastforce
   ultimately
@@ -1295,7 +1295,7 @@ next
     hence 0:"(\<exists>rvs2.
              (rvs' = vcsf @ rvs2 \<and>
              ((s, f,
-              [Local m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr>
+              [Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr>
                 [$Block ([] _> t2s)
                    es]]) \<Down>{(ls, r)} (s'', vs'', RValue rvs2))))"
       using reduce_to_local[OF invoke_native(8)]
@@ -1461,7 +1461,7 @@ next
     by blast
 next
   case (local s f es s_l fl es' f0 n)
-  obtain k where res_b_def:"((s_l, f0, ($C* vcsf) @ [Local n fl es']) \<Down>k{(ls, r)} (s'', vs'', res))"
+  obtain k where res_b_def:"((s_l, f0, ($C* vcsf) @ [Frame n fl es']) \<Down>k{(ls, r)} (s'', vs'', res))"
     using local(3) reduce_to_imp_reduce_to_n
     by blast
   then obtain lvs' lres where lres_def:"(s_l, fl, ($C*[])@es') \<Down>{([], Some n)} (s'', lvs', lres)"
