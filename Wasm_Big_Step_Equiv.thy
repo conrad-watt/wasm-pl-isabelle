@@ -461,7 +461,7 @@ next
     by auto
 next
   case (call ves s vs j ls r s' vs' res)
-  have 1:"\<lparr>s;vs;ves @ [$Call j]\<rparr> \<leadsto> \<lparr>s;vs;ves @ [Invoke (sfunc s (f_inst vs) j)]\<rparr>"
+  have 1:"\<lparr>s;vs;ves @ [$Call j]\<rparr> \<leadsto> \<lparr>s;vs;ves @ [Invoke (sfunc_ind (f_inst vs) j)]\<rparr>"
     using progress_L0_left[OF reduce.call] call(1)
           e_type_const_conv_vs
     by blast
@@ -521,8 +521,8 @@ next
     unfolding reduce_trans_def
     by auto
 next
-  case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s f ls r s' f' res)
-  have 1:"\<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]\<rparr>"
+  case (invoke_native s i_cl j t1s t2s ts es ves vcs n k m zs f ls r s' f' res)
+  have 1:"\<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs=(vcs @ zs), f_inst=j \<rparr> [$Block ([] _> t2s) es]]\<rparr>"
     using reduce.invoke_native[OF invoke_native(1,2,3,4,5,6,7)]
     by fastforce
   show ?case
@@ -1285,7 +1285,7 @@ next
     using reduce_to.call_indirect_None reduce_to_trap[of s f "(ls, r)"]
     by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)
 next
-  case (invoke_native cl j t1s t2s ts es ves vcs n k m zs s f)
+  case (invoke_native s i_cl j t1s t2s ts es ves vcs n k m zs f)
   thus ?case
   proof (cases "\<exists>rvs. res = RValue rvs")
     case True
@@ -1308,7 +1308,7 @@ next
       done
   next
     case False
-    have 0:"(s, f, ves @ [Invoke cl]) \<Down>{(ls, r)} (s'', vs'', res)"
+    have 0:"(s, f, ves @ [Invoke i_cl]) \<Down>{(ls, r)} (s'', vs'', res)"
       using reduce_to.invoke_native[OF invoke_native(1,2,3,4,5,6,7)] reduce_to_local[OF invoke_native(8)]
             False
       by blast
@@ -1328,7 +1328,7 @@ next
     apply (metis reduce_to_L0_consts_left)
     done
 next
-  case (invoke_host_None cl t1s t2s f ves vcs n m s vs i)
+  case (invoke_host_None s i_cl t1s t2s f ves vcs n m vs i)
   thus ?case
     using reduce_to.invoke_host_None reduce_to_trap[of s vs "(i, r)"]
     by (metis reduce_to_L0_consts_left_trap reduce_to_trap_L0_left)

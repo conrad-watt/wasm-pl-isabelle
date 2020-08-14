@@ -78,14 +78,14 @@ inductive reduce_to :: "[(s \<times> f \<times> e list), (nat list \<times> nat 
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind s (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>{(ls,r)} (s,f,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
-| call:"\<lbrakk>const_list ves; (s,f,ves@[Invoke (sfunc s (f_inst f) j)]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$(Call j)]) \<Down>{(ls,r)} (s',f',res)"
+| call:"\<lbrakk>const_list ves; (s,f,ves@[Invoke (sfunc_ind (f_inst f) j)]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$(Call j)]) \<Down>{(ls,r)} (s',f',res)"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some cl; stypes s (f_inst f) j = tf; cl_type cl = tf; const_list ves; (s,f,ves@[Invoke cl]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s',f',res)"
-| call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some cl \<and> stypes s (f_inst f) j \<noteq> cl_type cl) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s,f,RTrap)"
+| call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some i_cl; stypes s (f_inst f) j = tf; cl_type (funcs s!i_cl) = tf; const_list ves; (s,f,ves@[Invoke i_cl]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s',f',res)"
+| call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some i_cl \<and> stypes s (f_inst f) j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f',res)"
-| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s',f,RValue vcs')"
-| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>{(ls,r)} (s,f,RTrap)"
+| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke i_cl]) \<Down>{(ls,r)} (s',f',res)"
+| invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke i_cl]) \<Down>{(ls,r)} (s',f,RValue vcs')"
+| invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke i_cl]) \<Down>{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
 | const_value:"\<lbrakk>(s,f,es) \<Down>{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($C*ves)@es) \<Down>{\<Gamma>} (s',f',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,f,es) \<Down>{(n#ls,r)} (s',f',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>{(ls,r)} (s',f',RValue res)"
@@ -178,14 +178,14 @@ inductive reduce_to_n :: "[(s \<times> f \<times> e list), nat, (nat list \<time
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind s (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c),$(Grow_memory)]) \<Down>k'{(ls,r)} (s,f,RValue [(ConstInt32 int32_minus_one)])"
   \<comment> \<open>\<open>call\<close>\<close>
-| call:"\<lbrakk>const_list ves; (s,f,ves@[Invoke (sfunc s (f_inst f) j)]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$(Call j)]) \<Down>(Suc k'){(ls,r)} (s',f',res)"
+| call:"\<lbrakk>const_list ves; (s,f,ves@[Invoke (sfunc_ind(f_inst f) j)]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$(Call j)]) \<Down>(Suc k'){(ls,r)} (s',f',res)"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some cl; stypes s (f_inst f) j = tf; cl_type cl = tf; const_list ves; (s,f,ves@[Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s',f',res)"
-| call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some cl \<and> stypes s (f_inst f) j \<noteq> cl_type cl) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s,f,RTrap)"
+| call_indirect_Some:"\<lbrakk>stab s (f_inst f) (nat_of_int c) = Some i_cl; stypes s (f_inst f) j = tf; cl_type (funcs s!i_cl) = tf; const_list ves; (s,f,ves@[Invoke i_cl]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves@[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s',f',res)"
+| call_indirect_None:"\<lbrakk>(stab s (f_inst f) (nat_of_int c) = Some i_cl \<and> stypes s (f_inst f) j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s (f_inst f) (nat_of_int c) = None\<rbrakk> \<Longrightarrow> (s,f,[$C (ConstInt32 c), $(Call_indirect j)]) \<Down>k'{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>call\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f',res)"
-| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s',f,RValue vcs')"
-| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke cl]) \<Down>k'{(ls,r)} (s,f,RTrap)"
+| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs); (s,f,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k'{(ls,r)} (s',f',res)\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke i_cl]) \<Down>k'{(ls,r)} (s',f',res)"
+| invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke i_cl]) \<Down>k'{(ls,r)} (s',f,RValue vcs')"
+| invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> (s,f,ves @ [Invoke i_cl]) \<Down>k'{(ls,r)} (s,f,RTrap)"
   \<comment> \<open>\<open>value congruence\<close>\<close>
 | const_value:"\<lbrakk>(s,f,es) \<Down>k'{\<Gamma>} (s',f',RValue res); ves \<noteq> []\<rbrakk> \<Longrightarrow> (s,f,($C*ves)@es) \<Down>k'{\<Gamma>} (s',f',RValue (ves@res))"
 | label_value:"\<lbrakk>(s,f,es) \<Down>k'{(n#ls,r)} (s',f',RValue res)\<rbrakk> \<Longrightarrow> (s,f,[Label n les es]) \<Down>k'{(ls,r)} (s',f',RValue res)"
@@ -1539,7 +1539,7 @@ next
     by (simp add: is_const_def)
 qed auto
 
-lemma calln_imp: "((s,f,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',f',res)) \<Longrightarrow> ((s,f,($C*ves)@[(Invoke (sfunc s (f_inst f) j))]) \<Down>k{(ls,r)} (s',f',res))"
+lemma calln_imp: "((s,f,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',f',res)) \<Longrightarrow> ((s,f,($C*ves)@[(Invoke (sfunc_ind (f_inst f) j))]) \<Down>k{(ls,r)} (s',f',res))"
 proof (induction "(s,f,($C*ves)@[$(Call j)])" "(Suc k)" "(ls,r)" "(s',f',res)" arbitrary: s f s' f' res ves k rule: reduce_to_n.induct)
   case (const_value s vs es s' vs' res ves ves')
   consider (1) "($C* ves) = ($C* ves') @ [$Call j] \<and> es = []"
@@ -1919,7 +1919,7 @@ next
     done
 qed auto
 
-lemma calln: "((s,vs,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[(Invoke (sfunc s (f_inst vs) j))]) \<Down>k{(ls,r)} (s',vs',res))"
+lemma calln: "((s,vs,($C*ves)@[$(Call j)]) \<Down>(Suc k){(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[(Invoke (sfunc_ind (f_inst vs) j))]) \<Down>k{(ls,r)} (s',vs',res))"
   using calln_imp reduce_to_n.call
   by (metis is_const_list)
 
@@ -2276,11 +2276,11 @@ lemma reduce_to_n_label_emp1:
   by auto
 
 lemma invoke_native_imp_local_length:
-  assumes "(s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
-          "cl = Func_native j (t1s _> t2s) ts es"
+  assumes "(s,vs,($C* vcs) @ [Invoke i_cl]) \<Down>k{(ls,r)} (s',vs',res)"
+          "(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es"
   shows "length vcs \<ge> length t1s"
   using assms
-proof (induction "(s,vs,($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [Invoke i_cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (invoke_native cl j t1s t2s ts es ves vcs n m zs s vs k s' vs' res)
   thus ?case
     using inj_basic_econst
@@ -2308,23 +2308,23 @@ next
 qed auto
 
 lemma invoke_native_imp_local1:
-  assumes "(s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
-          "cl = Func_native j (t1s _> t2s) ts es"
+  assumes "(s,vs,($C* vcs) @ [Invoke i_cl]) \<Down>k{(ls,r)} (s',vs',res)"
+          "(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es"
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
   shows "(s,vs,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
   using assms
-proof (induction "(s,vs,($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
+proof (induction "(s,vs,($C* vcs) @ [Invoke i_cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs rule: reduce_to_n.induct)
   case (invoke_native cl' j t1s t2s ts es ves' vcs n m zs s vs k s' vs' res)
   thus ?case
     using inj_basic_econst
     by auto
 next
   case (const_value s vs es k s' vs' res ves)
-  consider (1) "($C* ves) = ($C* vcs) @ [Invoke cl]" "es = []"
-         | (2) "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es = ($C* ves'') @ [Invoke cl] \<and> vcs = ves' @ ves'')"
+  consider (1) "($C* ves) = ($C* vcs) @ [Invoke i_cl]" "es = []"
+         | (2) "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es = ($C* ves'') @ [Invoke i_cl] \<and> vcs = ves' @ ves'')"
     using consts_app_snoc[OF const_value(4)] inj_basic_econst
     by auto
   thus ?case
@@ -2336,7 +2336,7 @@ next
   next
     case 2
     then obtain ves' ves'' where ves'_def:"($C* ves) = $C* ves'"
-                                           "es = ($C* ves'') @ [Invoke cl]"
+                                           "es = ($C* ves'') @ [Invoke i_cl]"
                                            "vcs = ves' @ ves''"
       by blast
     show ?thesis
@@ -2370,10 +2370,10 @@ next
     {
       fix ves' :: "v list" and ves'' :: "v list"
       assume a1: "ves = $C* ves'"
-      assume a2: "(s, vs, ($C* ves'') @ [Invoke (Func_native j (t1s _> t2s) ts es)]) \<Down>k{(ls, r)} (s', vs', res)"
+      assume a2: "(s, vs, ($C* ves'') @ [Invoke i_cl]) \<Down>k{(ls, r)} (s', vs', res)"
       assume a3: "length t1s = length (ves' @ ves'')"
       have "length t1s \<le> length ves''"
-        using a2 by (simp add: invoke_native_imp_local_length)
+        using a2 invoke_native_imp_local_length seq_nonvalue1(8) by simp
       then have "ves'' = []"
         using a3 a1 by (simp add: local.seq_nonvalue1(5))
     }
@@ -2508,16 +2508,16 @@ next
 qed auto
 
 lemma invoke_native_imp_local:
-  assumes "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)"
-          "cl = Func_native j (t1s _> t2s) ts es"
+  assumes "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke i_cl]) \<Down>k{(ls,r)} (s',vs',res)"
+          "(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es"
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
   shows "(s,vs,($C* vfs)@[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res)"
   using assms
-proof (induction "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vfs rule: reduce_to_n.induct)
-  case (invoke_native cl j' t1s t2s' ts es' ves vcs' n k' m' zs' s f k s' f' res)
+proof (induction "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke i_cl])" k "(ls,r)" "(s',vs',res)" arbitrary: s vs s' vs' res vcs vfs rule: reduce_to_n.induct)
+  case (invoke_native s i_cl j' t1s t2s' ts es' ves vcs' n k' m' zs' f k s' f' res)
    thus ?case
    proof -
      {
@@ -2538,9 +2538,9 @@ proof (induction "(s,vs,($C* vfs) @ ($C* vcs) @ [Invoke cl])" k "(ls,r)" "(s',vs
    qed
 next
   case (const_value s vs es' k s' vs' res ves vcs)
-  consider (1) "($C* ves) = ($C*vfs @ vcs) @ [Invoke cl]" "es' = []"
-         | (2) "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es' = ($C* ves'') @ [Invoke cl] \<and> vfs @ vcs = ves' @ ves'')"
-    using consts_app_snoc[of "$C*ves" es' "vfs@vcs" "Invoke cl"] inj_basic_econst const_value(4)
+  consider (1) "($C* ves) = ($C*vfs @ vcs) @ [Invoke i_cl]" "es' = []"
+         | (2) "(\<exists>ves' ves''. ($C* ves) = ($C* ves') \<and> es' = ($C* ves'') @ [Invoke i_cl] \<and> vfs @ vcs = ves' @ ves'')"
+    using consts_app_snoc[of "$C*ves" es' "vfs@vcs" "Invoke i_cl"] inj_basic_econst const_value(4)
     by auto
   thus ?case
   proof cases
@@ -2551,7 +2551,7 @@ next
   next
     case 2
     then obtain ves' ves'' where ves'_def:"($C* ves) = $C* ves'"
-                                           "es' = ($C* ves'') @ [Invoke cl]"
+                                           "es' = ($C* ves'') @ [Invoke i_cl]"
                                            "vfs @ vcs = ves' @ ves''"
       by blast
     thus ?thesis
@@ -2579,18 +2579,18 @@ next
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
   thus ?case
-    using consts_app_snoc[of es es' "vfs@vcs" "Invoke cl"]
+    using consts_app_snoc[of es es' "vfs@vcs" "Invoke i_cl"]
     apply simp
     apply (metis reduce_to_n_consts res_b.inject(1))
     done
 next
   case (seq_nonvalue1 ves s vs es k s' vs' res)
-  consider (1) "ves = ($C* vfs @ vcs) @ [Invoke cl] \<and> es = []"
+  consider (1) "ves = ($C* vfs @ vcs) @ [Invoke i_cl] \<and> es = []"
          | (2) "(\<exists>ves' ves''.
                 ves = ($C* ves') \<and>
-                es = ($C* ves'') @ [Invoke cl] \<and>
+                es = ($C* ves'') @ [Invoke i_cl] \<and>
                 vfs @ vcs = ves' @ ves'')"
-    using consts_app_snoc[of ves es "vfs@vcs" "Invoke cl"] seq_nonvalue1(7)
+    using consts_app_snoc[of ves es "vfs@vcs" "Invoke i_cl"] seq_nonvalue1(7)
     by fastforce
   thus ?case
   proof cases
@@ -2601,7 +2601,7 @@ next
   next
     case 2
     then obtain ves' ves'' where ves'_def:"ves = ($C* ves')"
-                                          "es = ($C* ves'') @ [Invoke cl]"
+                                          "es = ($C* ves'') @ [Invoke i_cl]"
                                           "vfs @ vcs = ves' @ ves''"
       by blast
     show ?thesis
@@ -2632,7 +2632,7 @@ next
 next
   case (seq_nonvalue2 s vs es k s' vs' res es')
   thus ?case
-    using consts_app_snoc[of es es' "vfs@vcs" "Invoke cl"]
+    using consts_app_snoc[of es es' "vfs@vcs" "Invoke i_cl"]
     apply simp
     apply (metis reduce_to_n_consts)
     done
@@ -2640,12 +2640,12 @@ next
 qed auto
 
 lemma invoke_native_equiv_local:
-  assumes "cl = Func_native j (t1s _> t2s) ts es"
+  assumes "(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es"
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
           "(n_zeros ts = zs)"
-  shows "((s,vs,($C* vcs) @ [Invoke cl]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res))"
+  shows "((s,vs,($C* vcs) @ [Invoke i_cl]) \<Down>k{(ls,r)} (s',vs',res)) = ((s,vs,[Frame m \<lparr> f_locs=(vcs@zs), f_inst=j \<rparr> [$(Block ([] _> t2s) es)]]) \<Down>k{(ls,r)} (s',vs',res))"
   using invoke_native_imp_local1[OF _ assms] reduce_to_n.invoke_native[OF assms(1) _ assms(2) _ assms(3,4)] assms(5)
   by blast
 
@@ -3289,7 +3289,7 @@ next
 qed (insert reduce_to_app_disj, (fast+))
 (* terminal method long-running *)
 
-lemma reduce_to_call: "((s,vs,($C*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[(Invoke (sfunc s (f_inst vs) j))]) \<Down>{(ls,r)} (s',vs',res))"
+lemma reduce_to_call: "((s,vs,($C*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res)) = ((s,vs,($C*ves)@[(Invoke (sfunc_ind (f_inst vs) j))]) \<Down>{(ls,r)} (s',vs',res))"
 proof -
   {
     assume local_assms:"((s,vs,($C*ves)@[$(Call j)]) \<Down>{(ls,r)} (s',vs',res))"

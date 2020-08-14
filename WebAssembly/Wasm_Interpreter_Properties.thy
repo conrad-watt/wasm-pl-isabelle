@@ -183,24 +183,24 @@ proof (induction es' arbitrary: ves rule: reduce.induct)
     using reduce_simple_not_value
     by fastforce
 next
-  case (invoke_native cl i' j ts es s t1s t2s ves vcs n k m zs vs)
-  have "\<not>(is_const (Invoke cl))"
+  case (invoke_native s i_cl j t1s t2s ts es ves vcs n k m zs f)
+  have "\<not>(is_const (Invoke i_cl))"
     unfolding is_const_def
     by simp
   thus ?case
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (invoke_host_Some cl t1s t2s f ves vcs n m s i s' vcs' vs)
-  have "\<not>(is_const (Invoke cl))"
+  case (invoke_host_Some s i_cl t1s t2s h ves vcs n m hs s' vcs' f)
+  have "\<not>(is_const (Invoke i_cl))"
     unfolding is_const_def
     by simp
   thus ?case
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (invoke_host_None cl t1s t2s f ves vcs n m s vs i)
-  have "\<not>(is_const (Invoke cl))"
+  case (invoke_host_None s i_cl t1s t2s f ves vcs n m vs i)
+  have "\<not>(is_const (Invoke i_cl))"
     unfolding is_const_def
     by simp
   thus ?case
@@ -300,7 +300,7 @@ lemma reduce_call:
   assumes "\<lparr>s;f;[$Call j]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
   shows "s = s'"
         "f = f'"
-        "es' = [Invoke (sfunc s (f_inst f) j)]"
+        "es' = [Invoke (sfunc_ind (f_inst f) j)]"
   using assms
 proof (induction "[$Call j]:: e list" s' f' es' rule: reduce.induct)
   case (label s f es s' f' es' k lholed les')
@@ -310,8 +310,8 @@ proof (induction "[$Call j]:: e list" s' f' es' rule: reduce.induct)
     by auto
   thus "s = s'"
        "f = f'"
-       "les' = [Invoke (sfunc s (f_inst f) j)]"
-    using label(2,3,4,6) Lfilled.simps[of k "LBase [] []" "[Invoke (sfunc s (f_inst f) j)]" les']
+       "les' = [Invoke (sfunc_ind (f_inst f) j)]"
+    using label(2,3,4,6) Lfilled.simps[of k "LBase [] []" "[Invoke (sfunc_ind (f_inst f) j)]" les']
     by auto
 qed (auto simp add: reduce_simple_call)
 
@@ -465,7 +465,7 @@ proof (cases ves)
       case (Some cl)
       thus ?thesis
         using Cons assms ConstInt32
-        by (cases cl; cases "stypes s (f_inst f) x13 = cl_type cl") auto
+        by (cases cl; cases "stypes s (f_inst f) x13 = cl_type (funcs s!cl)") auto
     qed auto
   qed auto
 qed auto
@@ -685,16 +685,16 @@ lemma run_one_step_trap_result:
   by auto
 
 lemma run_one_step_invoke_result:
-  assumes "run_one_step d (s,f,ves,Invoke cl) = (s', f', res)"
+  assumes "run_one_step d (s,f,ves,Invoke i_cl) = (s', f', res)"
   shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
 proof -
-  obtain t1s t2s where cl_type_is:"cl_type cl = (t1s _> t2s)"
+  obtain t1s t2s where cl_type_is:"cl_type (funcs s!i_cl) = (t1s _> t2s)"
     using tf.exhaust
     by blast
   obtain ves' ves'' where split_n_is:"split_n ves (length t1s) = (ves', ves'')"
     by fastforce
   show ?thesis
-  proof (cases cl)
+  proof (cases "(funcs s!i_cl)")
     case (Func_native x11 x12 x13 x14)
     thus ?thesis
       using assms cl_type_is split_n_is
@@ -1648,7 +1648,7 @@ proof -
         next
           case (Some cl)
           thus ?thesis
-          proof (cases "stypes s (f_inst f) x13 = cl_type cl")
+          proof (cases "stypes s (f_inst f) x13 = cl_type (funcs s!cl)")
             case True
             hence "\<lparr>s;f;(vs_to_es list) @ [$C ConstInt32 c, $Call_indirect x13]\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es list) @ [Invoke cl]\<rparr>"
               using progress_L0_left[OF reduce.intros(3)] True Some is_const_list_vs_to_es_list[of "rev list"]
@@ -1980,7 +1980,7 @@ proof -
         by simp
     next
       case (Invoke cl)
-      obtain t1s t2s where "cl_type cl = (t1s _> t2s)"
+      obtain t1s t2s where "cl_type (funcs s!cl) = (t1s _> t2s)"
         using tf.exhaust[of _ thesis]
         by fastforce
       moreover
@@ -2000,7 +2000,7 @@ proof -
           using split_n_length[OF true_defs outer_True] inj_basic_econst length_rev map_injective
           by blast
         show ?thesis
-        proof (cases cl)
+        proof (cases "(funcs s!cl)")
           case (Func_native i' tf fts fes)
           hence "s' = s" "f' = f" "es' = (vs_to_es ves'' @ [Frame (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])"
             using 2(3) Invoke local_defs outer_True true_defs
@@ -2065,7 +2065,7 @@ proof -
         thus ?thesis
           using 2(3) Invoke local_defs
           unfolding cl_type_def
-          by (cases cl) auto
+          by (cases "(funcs s!cl)") auto
       qed
     next
       case (Label ln les es)

@@ -225,7 +225,7 @@ record f = \<comment> \<open>frame\<close>
 datatype e = \<comment> \<open>administrative instruction\<close>
   Basic b_e ("$_" 60)
   | Trap
-  | Invoke cl
+  | Invoke i
   | Label nat "e list" "e list"
   | Frame nat f "e list"
 

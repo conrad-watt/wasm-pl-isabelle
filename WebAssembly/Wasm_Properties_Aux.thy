@@ -192,14 +192,40 @@ next
     by blast
 qed auto
 
-lemma stab_typed_some_imp_cl_typed:
-  assumes "stab s i c = Some cl"
+lemma stab_some_length:
+  assumes "stab s i c = Some i_cl"
           "inst_typing s i \<C>"
           "store_typing s"
-  shows "\<exists>tf. cl_typing s cl tf"
-  using stab_unfold[OF assms(1)] assms(3)
-  unfolding store_typing.simps list_all_length
-  by fastforce
+        shows "i_cl < length (funcs s)"
+proof -
+  obtain k ks where k_is:
+     "inst.tabs i = k # ks"
+     "c < tab_size (s.tabs s ! k)"
+     "fst (s.tabs s ! k) ! c = Some i_cl"
+    using stab_unfold[OF assms(1)]
+    by blast
+  have "k < length (tabs s)"
+    using assms(2) k_is(1)
+    unfolding inst_typing.simps
+    by (metis inst.select_convs(3) list_all2_Cons1 tabi_agree_def)
+  hence "tab_agree s ((tabs s)!k)"
+    using assms(3)
+    unfolding store_typing.simps list_all_length
+    by blast
+  thus ?thesis
+    using k_is(2,3)
+    unfolding tab_agree_def
+    by (metis list_all_length option.simps(5))
+qed
+
+lemma stab_typed_some_imp_cl_typed:
+  assumes "stab s i c = Some i_cl"
+          "inst_typing s i \<C>"
+          "store_typing s"
+  shows "i_cl < length (funcs s) \<and> (\<exists>tf. cl_typing s (funcs s!i_cl) tf)"
+  using stab_some_length[OF assms] assms(3)
+  unfolding store_typing.simps
+  by (simp add: list_all_length)
 
 lemma b_e_type_empty1[dest]: assumes "\<C> \<turnstile> [] : (ts _> ts')" shows "ts = ts'"
   using assms
@@ -630,16 +656,14 @@ next
     by fastforce
 qed
 
-lemma e_type_invoke_native:
-  assumes "s\<bullet>\<C> \<turnstile> [Invoke cl] : (t1s' _> t2s')"
-          "cl = Func_native i tf ts es"
+lemma e_type_invoke:
+  assumes "s\<bullet>\<C> \<turnstile> [Invoke i_cl] : (t1s' _> t2s')"
   shows "\<exists>t1s t2s ts_c \<C>i. (t1s' = ts_c @ t1s)
                          \<and> (t2s' = ts_c @ t2s)
-                         \<and> tf = (t1s _> t2s)
-                         \<and> inst_typing s i \<C>i
-                         \<and> (\<C>i\<lparr>local := (local \<C>i) @ t1s @ ts, label := ([t2s] @ (label \<C>i)), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
+                         \<and> cl_type ((funcs s)!i_cl) = (t1s _> t2s)
+                         \<and> i_cl < length (funcs s)"
   using assms
-proof (induction "s" "\<C>" "[Invoke cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
+proof (induction "s" "\<C>" "[Invoke i_cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
   case (1 \<C> b_es \<S>)
   thus ?case
     by auto
@@ -649,7 +673,7 @@ next
     using 2(1,5) unlift_b_e
     by (metis Nil_is_map_conv append_Nil butlast_snoc)
   thus ?case
-    using 2(4,5,6)
+    using 2
     by fastforce
 next
   case (3 \<S> \<C> t1s t2s ts)
@@ -658,58 +682,23 @@ next
 next
   case (6 \<S> \<C>)
   thus ?case
-    unfolding cl_typing.simps
     by fastforce
 qed
 
-lemma e_type_invoke_host:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [Invoke cl] : (t1s' _> t2s')"
-          "cl = Func_host tf f"
-  shows "\<exists>t1s t2s ts_c. (t1s' = ts_c @ t1s)
-                        \<and> (t2s' = ts_c @ t2s)
-                        \<and> tf = (t1s _> t2s)"
+lemma cl_typing_native:
+  assumes "cl_typing s (Func_native i tf ts es) tf'"
+  shows "\<exists>t1s t2s \<C>i. tf = tf' \<and> tf = (t1s _> t2s) \<and> inst_typing s i \<C>i
+         \<and> (\<C>i\<lparr>local := (local \<C>i) @ t1s @ ts, label := ([t2s] @ (label \<C>i)), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
   using assms
-proof (induction "\<S>" "\<C>" "[Invoke cl]" "(t1s' _> t2s')" arbitrary: t1s' t2s')
-  case (1 \<C> b_es \<S>)
-  thus ?case
-    by auto
-next
-  case (2 \<S> \<C> es t1s t2s e t3s)
-  have "\<C> \<turnstile> [] : (t1s _> t2s)"
-    using 2(1,5) unlift_b_e
-    by (metis Nil_is_map_conv append_Nil butlast_snoc)
-  thus ?case
-    using 2(4,5,6)
-    by fastforce
-next
-  case (3 \<S> \<C> t1s t2s ts)
-    thus ?case
-    by fastforce
-next
-  case (6 \<S> \<C>)
-  thus ?case
-    unfolding cl_typing.simps
-    by fastforce
-qed
+  unfolding cl_typing.simps
+  by blast
 
-lemma e_type_invoke:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [Invoke cl] : (t1s' _> t2s')"
-  shows "\<exists>t1s t2s ts_c. (t1s' = ts_c @ t1s)
-                        \<and> (t2s' = ts_c @ t2s)
-                        \<and> cl_type cl = (t1s _> t2s)"
-proof (cases cl)
-  case (Func_native x11 x12 x13 x14)
-  thus ?thesis
-    using e_type_invoke_native[OF assms]
-    unfolding cl_type_def
-    by (cases x12) fastforce
-next
-  case (Func_host x21 x22)
-  thus ?thesis
-    using e_type_invoke_host[OF assms]
-    unfolding cl_type_def
-    by fastforce
-qed
+lemma cl_typing_host:
+  assumes "cl_typing s (Func_host tf f) tf'"
+  shows "tf = tf'"
+  using assms
+  unfolding cl_typing.simps
+  by blast
 
 lemma s_type_unfold:
   assumes "s\<bullet>rs \<tturnstile> f;es : ts"
@@ -1473,14 +1462,22 @@ lemma cl_type_exists:
   unfolding cl_type_def
   by (induction) auto
 
+lemma store_typing_imp_cl_typing:
+  assumes "store_typing s"
+          "j < length (funcs s)"
+  shows "cl_typing s (funcs s!j) (cl_type (funcs s!j))"
+  using assms cl_type_exists
+  unfolding store_typing.simps list_all_length
+  by auto
+
 lemma store_typing_imp_func_agree:
   assumes "store_typing s"
           "inst_typing s i \<C>"
           "j < length (inst.funcs i)"
-  shows "funci_agree (funcs s) (sfunc_ind s i j) ((func_t \<C>)!j)"
+  shows "funci_agree (funcs s) (sfunc_ind i j) ((func_t \<C>)!j)"
         "cl_typing s (sfunc s i j) ((func_t \<C>)!j)"
 proof -
-  show 1:"funci_agree (funcs s) (sfunc_ind s i j) ((func_t \<C>)!j)"
+  show 1:"funci_agree (funcs s) (sfunc_ind i j) ((func_t \<C>)!j)"
     using assms(2,3) list_all2_nthD
     unfolding inst_typing.simps sfunc_ind_def
     by fastforce
@@ -1738,10 +1735,20 @@ lemma e_typing_s_typing_store_extension_inv:
         "s\<bullet>rs \<tturnstile> f;es : ts \<Longrightarrow> s'\<bullet>rs \<tturnstile> f;es : ts"
   using assms
 proof (induction s \<C> es tf and s rs f es ts rule: e_typing_s_typing.inducts)
-  case (6 s cl tf \<C>)
-  thus ?case
-    using cl_typing_store_extension_inv e_typing_s_typing.intros(6)
-    by blast
+  case (6 i \<S> tf \<C>)
+  have "i < length (s.funcs s')"
+    using 6(1,3)
+    unfolding store_extension.simps
+    by auto
+  moreover
+  have "s.funcs \<S> ! i = s.funcs s' ! i"
+    using 6(1,3)
+    unfolding store_extension.simps
+    by (metis nth_append s.select_convs(1))
+  ultimately
+  show ?case
+    using e_typing_s_typing.intros(6) 6(2)
+    by simp
 next
   case (8 tvs vs s i \<C>i \<C> rs es ts)
   show ?case
