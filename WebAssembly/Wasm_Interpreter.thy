@@ -135,7 +135,7 @@ axiomatization
   host_apply_impl:: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> (s \<times> v list) option" where
   host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs = Some m')"
 
-function (sequential)                                                                               
+function (sequential)
     run_step :: "depth \<Rightarrow> config_tuple \<Rightarrow> res_tuple"
 and run_one_step :: "depth \<Rightarrow> config_one_tuple \<Rightarrow> res_tuple" where
   "run_step d (s,f,es) = (let (ves, es') = split_vals_e es in

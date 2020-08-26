@@ -84,13 +84,16 @@ inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
       \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr>
                         \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
 
+inductive frame_typing :: "[s, f, t_context] \<Rightarrow> bool" where
+"\<lbrakk>tvs = map typeof (f_locs f); inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
+
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
-   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := (local \<C>) @ t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
+   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
  |  "cl_typing s (Func_host tf h) tf"
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
-and       s_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
+and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
 (* section: e_typing *)
   (* lifting *)
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
@@ -100,14 +103,14 @@ and       s_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow>\<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
-  (* local *)
+  (* frame *)
 | "\<lbrakk>\<S>\<bullet>Some ts \<tturnstile> f;es : ts; length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Frame n f es] : ([] _> ts)"
   (* invoke *)
 | "\<lbrakk>i < length (funcs \<S>); cl_type ((funcs \<S>)!i) = tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke i] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
-(* section: s_typing *)
-| "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> \<lparr> f_locs=vs,f_inst=i\<rparr>;es : ts"
+(* section: l_typing *)
+| "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
 definition "tab_agree s tab =
   ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>

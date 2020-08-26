@@ -484,8 +484,8 @@ lemma b_e_type_comp2_relift:
   shows "\<S>\<bullet>\<C> \<turnstile> [$e1, $e2] : (ts@t1s _> ts@t2s)"
   using assms
         b_e_typing.composition[OF assms]
-        e_typing_s_typing.intros(1)[of \<C> "[e1, e2]" "(t1s _> t2s)"]
-        e_typing_s_typing.intros(3)[of \<S> \<C> "([$e1,$e2])" t1s t2s ts]
+        e_typing_l_typing.intros(1)[of \<C> "[e1, e2]" "(t1s _> t2s)"]
+        e_typing_l_typing.intros(3)[of \<S> \<C> "([$e1,$e2])" t1s t2s ts]
   by simp
 
 lemma b_e_type_value2:
@@ -511,7 +511,7 @@ lemma e_type_comp:
 proof (cases es rule: List.rev_cases)
   case Nil
   thus ?thesis
-    using assms e_typing_s_typing.intros(1)
+    using assms e_typing_l_typing.intros(1)
     by (metis append_Nil b_e_type_empty list.simps(8))
 next
   case (snoc es' e')
@@ -533,12 +533,12 @@ next
       by blast
     ultimately
     show ?case
-      using e_typing_s_typing.intros(1)
+      using e_typing_l_typing.intros(1)
       by fastforce
   next
     case (3 \<S> \<C> t1s t2s ts)
     thus ?case
-      using e_typing_s_typing.intros(3)
+      using e_typing_l_typing.intros(3)
       by fastforce
   qed auto
 qed
@@ -554,7 +554,7 @@ proof (induction es' arbitrary: t3s rule: List.rev_induct)
     using unlift_b_e[of _ _ "[]"] b_e_type_empty[of _ t2s t3s]
     by fastforce
   then show ?case
-    using Nil assms(1) e_typing_s_typing.intros(2)
+    using Nil assms(1) e_typing_l_typing.intros(2)
     by fastforce
 next
   case (snoc x xs)
@@ -562,7 +562,7 @@ next
     using e_type_comp[of _ _ xs x]
     by fastforce
   then show ?case
-    using snoc(1)[of ts'] e_typing_s_typing.intros(2)[of _ _ "es @ xs" t1s ts' x t3s]
+    using snoc(1)[of ts'] e_typing_l_typing.intros(2)[of _ _ "es @ xs" t1s ts' x t3s]
     by simp
 qed
 
@@ -574,10 +574,10 @@ lemma b_e_type_comp_conc:
 proof -
   fix \<S>
   have 1:"\<S>\<bullet>\<C> \<turnstile> $*es : (t1s _> t2s)"
-    using e_typing_s_typing.intros(1)[OF assms(1)]
+    using e_typing_l_typing.intros(1)[OF assms(1)]
     by fastforce
   have 2:"\<S>\<bullet>\<C> \<turnstile> $*es' : (t2s _> t3s)"
-    using e_typing_s_typing.intros(1)[OF assms(2)]
+    using e_typing_l_typing.intros(1)[OF assms(2)]
     by fastforce
   show ?thesis
     using e_type_comp_conc[OF 1 2]
@@ -591,12 +591,12 @@ lemma e_type_comp_conc1:
 proof (induction es' arbitrary: ts ts' rule: List.rev_induct)
   case Nil
   thus ?case
-    using b_e_type_empty[of _ ts' ts'] e_typing_s_typing.intros(1)
+    using b_e_type_empty[of _ ts' ts'] e_typing_l_typing.intros(1)
     by fastforce
 next
   case (snoc x xs)
   then show ?case
-    using e_type_comp[of \<S> \<C> "es @ xs" x ts ts'] e_typing_s_typing.intros(2)[of \<S> \<C> xs _ _ x ts']
+    using e_type_comp[of \<S> \<C> "es @ xs" x ts ts'] e_typing_l_typing.intros(2)[of \<S> \<C> xs _ _ x ts']
     by fastforce
 qed
 
@@ -638,7 +638,7 @@ lemma e_type_label:
                 \<and> (\<S>\<bullet>\<C> \<turnstile> es0 : (tls _> t2s))
                 \<and> (\<S>\<bullet>\<C>\<lparr>label := [tls] @ (label \<C>)\<rparr> \<turnstile> es : ([] _> t2s))"
   using assms
-proof (induction "\<S>" "\<C>" "[Label n es0 es]" "(ts _> ts')" arbitrary: ts ts')
+proof (induction "\<S>" "\<C>" "[Label n es0 es]" "(ts _> ts')" arbitrary: ts ts' es0 es)
   case (1 \<C> b_es \<S>)
   then show ?case
     by (simp add: map_eq_Cons_conv)
@@ -654,7 +654,7 @@ next
   case (7 \<S> \<C> t2s)
   then show ?case
     by fastforce
-qed
+qed blast
 
 lemma e_type_invoke:
   assumes "s\<bullet>\<C> \<turnstile> [Invoke i_cl] : (t1s' _> t2s')"
@@ -683,12 +683,12 @@ next
   case (6 \<S> \<C>)
   thus ?case
     by fastforce
-qed
+qed blast
 
 lemma cl_typing_native:
   assumes "cl_typing s (Func_native i tf ts es) tf'"
   shows "\<exists>t1s t2s \<C>i. tf = tf' \<and> tf = (t1s _> t2s) \<and> inst_typing s i \<C>i
-         \<and> (\<C>i\<lparr>local := (local \<C>i) @ t1s @ ts, label := ([t2s] @ (label \<C>i)), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
+         \<and> (\<C>i\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>i)), return := Some t2s\<rparr>  \<turnstile> es : ([] _> t2s))"
   using assms
   unfolding cl_typing.simps
   by blast
@@ -702,18 +702,17 @@ lemma cl_typing_host:
 
 lemma s_type_unfold:
   assumes "s\<bullet>rs \<tturnstile> f;es : ts"
-  shows "(rs = Some ts) \<or> rs = None"
-        "\<exists>\<C>i. inst_typing s (f_inst f) \<C>i
-              \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof (f_locs f)), return := rs\<rparr> \<turnstile> es : ([] _> ts))"
+  shows "\<exists>\<C>i. inst_typing s (f_inst f) \<C>i
+              \<and> (s\<bullet>\<C>i\<lparr>local := (map typeof (f_locs f)), return := rs\<rparr> \<turnstile> es : ([] _> ts))"
   using assms
-  unfolding s_typing.simps
+  unfolding l_typing.simps frame_typing.simps
   by auto
 
 lemma e_type_local:
   assumes "s\<bullet>\<C> \<turnstile> [Frame n f es] : (ts _> ts')"
   shows "\<exists>tls \<C>i. inst_typing s (f_inst f) \<C>i
                 \<and> length tls = n
-                \<and> (s\<bullet>\<C>i\<lparr>local := (local \<C>i) @ (map typeof (f_locs f)), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))
+                \<and> (s\<bullet>\<C>i\<lparr>local := (map typeof (f_locs f)), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))
                 \<and> ts' = ts @ tls"
   using assms
 proof (induction "s" "\<C>" "[Frame n f es]" "(ts _> ts')" arbitrary: ts ts')
@@ -724,7 +723,7 @@ proof (induction "s" "\<C>" "[Frame n f es]" "(ts _> ts')" arbitrary: ts ts')
   thus ?case
     using 2
     by simp
-qed (auto simp add: unlift_b_e s_typing.simps)
+qed (auto simp add: unlift_b_e frame_typing.simps l_typing.simps)
 
 lemma e_type_local_shallow:
   assumes "\<S>\<bullet>\<C> \<turnstile> [Frame n f es] : (ts _> ts')"
@@ -752,7 +751,7 @@ proof (cases e)
   proof (cases x1)
     case (EConst x23)
       thus ?thesis
-        using Basic e_typing_s_typing.intros(1,3)
+        using Basic e_typing_l_typing.intros(1,3)
         by fastforce
   qed  (simp_all add: is_const_def)
 qed (simp_all add: is_const_def)
@@ -1117,7 +1116,7 @@ proof (cases e)
       hence "\<C> \<turnstile> [x1] : ([] _> [typeof x23])"
         by (simp add: b_e_typing.intros(1))
       thus ?thesis
-        using Basic e_typing_s_typing.intros(1,3)
+        using Basic e_typing_l_typing.intros(1,3)
         by (metis append_Nil2 to_e_list_1)
   qed  (simp_all add: is_const_def)
 qed (simp_all add: is_const_def)
@@ -1137,7 +1136,7 @@ proof (cases e)
         by (metis (no_types) Basic assms(2) b_e_type_value list.simps(8,9) unlift_b_e)
       moreover
       have "\<S>'\<bullet>\<C>' \<turnstile> [e] : ([] _> [typeof x23])"
-        using Basic EConst b_e_typing.intros(1) e_typing_s_typing.intros(1)
+        using Basic EConst b_e_typing.intros(1) e_typing_l_typing.intros(1)
         by fastforce
       ultimately
       show ?thesis
@@ -1165,7 +1164,7 @@ lemma e_type_const_list:
 proof (induction vs arbitrary: ts ts' rule: List.rev_induct)
   case Nil
   have "\<S>'\<bullet>\<C>' \<turnstile> [] : ([] _> [])"
-    using b_e_type_empty[of \<C>' "[]" "[]"] e_typing_s_typing.intros(1)
+    using b_e_type_empty[of \<C>' "[]" "[]"] e_typing_l_typing.intros(1)
     by fastforce
   thus ?case
     using Nil
@@ -1191,7 +1190,7 @@ next
     by simp
   moreover
   have "\<S>'\<bullet>\<C>' \<turnstile> (xs@[x]) : ([] _> ts_b@[t])"
-    using ts_b_def(3) t_def e_typing_s_typing.intros(2,3)
+    using ts_b_def(3) t_def e_typing_l_typing.intros(2,3)
     by fastforce
   ultimately
   show ?case
@@ -1249,7 +1248,7 @@ next
   proof (cases ts2 rule: List.rev_cases)
     case Nil
     have "\<S>\<bullet>\<C> \<turnstile> [] : (ts1 _> ts1 @ [])"
-      using b_e_typing.empty b_e_typing.weakening e_typing_s_typing.intros(1)
+      using b_e_typing.empty b_e_typing.weakening e_typing_l_typing.intros(1)
       by fastforce
     then show ?thesis
       using snoc(3,4) Nil
@@ -1268,7 +1267,7 @@ next
       by fastforce
     show ?thesis
       using snoc_outer(1)[OF vs1_def(6,4,1)] snoc_outer(2) vs1_def(3,5)
-            e_typing_s_typing.intros(2)[OF _ vs1_def(2), of _ ts1]
+            e_typing_l_typing.intros(2)[OF _ vs1_def(2), of _ ts1]
             snoc
       unfolding const_list_def
       by fastforce
@@ -1298,7 +1297,7 @@ lemma e_type_consts:
 proof (induction vs arbitrary: ts ts' rule: List.rev_induct)
   case Nil
   have "\<S>'\<bullet>\<C>' \<turnstile> [] : ([] _> [])"
-    using b_e_type_empty[of \<C>' "[]" "[]"] e_typing_s_typing.intros(1)
+    using b_e_type_empty[of \<C>' "[]" "[]"] e_typing_l_typing.intros(1)
     by fastforce
   thus ?case
     using Nil
@@ -1319,7 +1318,7 @@ next
     by fastforce
   moreover
   have "\<S>'\<bullet>\<C>' \<turnstile> $C*(xs@[x]) : ([] _> (map typeof xs)@[t])"
-    using ts_b_def(2) t_def e_typing_s_typing.intros(2,3)
+    using ts_b_def(2) t_def e_typing_l_typing.intros(2,3)
     by fastforce
   ultimately
   show ?case
@@ -1729,12 +1728,12 @@ next
 qed
 
 
-lemma e_typing_s_typing_store_extension_inv:
+lemma e_typing_l_typing_store_extension_inv:
   assumes"store_extension s s'"
   shows "s\<bullet>\<C> \<turnstile> es : tf \<Longrightarrow> s'\<bullet>\<C> \<turnstile> es : tf"
         "s\<bullet>rs \<tturnstile> f;es : ts \<Longrightarrow> s'\<bullet>rs \<tturnstile> f;es : ts"
   using assms
-proof (induction s \<C> es tf and s rs f es ts rule: e_typing_s_typing.inducts)
+proof (induction s \<C> es tf and s rs f es ts rule: e_typing_l_typing.inducts)
   case (6 i \<S> tf \<C>)
   have "i < length (s.funcs s')"
     using 6(1,3)
@@ -1747,15 +1746,16 @@ proof (induction s \<C> es tf and s rs f es ts rule: e_typing_s_typing.inducts)
     by (metis nth_append s.select_convs(1))
   ultimately
   show ?case
-    using e_typing_s_typing.intros(6) 6(2)
+    using e_typing_l_typing.intros(6) 6(2)
     by simp
 next
-  case (8 tvs vs s i \<C>i \<C> rs es ts)
-  show ?case
-    using inst_typing_store_extension_inv[OF 8(2) 8(7)]
-          e_typing_s_typing.intros(8)[OF 8(1) _ 8(3) 8(6)[OF 8(7)] 8(5)]
+  case (8 \<S> f \<C> rs es ts)
+  thus ?case
+    using inst_typing_store_extension_inv
+          e_typing_l_typing.intros(8)
+    unfolding frame_typing.simps
     by blast
-qed (auto simp add: e_typing_s_typing.intros)
+qed (auto simp add: e_typing_l_typing.intros)
 
 lemma tab_agree_store_extension_inv:
   assumes "store_extension s s'"
@@ -1874,7 +1874,7 @@ qed
 lemma types_agree_imp_e_typing:
   assumes "types_agree t v"
   shows "\<S>\<bullet>\<C> \<turnstile> [$C v] : ([] _> [t])"
-  using assms e_typing_s_typing.intros(1)[OF b_e_typing.intros(1)]
+  using assms e_typing_l_typing.intros(1)[OF b_e_typing.intros(1)]
   unfolding types_agree_def
   by fastforce
 
@@ -1885,7 +1885,7 @@ lemma list_types_agree_imp_e_typing:
 proof (induction rule: list_all2_induct)
   case Nil
   thus ?case
-    using b_e_typing.empty e_typing_s_typing.intros(1)
+    using b_e_typing.empty e_typing_l_typing.intros(1)
     by fastforce
 next
   case (Cons t ts v vs)
@@ -1893,7 +1893,7 @@ next
     using types_agree_imp_e_typing
     by fastforce
   thus ?case
-    using e_typing_s_typing.intros(3)[OF Cons(3), of "[t]"] e_type_comp_conc
+    using e_typing_l_typing.intros(3)[OF Cons(3), of "[t]"] e_type_comp_conc
     by fastforce
 qed
 
@@ -1910,14 +1910,14 @@ proof (induction "(map (\<lambda>v. C v) vs)" "(ts' _> ts'@ts)" arbitrary: ts ts
     using es_e_def(1) is_const_list1
     by auto
   then obtain tvs1 where "t2s = t1s@tvs1"
-    using e_type_const_list e_typing_s_typing.intros(1)[OF composition(1)]
+    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(1)]
     by fastforce
   moreover
   have "const_list ($*[e])"
     using es_e_def(2) is_const_list1
     by auto
   then obtain tvs2 where "t1s @ ts = t2s @ tvs2"
-    using e_type_const_list e_typing_s_typing.intros(1)[OF composition(3)]
+    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(3)]
     by fastforce
   ultimately
   show ?case
@@ -1970,7 +1970,7 @@ proof -
     using b_e_type_set_global ts''_def(2) unlift_b_e[of s \<C> "[Set_global j]"]
     by fastforce+
   thus "s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')" "tg_t (global \<C> ! j) = typeof v" "tg_mut (global \<C> ! j) = T_mut" "j < length(global \<C>)"
-    using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_s_typing.intros(1)
+    using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_l_typing.intros(1)
     by fastforce+
 qed
 
