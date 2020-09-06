@@ -389,7 +389,7 @@ inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarro
     list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs (m_data m);
     map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) = start;
     init_tabs s' inst (map nat_of_int e_offs) (m_elem m) = s'';
-    init_mems s' inst (map nat_of_int d_offs) (m_data m) = s_end
+    init_mems s'' inst (map nat_of_int d_offs) (m_data m) = s_end
     \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s_end, inst, v_exps), start)"
 
 definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> v" where
@@ -417,7 +417,7 @@ fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarr
                 list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs (m_data m)) then
               let start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) in
               let s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m) in
-              let s_end = init_mems s' inst (map nat_of_int d_offs) (m_data m) in
+              let s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m) in
               Some ((s_end, inst, v_exps), start)
             else None
           else None
@@ -785,7 +785,7 @@ proof -
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
     "start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m)"
     "s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m)"
-    "s_end = init_mems s' inst (map nat_of_int d_offs) (m_data m)"
+    "s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m)"
     "inst' = \<lparr>types=[],funcs=[],tabs=[],mems=[],globs=ext_globs v_imps\<rparr>"
     using assms
     by (fastforce simp add: Let_def split: if_splits option.splits prod.splits)
@@ -889,7 +889,7 @@ proof -
         using s_end_is(3) local_assms
         by (simp add: interp_get_v_def split: v.splits)
       obtain f_temp where f_temp_is:
-        "reduce_trans (s, \<lparr>f_locs = [], f_inst = inst'\<rparr>, $* g_init (m_globs m ! i)) (s, f_temp, $$* [g_inits ! i])"
+        "reduce_trans (s, \<lparr>f_locs = [], f_inst = inst'\<rparr>, $* g_init (m_globs m ! i)) (s, f_temp, $C* [g_inits ! i])"
         using run_v_sound[OF a_runv]
         by blast
       hence l3:"reduce_trans (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,$*(g_init ((m_globs m)!i))) (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,[$C (g_inits!i)])"
@@ -1018,7 +1018,7 @@ proof -
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs ds"
     "map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) i_opt = start"
     "init_tabs s' inst (map nat_of_int e_offs) els = s''"
-    "init_mems s' inst (map nat_of_int d_offs) ds = s_end"
+    "init_mems s'' inst (map nat_of_int d_offs) ds = s_end"
     "f = \<lparr> f_locs=[], f_inst=inst \<rparr>"
     using assms m_is
     unfolding instantiate.simps
@@ -1131,7 +1131,7 @@ proof -
         using const_exprs_reduce_trans[OF l2(2,1) l1 _ 12, of _ s "[]" _ inst' "[]"]
               alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3)
         unfolding alloc_module.simps s_end_is(12)
-        apply simp
+        apply (simp split: prod.splits del: run_v.simps)
         apply (metis (mono_tags, lifting) inst'_is inst.select_convs(5))
         done
       hence "interp_get_v s inst' (g_init (gs!i)) = g_inits!i"
