@@ -6,6 +6,6 @@ lemma [code]: "pred_option P None = True"
 
 lemmas[code] = Option.option.pred_inject(2)
 
-export_code open interp_instantiate typing run in OCaml file "code/Wasm_Executable.ml"
+export_code open interp_instantiate typing run in OCaml module_name WasmRef_Isa file "code/Wasm_Executable.ml"
 
 end
