@@ -133,10 +133,10 @@ lemma mem_grow_impl_correct:
 *)
 axiomatization 
   host_apply_impl:: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> (s \<times> v list) option" where
-  host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs = Some m')"
+  host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs (Some m'))"
 
 function (sequential)
-    run_step :: "depth \<Rightarrow> config_tuple \<Rightarrow> res_tuple" where
+  run_step :: "depth \<Rightarrow> config_tuple \<Rightarrow> res_tuple" where
   "run_step d (s,f,(ves, es)) = (case es of
                                [] \<Rightarrow> (s,f, crash_error)
                              | e#es' \<Rightarrow>
@@ -489,7 +489,7 @@ fun run_vs_es :: "fuel \<Rightarrow> depth \<Rightarrow> config_tuple \<Rightarr
                                                    RSNormal ves' es' \<Rightarrow> run_vs_es n d (s',f',(ves',es'))
                                                  | RSCrash error \<Rightarrow> (s, RCrash error)
                                                  | _ \<Rightarrow> (s, RCrash CError)))"
-| "run_vs_es 0 d (s,f,es) = (s, RCrash CExhaustion)"
+| "run_vs_es 0 d (s,f,(ves,es)) = (s, RCrash CExhaustion)"
 
 fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> f \<times> e list) \<Rightarrow> (s \<times> res)" where
   "run_v n d (s,f,es) = (let (ves, es') = split_vals_e es in run_vs_es n d (s,f,(rev ves, es')))"

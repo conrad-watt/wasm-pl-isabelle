@@ -19,15 +19,23 @@ setup_lifting type_definition_i32
 declare Quotient_i32[transfer_rule]
 
 \<comment> \<open>memory\<close>
-type_synonym byte = "8 word"
+(* type_synonym byte = "8 word" *)
+typedef byte = "UNIV :: (8 word) set" ..
+setup_lifting type_definition_byte
+declare Quotient_byte[transfer_rule]
+
+lift_definition msb_byte :: "byte \<Rightarrow> bool" is msb .
+lift_definition zero_byte :: "byte" is 0 .
+lift_definition negone_byte :: "byte" is "-1" .
+
 
 type_synonym bytes = "byte list"
 
 definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" where
-  "bytes_takefill = (\<lambda>(a::8 word) n as. takefill a n as)"
+  "bytes_takefill = (\<lambda>(a::byte) n as. takefill a n as)"
 
 definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" where
-  "bytes_replicate = (\<lambda>n (b::8 word). replicate n b)"
+  "bytes_replicate = (\<lambda>n (b::byte). replicate n b)"
 
 definition msbyte :: "bytes \<Rightarrow> byte" where
   "msbyte bs = last (bs)"
@@ -54,7 +62,7 @@ typedef mem = "UNIV :: ((byte list) \<times> nat option) set" ..
 setup_lifting type_definition_mem
 declare Quotient_mem[transfer_rule]
 
-lift_definition mem_mk :: "limit_t \<Rightarrow> mem" is "(\<lambda>lim. ((bytes_replicate ((l_min lim) * Ki64) 0), l_max lim))" .
+lift_definition mem_mk :: "limit_t \<Rightarrow> mem" is "(\<lambda>lim. ((bytes_replicate ((l_min lim) * Ki64) zero_byte), l_max lim))" .
 
 lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>(m,max) n. m!n)::((byte list) \<times> nat option) \<Rightarrow> nat \<Rightarrow> byte" .
 lift_definition mem_length :: "mem \<Rightarrow> nat" is "(\<lambda>(m,max). length m)" .

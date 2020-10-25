@@ -57,7 +57,7 @@ abbreviation "mem_agree m \<equiv> pred_option ((\<le>) (mem_size m)) (mem_max m
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow m n = (let len = (mem_size m) + n in
                    if (len \<le> 2^16 \<and> pred_option (\<lambda>max. len \<le> max) (mem_max m))
-                    then Some (mem_append m (bytes_replicate (n * Ki64) 0))
+                    then Some (mem_append m (bytes_replicate (n * Ki64) zero_byte))
                     else None)"
 
 definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> bytes option" where
@@ -66,8 +66,8 @@ definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<
                        else None)"
 
 definition sign_extend :: "sx \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" where
-  "sign_extend sx l bytes = (let msb = msb (msbyte bytes) in
-                          let byte = (case sx of U \<Rightarrow> 0 | S \<Rightarrow> if msb then -1 else 0) in
+  "sign_extend sx l bytes = (let msb = msb_byte (msbyte bytes) in
+                          let byte = (case sx of U \<Rightarrow> zero_byte | S \<Rightarrow> if msb then negone_byte else zero_byte) in
                           bytes_takefill byte l bytes)"
 
 definition load_packed :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes option" where
@@ -75,7 +75,7 @@ definition load_packed :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> 
 
 definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store m n off bs l = (if (mem_length m \<ge> (n+off+l))
-                          then Some (write_bytes m (n+off) (bytes_takefill 0 l bs))
+                          then Some (write_bytes m (n+off) (bytes_takefill zero_byte l bs))
                           else None)"
 
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
@@ -84,7 +84,7 @@ definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow
 consts
   wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v"
   (* host *)
-  host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option"
+  host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
 
 definition typeof :: " v \<Rightarrow> t" where
   "typeof v = (case v of

@@ -731,7 +731,7 @@ lemma types_preserved_invoke_host_some:
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
-          "host_apply s (t1s _> t2s) f vcs hs = Some (s', vcs')"
+          "host_apply s (t1s _> t2s) f vcs hs (Some (s', vcs'))"
           "store_typing s"
   shows "s'\<bullet>\<C> \<turnstile> $C* vcs' : (ts _> ts')"
 proof -
@@ -2838,16 +2838,16 @@ proof -
         using cl_def(3)
         unfolding cl_type_def
         by simp
-      fix hs
+      fix hs res
       have "\<exists>s' a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;a\<rparr>"
-      proof (cases "host_apply s (t1s _> t2s) x22 vs2 hs")
-        case None
+      proof (cases "host_apply s (t1s _> t2s) x22 vs2 hs (Some res)")
+        case False
         thus ?thesis
           using reduce.intros(7)[OF func_host_def] l
           by blast
       next
-        case (Some a)
-        then obtain s' vcs' where ha_def:"host_apply s (t1s _> t2s) x22 vs2 hs = Some (s', vcs')"
+        case True
+        then obtain s' vcs' where ha_def:"host_apply s (t1s _> t2s) x22 vs2 hs (Some (s', vcs'))"
           by (metis surj_pair)
         have "list_all2 types_agree t1s vs2"
           using e_typing_imp_list_types_agree vs_def(2)

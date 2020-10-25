@@ -49,7 +49,7 @@ lemma mem_grow_byte_at_m_n:
   assumes "k \<ge> mem_length m"
           "(mem_grow m n) = Some m'"
           "k < mem_length m'"
-  shows "byte_at m' k = (0::byte)"
+  shows "byte_at m' k = (zero_byte::byte)"
   using assms
   unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate_def mem_append_def
   by (auto simp add: Abs_mem_inverse nth_append Let_def split: prod.splits if_splits)
@@ -115,12 +115,12 @@ axiomatization where
   wasm_deserialise_type:"typeof (wasm_deserialise bs t) = t"
 
 axiomatization where
-    host_apply_preserve_store1:"host_apply s (t1s _> t2s) f vs hs = Some (s', vs') \<Longrightarrow> store_extension s s'"
-and host_apply_preserve_store2:"host_apply s (t1s _> t2s) f vs hs = Some (s', vs') \<Longrightarrow> store_typing s \<Longrightarrow> store_typing s'"
-and host_apply_respect_type:"list_all2 types_agree t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs = Some (s', vs') \<Longrightarrow> list_all2 types_agree t2s vs'"
+    host_apply_preserve_store1:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_extension s s'"
+and host_apply_preserve_store2:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_typing s \<Longrightarrow> store_typing s'"
+and host_apply_respect_type:"list_all2 types_agree t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> list_all2 types_agree t2s vs'"
 
 lemma host_apply_preserve_store:
-  assumes "host_apply s (t1s _> t2s) f vs hs = Some (s', vs')"
+  assumes "host_apply s (t1s _> t2s) f vs hs (Some (s', vs'))"
           "store_typing s"
   shows "store_extension s s' \<and> store_typing s'"
   using assms host_apply_preserve_store1 host_apply_preserve_store2
