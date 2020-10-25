@@ -7,6 +7,14 @@ code_printing
 
 (* memory *)
 
+code_printing
+  type_constructor byte \<rightharpoonup> (OCaml) "ImplWrapperTypes.byte"
+
+code_printing
+  constant msb_byte \<rightharpoonup> (OCaml) "ImplWrapperTypes.msb'_byte"
+| constant zero_byte \<rightharpoonup> (OCaml) "ImplWrapperTypes.zero'_byte"
+| constant negone_byte \<rightharpoonup> (OCaml) "ImplWrapperTypes.negone'_byte"
+
 (*
 declare Rep_bytes_inverse[code abstype]
 declare Rep_mem_inverse[code abstype]
