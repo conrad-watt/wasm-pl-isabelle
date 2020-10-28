@@ -2,9 +2,9 @@ section {* WebAssembly Base Definitions *}
 
 theory Wasm_Base_Defs imports Wasm_Ast Wasm_Type_Abs begin
 
-instantiation i32 :: wasm_int begin
-  lift_definition nat_of_int :: "i32 \<Rightarrow> nat" is "unat" .
-  lift_definition int_of_nat :: "nat \<Rightarrow> i32" is "of_nat" .
+instantiation i32 :: wasm_int begin                 
+  lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
+  lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
 instance ..
 
 end
@@ -45,6 +45,10 @@ consts
   serialise_i64 :: "i64 \<Rightarrow> bytes"
   serialise_f32 :: "f32 \<Rightarrow> bytes"
   serialise_f64 :: "f64 \<Rightarrow> bytes"
+  deserialise_i32 :: "bytes \<Rightarrow> i32"
+  deserialise_i64 :: "bytes \<Rightarrow> i64"
+  deserialise_f32 :: "bytes \<Rightarrow> f32"
+  deserialise_f64 :: "bytes \<Rightarrow> f64"
   wasm_bool :: "bool \<Rightarrow> i32"
   int32_minus_one :: i32
 
@@ -57,7 +61,7 @@ abbreviation "mem_agree m \<equiv> pred_option ((\<le>) (mem_size m)) (mem_max m
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow m n = (let len = (mem_size m) + n in
                    if (len \<le> 2^16 \<and> pred_option (\<lambda>max. len \<le> max) (mem_max m))
-                    then Some (mem_append m (bytes_replicate (n * Ki64) zero_byte))
+                    then Some (mem_append m (n * Ki64) zero_byte)
                     else None)"
 
 definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> bytes option" where
@@ -82,9 +86,15 @@ definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow
   "store_packed = store"
 
 consts
-  wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v"
   (* host *)
   host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
+
+definition wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v" where
+  "wasm_deserialise bs t = (case t of
+                              T_i32 \<Rightarrow> ConstInt32 (deserialise_i32 bs)
+                            | T_i64 \<Rightarrow> ConstInt64 (deserialise_i64 bs)
+                            | T_f32 \<Rightarrow> ConstFloat32 (deserialise_f32 bs)
+                            | T_f64 \<Rightarrow> ConstFloat64 (deserialise_f64 bs))"
 
 definition typeof :: " v \<Rightarrow> t" where
   "typeof v = (case v of

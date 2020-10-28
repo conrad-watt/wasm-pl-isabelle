@@ -1613,8 +1613,9 @@ proof -
               progress_L0[OF reduce.intros(12)]
               progress_L0[OF reduce.intros(13)]
               is_const_list_vs_to_es_list[of "rev list"]
-          by (cases "load (s.mems s ! a) (nat_of_int x1) x194 (t_length x191)" )
-             (auto simp add: is_const_def)
+          apply (cases "load (s.mems s ! a) (nat_of_int x1) x194 (t_length x191)" )
+          apply (fastforce simp add: is_const_def)+
+          done
       qed auto
     next
       case outer_some:(Some tp_sx)
@@ -1631,7 +1632,7 @@ proof -
                   progress_L0[OF reduce.intros(15)]
                   is_const_list_vs_to_es_list[of "rev list"]
             by (cases "load_packed sx (s.mems s ! a) (nat_of_int x1) x194 (tp_length tp) (t_length x191)")
-               (auto simp add: is_const_def)
+               (fastforce simp add: is_const_def)+
         qed auto
     qed auto
   next
@@ -1662,7 +1663,7 @@ proof -
                       progress_L0[OF reduce.intros(17)]
                       is_const_list_vs_to_es_list[of "rev list'"]
                 by (cases "store (s.mems s ! j) (nat_of_int x1) off (bits a) (t_length t)")
-                   auto
+                   fastforce+
             next
               case (Some the_tp)
               thus ?thesis
@@ -1671,7 +1672,7 @@ proof -
                       progress_L0[OF reduce.intros(19)]
                       is_const_list_vs_to_es_list[of "rev list'"]
                 by (cases "store_packed (s.mems s ! j) (nat_of_int x1) off (bits a) (tp_length the_tp)")
-                   auto
+                   fastforce+
             qed
           qed (cases tp; auto)+
         qed (cases tp; auto)+
@@ -1687,7 +1688,7 @@ proof -
         using assms Current_memory 
               progress_L0[OF reduce.intros(20)]
               is_const_list_vs_to_es_list[of "rev ves"]
-        by (auto simp add: is_const_def)
+        by (fastforce simp add: is_const_def)
     qed auto
   next
     case Grow_memory
@@ -1705,7 +1706,7 @@ proof -
                              progress_L0[OF reduce.intros(21)]
                              progress_L0[OF reduce.intros(22)]
               is_const_list_vs_to_es_list[of "rev list"] 
-          by (cases "mem_grow (s.mems s ! j) (nat_of_int x1)") (auto simp add: is_const_def)
+          by (cases "mem_grow (s.mems s ! j) (nat_of_int x1)") (fastforce simp add: is_const_def)+
       qed auto
     qed auto
   next

@@ -63,8 +63,8 @@ code_printing
 | constant f64_convert_ui32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i32"
 | constant f64_convert_si32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i32"
   (* VALUE CONVERSIONS - wrap *)
-| constant wasm_int_i32_inst.int_of_nat_i32 \<rightharpoonup> (OCaml) "I32Wrapper.int32'_of'_big'_int (Arith.integer'_of'_nat _)"
-| constant wasm_int_i32_inst.nat_of_int_i32 \<rightharpoonup> (OCaml) "Arith.Nat (I32Wrapper.big'_int'_of'_int32 _)"
+| constant wasm_int_i32_inst.int_of_nat_i32 \<rightharpoonup> (OCaml) "I32Wrapper.int'_of'_z (integer'_of'_nat _)"
+| constant wasm_int_i32_inst.nat_of_int_i32 \<rightharpoonup> (OCaml) "Nat (I32Wrapper.z'_of'_int _)"
   (* SIGN EXTENDING DESERIALISATION TODO *)
 
 (* INT64 *)
@@ -106,9 +106,8 @@ code_printing
 | constant f64_convert_ui64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i64"
 | constant f64_convert_si64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i64"
   (* VALUE CONVERSIONS - wrap *)
-| constant wasm_int_i64_inst.int_of_nat_i64 \<rightharpoonup> (OCaml) "I64Wrapper.int64'_of'_big'_int (Arith.integer'_of'_nat _)"
-| constant wasm_int_i64_inst.nat_of_int_i64 \<rightharpoonup> (OCaml) "Arith.Nat (I64Wrapper.big'_int'_of'_int64 _)"
-
+| constant wasm_int_i64_inst.int_of_nat_i64 \<rightharpoonup> (OCaml) "I64Wrapper.int'_of'_z (integer'_of'_nat _)"
+| constant wasm_int_i64_inst.nat_of_int_i64 \<rightharpoonup> (OCaml) "Nat (I64Wrapper.z'_of'_int _)"
 (* FLOAT32 *)
   (* UNOPS *)
 | constant wasm_float_f32_inst.float_neg_f32 \<rightharpoonup> (OCaml) "F32Wrapper.neg"
@@ -169,16 +168,15 @@ code_printing
 | constant si64_trunc_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_s'_f64"
 
 code_printing
-  constant serialise_i32 \<rightharpoonup> (OCaml) "ImplWrapper.serialise_i32"
-| constant serialise_i64 \<rightharpoonup> (OCaml) "ImplWrapper.serialise_i64"
-| constant serialise_f32 \<rightharpoonup> (OCaml) "ImplWrapper.serialise_f32"
-| constant serialise_f64 \<rightharpoonup> (OCaml) "ImplWrapper.serialise_f64"
-| constant wasm_deserialise \<rightharpoonup> (OCaml) "ImplWrapper.deserialise"
+  constant serialise_i32 \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_i32"
+| constant serialise_i64 \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_i64"
+| constant serialise_f32 \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_f32"
+| constant serialise_f64 \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_f64"
+| constant deserialise_i32 \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_i32"
+| constant deserialise_i64 \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_i64"
+| constant deserialise_f32 \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f32"
+| constant deserialise_f64 \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f64"
 | constant wasm_bool \<rightharpoonup> (OCaml) "ImplWrapper.bool"
 | constant int32_minus_one \<rightharpoonup> (OCaml) "I32Wrapper.minus'_one"
 
-(* host *)
-
-code_printing
-  type_constructor host \<rightharpoonup> (OCaml) "ImplWrapperTypes.host'_function'_t"
 end

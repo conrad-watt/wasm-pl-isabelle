@@ -3,38 +3,38 @@ section {* Host Properties *}
 theory Wasm_Axioms imports Wasm begin
 
 lemma old_mem_size_def:
-  shows "mem_size m = length (fst (Rep_mem m)) div Ki64"
-  unfolding mem_size_def mem_length_def
+  shows "mem_size m = length (Rep_mem_rep (fst m)) div Ki64"
+  unfolding mem_size_def mem_rep_length_def mem_length_def
   by (simp split: prod.splits)
 
 (* these were originally axioms, but memory now has a concrete representation in the model *)
 lemma mem_grow_size:
   assumes "mem_grow m n = Some m'"
   shows "(mem_size m + n) = mem_size m'"
-  using assms Abs_mem_inverse
-  unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
+  using assms Abs_mem_rep_inverse
+  unfolding mem_grow_def old_mem_size_def mem_append_def mem_rep_append_def bytes_replicate_def
   by (auto simp add: Ki64_def Let_def split: prod.splits if_splits)
 
 lemma mem_grow_max1:
   assumes "mem_grow m n = Some m'"
   shows "mem_max m = mem_max m'"
-  using assms Abs_mem_inverse
+  using assms Abs_mem_rep_inverse
   unfolding mem_grow_def mem_max_def mem_append_def 
   by (auto simp add: Ki64_def Let_def split: prod.splits if_splits)
 
 lemma mem_grow_max2:
   assumes "mem_grow m n = Some m'"
   shows "pred_option ((\<le>) (mem_size m')) (mem_max m')"
-  using assms Abs_mem_inverse
+  using assms Abs_mem_rep_inverse
   unfolding mem_grow_def mem_max_def mem_append_def
   by (auto simp add: assms mem_grow_size Let_def split: prod.splits if_splits)
 
 lemma mem_grow_length:
   assumes "mem_grow m n = Some m'"
   shows "(mem_length m + (n * Ki64)) = mem_length m'"
-  using assms Abs_mem_inverse
-        bytes_replicate_def mem_append.rep_eq mem_length.rep_eq
-  unfolding mem_grow_def old_mem_size_def mem_append_def bytes_replicate_def
+  using assms Abs_mem_rep_inverse
+        bytes_replicate_def mem_rep_append.rep_eq mem_rep_length.rep_eq
+  unfolding mem_grow_def mem_length_def old_mem_size_def mem_rep_append_def mem_append_def bytes_replicate_def
   by (auto simp add: Let_def split: prod.splits if_splits)
 
 lemma mem_grow_byte_at_m:
@@ -42,8 +42,9 @@ lemma mem_grow_byte_at_m:
           "(mem_grow m n) = Some m'"
   shows "byte_at m' k = byte_at m k"
   using assms
-  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq mem_append_def
-  by (auto simp add: Abs_mem_inverse nth_append Let_def split: prod.splits if_splits)
+  unfolding mem_rep_byte_at.rep_eq mem_length_def mem_rep_length.rep_eq mem_grow_def
+            mem_rep_append.rep_eq mem_append_def mem_rep_append_def mem_size_def byte_at_def
+  by (auto simp add: Abs_mem_rep_inverse nth_append Let_def split: prod.splits if_splits)
 
 lemma mem_grow_byte_at_m_n:
   assumes "k \<ge> mem_length m"
@@ -51,8 +52,9 @@ lemma mem_grow_byte_at_m_n:
           "k < mem_length m'"
   shows "byte_at m' k = (zero_byte::byte)"
   using assms
-  unfolding byte_at.rep_eq mem_length.rep_eq mem_grow_def mem_append.rep_eq bytes_replicate_def mem_append_def
-  by (auto simp add: Abs_mem_inverse nth_append Let_def split: prod.splits if_splits)
+  unfolding mem_rep_byte_at.rep_eq mem_length_def mem_rep_length.rep_eq mem_grow_def
+            mem_rep_append.rep_eq mem_append_def mem_rep_append_def mem_size_def byte_at_def
+  by (auto simp add: Abs_mem_rep_inverse nth_append Let_def split: prod.splits if_splits)
 
 lemma load_size:
   "(load m n off l = None) = (mem_length m < (off + n + l))"
@@ -73,23 +75,29 @@ lemma store_size1:
 lemma store_size:
   assumes "(store m n off v l = Some m')"
   shows "mem_size m = mem_size m'"
-  using assms Abs_mem_inverse mem_length.rep_eq
-  unfolding store_def write_bytes_def bytes_takefill_def
-  by (cases "n + off + l \<le> mem_length m") (auto simp add: old_mem_size_def split: prod.splits)
+  using assms Abs_mem_rep_inverse mem_rep_length.rep_eq
+  unfolding store_def mem_rep_write_bytes_def write_bytes_def 
+            bytes_takefill_def
+  apply (cases "n + off + l \<le> mem_length m") 
+  apply(auto simp add: old_mem_size_def mem_length_def split: prod.splits)
+  done
 
 lemma store_max:
   assumes "(store m n off v l = Some m')"
   shows "mem_max m = mem_max m'"
-  using assms Abs_mem_inverse
-  unfolding store_def mem_max.rep_eq write_bytes_def
+  using assms Abs_mem_rep_inverse
+  unfolding store_def mem_max_def write_bytes_def
   by (auto split: if_splits prod.splits)
 
 lemma store_length:
   assumes "(store m n off v l = Some m')"
   shows "mem_length m = mem_length m'"
-  using assms Abs_mem_inverse mem_length.rep_eq
-  unfolding store_def write_bytes_def bytes_takefill_def
-  by (cases "n + off + l \<le> mem_length m") (auto split: prod.splits)
+  using assms Abs_mem_rep_inverse mem_rep_length.rep_eq
+  unfolding store_def mem_rep_write_bytes_def write_bytes_def 
+            bytes_takefill_def
+  apply (cases "n + off + l \<le> mem_length m") 
+  apply(auto simp add: old_mem_size_def mem_length_def split: prod.splits)
+  done
 
 lemma store_packed_size1:
   "(store_packed m n off v l = None) = (mem_length m < (off + n + l))"

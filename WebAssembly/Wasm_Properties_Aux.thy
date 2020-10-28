@@ -1649,7 +1649,8 @@ proof -
     by auto
   have "list_all2 (tabi_agree clss') (inst.tabs i) (table \<C>)"
     using assms 1(1)
-    unfolding store_extension.simps list_all2_conv_all_nth tab_extension_def tabi_agree_def tab_typing_def
+    unfolding store_extension.simps list_all2_conv_all_nth tab_extension_def tabi_agree_def
+              tab_typing_def limits_compat_def
     by fastforce
   thus ?thesis
     using 1(2) nth_append[of clss' clss'']
@@ -1669,7 +1670,8 @@ proof -
     by auto
   have "list_all2 (memi_agree mss') (inst.mems i) (memory \<C>)"
     using assms 1(1)
-    unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def mem_typing_def
+    unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
+              mem_typing_def limits_compat_def
     by fastforce
   thus ?thesis
     using 1(2) nth_append[of mss' mss'']

@@ -64,12 +64,18 @@ definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_v
 
 definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
 
-definition "tab_typing t tt = ((l_min tt) \<le> (tab_size (t)) \<and> (tab_max (t)) = l_max tt)"
+definition "limits_compat lt1 lt2 =
+  ((l_min lt1) \<ge> (l_min lt2) \<and>
+  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
+                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
+                          | None \<Rightarrow> False)) (l_max lt2))"
+
+definition "tab_typing t tt = (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> tt)"
 
 definition "tabi_agree ts n tab_t =
   ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
 
-definition "mem_typing m mt = ((l_min mt) \<le> (mem_size m) \<and> mem_max m = l_max mt)"
+definition "mem_typing m mt = (limits_compat \<lparr>l_min=(mem_size m),l_max=(mem_max m)\<rparr> mt)"
 
 definition "memi_agree ms n mem_t =
   ((n < length ms) \<and> mem_typing (ms!n) mem_t)"
