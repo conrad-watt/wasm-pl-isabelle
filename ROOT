@@ -2,6 +2,8 @@ session "WASM" = "HOL-Library" +
   options [document = pdf, document_output = "output", document_variants="document:outline=/proof,/ML", timeout=2000]
   sessions
     "HOL-Word"
+  directories
+    "WebAssembly"
   theories
     "WebAssembly/Wasm_Soundness"
     "Wasm_Big_Step_Equiv"
