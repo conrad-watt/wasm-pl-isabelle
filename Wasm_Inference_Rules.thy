@@ -3090,7 +3090,7 @@ next
     hence res_wf':"res_wf lvar_st (fs, Q # ls, r) res' locs' s' hf [] Q"
       using res_wf_valid_triple_n_intro[OF 3 _ res'_def(1)] ass_is r_lab' local_assms(1)
       unfolding ass_wf_def reifies_ret_def
-      by auto
+      by fastforce
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
     proof (cases res')
       case (RValue x1)

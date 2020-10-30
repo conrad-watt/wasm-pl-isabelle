@@ -1,4 +1,8 @@
-theory Wasm_Big_Step imports "WebAssembly/Wasm_Properties" begin
+theory Wasm_Big_Step
+  imports
+    "WebAssembly/Wasm_Properties"
+    "Word_Lib.Misc_Arithmetic"
+begin
 
 datatype res_b =
   RValue "v list" 
@@ -1841,7 +1845,7 @@ next
     case True
     then obtain ves''_1  where "ves'' = ves''_1@vcs"
       using seq_nonvalue1(8)
-      by (metis (no_types, lifting) append_eq_append_conv_if le_antisym length_append nat_add_right_cancel option.sel pl_pl_rels ves'_def)
+      by (metis append_eq_append_conv append_eq_append_conv_if le_antisym length_append option.sel pl_pl_rels ves'_def)
     thus ?thesis
       using ves'_def seq_nonvalue1
       by (metis append_assoc map_append)
@@ -2149,12 +2153,9 @@ next
   next
     case 2
     thus ?thesis
+      apply simp
       using const_value.hyps(2) inj_basic_econst
-      apply simp
-      apply safe
-      apply simp
-      apply fastforce
-      done
+      by fastforce
   qed
 next
   case (seq_value s vs es k s'' vs'' res'' es' s' vs' res)
