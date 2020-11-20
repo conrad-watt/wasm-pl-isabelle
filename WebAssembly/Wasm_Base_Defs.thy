@@ -4,7 +4,7 @@ theory Wasm_Base_Defs
   imports
     Wasm_Ast
     Wasm_Type_Abs
-    "Word_Lib.Misc_msb"
+    "Word_Lib.Most_significant_bit"
 begin
 
 instantiation i32 :: wasm_int begin

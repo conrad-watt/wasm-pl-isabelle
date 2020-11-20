@@ -1,7 +1,7 @@
 theory Wasm_Big_Step
   imports
     "WebAssembly/Wasm_Properties"
-    "Word_Lib.Misc_Arithmetic"
+    "Word_Lib.More_Arithmetic"
 begin
 
 datatype res_b =
