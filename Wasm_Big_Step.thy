@@ -1648,7 +1648,7 @@ next
       case True
       then obtain ves''_1  where "ves'' = ves''_1@vcs"
         using const_value(5) 2
-        by (metis (no_types, lifting) append_eq_append_conv append_eq_append_conv_if le_antisym length_append pl_pl_rels)
+        using local.const_value(1) reduce_to_n_br_imp_length by blast
       hence 3:"es = ($$* ves''_1) @ ($$* vcs) @ [$Br j]"
         using 2
         by simp
@@ -1679,7 +1679,7 @@ next
     case True
     then obtain ves''_1  where "ves'' = ves''_1@vcs"
       using seq_nonvalue1(8)
-      by (metis (no_types, lifting) append_eq_append_conv append_eq_append_conv_if le_antisym length_append pl_pl_rels ves'_def)
+      by (metis (no_types, hide_lams) add.commute append_eq_append_conv_if length_append nat_add_left_cancel_le ves'_def)
     thus ?thesis
       using ves'_def seq_nonvalue1
       by (metis append_assoc map_append)
@@ -1845,7 +1845,8 @@ next
     case True
     then obtain ves''_1  where "ves'' = ves''_1@vcs"
       using seq_nonvalue1(8)
-      by (metis append_eq_append_conv append_eq_append_conv_if le_antisym length_append option.sel pl_pl_rels ves'_def)
+      apply simp
+      by (metis add.commute append_eq_append_conv_if length_append nat_add_left_cancel_le ves'_def)
     thus ?thesis
       using ves'_def seq_nonvalue1
       by (metis append_assoc map_append)
