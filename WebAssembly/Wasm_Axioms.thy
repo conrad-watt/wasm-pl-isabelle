@@ -75,7 +75,8 @@ lemma store_size:
   shows "mem_size m = mem_size m'"
   using assms Abs_mem_inverse mem_length.rep_eq
   unfolding store_def write_bytes_def bytes_takefill_def
-  by (cases "n + off + l \<le> mem_length m") (auto simp add: old_mem_size_def split: prod.splits)
+  by (cases "n + off + l \<le> mem_length m")
+    (auto simp: old_mem_size_def min_absorb2 split: prod.splits)
 
 lemma store_max:
   assumes "(store m n off v l = Some m')"

@@ -645,7 +645,7 @@ lemma alloc_globs_ext_typing:
           "list_all2 (\<lambda>v m_g. typeof v = (tg_t (g_type m_g))) vs m_gs"
   shows "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) i_gs (map g_type m_gs)"
   using assms(2,1)
-proof (induction arbitrary: s i_gs rule: list_all2_induct)
+proof (induction vs m_gs arbitrary: s i_gs rule: list.rel_induct)
 case Nil
   thus ?case
     by simp
@@ -654,17 +654,17 @@ next
   obtain i_g i_gs' s'' where i_gs_is:"i_gs = i_g#i_gs'"
                                      "alloc_glob s (y,x) = (s'', i_g)"
                                      "alloc_globs s'' ys xs = (s', i_gs')"
-    using Cons(4)
+    using Cons.prems
     by (fastforce split: prod.splits)
   have "external_typing s' (Ext_glob i_g) (Te_glob (g_type y))"
-    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] alloc_globs_range[OF i_gs_is(3)] list_all2_lengthD[OF Cons(2)]
-          nth_append[of "s.globs s''"]
+    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] alloc_globs_range[OF i_gs_is(3)]
+    using list_all2_lengthD[OF Cons(2)] nth_append[of "s.globs s''"]
     unfolding external_typing.simps
     apply simp
     apply (metis length_append trans_less_add1)
     done
   thus ?case
-    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] Cons(3)[OF i_gs_is(3)] i_gs_is(1)
+    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] Cons(2)[OF i_gs_is(3)] i_gs_is(1)
     by (simp split: prod.splits)
 qed
 
@@ -672,7 +672,7 @@ lemma list_all2_external_typing_glob_alloc:
   assumes "list_all2 (\<lambda>i t. external_typing s i t) v_imps t_imps"
   shows "list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (ext_globs v_imps) (ext_t_globs t_imps)"
   using assms
-proof (induction t_imps rule: list_all2_induct)
+proof (induction v_imps t_imps rule: list.rel_induct)
   case Nil
   thus ?case
     by (simp add: map_filter_simps(2))

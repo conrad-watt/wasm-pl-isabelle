@@ -2579,8 +2579,7 @@ proof(induction arbitrary: n rule:inf_triples.induct)
       by blast+
     have vcs_is:"vcs = []"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      done
+      by (simp add: stack_ass_sat_def)
     have 1:"(s, locs, ($$* vcsf) @ [$C v]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -2628,9 +2627,7 @@ next
       by blast+
     obtain v where vcs_is:"vcs = [v]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth Suc_length_conv)
     hence 0:"ass_sat ([is_lvar_unop lv op] \<^sub>s|\<^sub>h emp) [app_unop op v] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_unop_def list_all2_conv_all_nth is_lvar_def
@@ -2670,9 +2667,7 @@ next
       by blast+
     obtain v where vcs_is:"vcs = [v]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth Suc_length_conv)
     hence 0:"ass_sat ([is_lvar_testop lv op] \<^sub>s|\<^sub>h emp) [app_testop op v] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
@@ -2712,9 +2707,7 @@ next
       by blast+
     obtain v1 v2 where vcs_is:"vcs = [v1, v2]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def is_lvar_def var_st_get_lvar_def)
-      apply (metis list_all2_Cons1 list_all2_Nil)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_Cons1)
     then obtain v where v_def:"app_binop op v1 v2 = Some v"
                               "emp h st"
       using ass_is(1)
@@ -2762,9 +2755,7 @@ next
       by blast+
     obtain v1 v2 where vcs_is:"vcs = [v1, v2]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def is_lvar_def var_st_get_lvar_def)
-      apply (metis list_all2_Cons1 list_all2_Nil)
-      done
+      by (auto simp: stack_ass_sat_def is_lvar_def var_st_get_lvar_def list_all2_Cons1)
     hence 0:"ass_sat ([is_lvar_relop lv1 lv2 op] \<^sub>s|\<^sub>h emp) [app_relop op v1 v2] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_relop_def is_lvar_def var_st_get_lvar_def)
@@ -2803,9 +2794,7 @@ next
       by blast+
     obtain v where vcs_is:"vcs = [v]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth Suc_length_conv)
     then obtain v' where v_def:"cvt t2 sx v = Some v'"
                               "emp h st"
       using ass_is(1)
@@ -2857,9 +2846,7 @@ next
       by blast+
     obtain v where vcs_is:"vcs = [v]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth Suc_length_conv)
     hence 0:"ass_sat ([is_lvar_reinterpret lv t2] \<^sub>s|\<^sub>h emp) [(wasm_deserialise (bits v) t2)] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_reinterpret_def list_all2_conv_all_nth is_lvar_t_def
@@ -2899,8 +2886,7 @@ next
       by blast+
     have vcs_is:"vcs = []"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      done
+      by (simp add: stack_ass_sat_def)
     hence 0:"ass_sat ([] \<^sub>s|\<^sub>h emp) [] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
@@ -2940,9 +2926,7 @@ next
       by blast+
     obtain v where vcs_is:"vcs = [v]"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth Suc_length_conv)
     hence 0:"ass_sat ([] \<^sub>s|\<^sub>h emp) [] h st"
       using ass_is(1)
       by (simp add: stack_ass_sat_def is_lvar_testop_def list_all2_conv_all_nth is_lvar_def
@@ -3090,7 +3074,7 @@ next
     hence res_wf':"res_wf lvar_st (fs, Q # ls, r) res' locs' s' hf [] Q"
       using res_wf_valid_triple_n_intro[OF 3 _ res'_def(1)] ass_is r_lab' local_assms(1)
       unfolding ass_wf_def reifies_ret_def
-      by auto
+      by fastforce
     hence "res_wf lvar_st \<Gamma> res locs' s' hf vcsf Q"
     proof (cases res')
       case (RValue x1)
@@ -3254,8 +3238,7 @@ next
       by blast+
     have vcs_is:"vcs = []"
       using ass_is(1)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      done
+      by (simp add: stack_ass_sat_def)
     have 1:"(s, locs, ($$* vcsf) @ [$Get_local j]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -3306,9 +3289,7 @@ next
                           "emp h st"
                           "lvar_st lv = Some (V_p v)"
       using ass_is(1,7)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis length_Suc_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def Suc_length_conv)
     have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_local j]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -3363,9 +3344,7 @@ next
                           "emp h st"
                           "lvar_st lv = Some (V_p v)"
       using ass_is(1,7)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis length_Suc_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def Suc_length_conv)
     have 1:"(s, locs, ($$* vcsf) @ [$C v, $Tee_local j]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -3465,9 +3444,7 @@ next
                           "emp h st"
                           "lvar_st lv = Some (V_p v)"
       using ass_is(1,7)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def)
-      apply (metis length_Suc_conv list_exhaust_size_eq0)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth is_lvar_def var_st_get_lvar_def Suc_length_conv)
     have 1:"(s, locs, ($$* vcsf) @ [$C v, $Set_global j]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -3528,9 +3505,8 @@ case (Load \<Gamma> assms lv lvs t off a)
     obtain c where vcs_is:"vcs = [ConstInt32 c]"
                           "lvar_st lv = Some (V_p (ConstInt32 c))"
       using ass_is(1,7)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def Suc_length_conv
+            dest: typeof_i32)
     have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t None a off]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -3607,9 +3583,8 @@ next
     obtain c where vcs_is:"vcs = [ConstInt32 c]"
                           "lvar_st lv = Some (V_p (ConstInt32 c))"
       using ass_is(1,7)
-      apply (simp add: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def)
-      apply (metis Suc_length_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
-      done
+      by (auto simp: stack_ass_sat_def list_all2_conv_all_nth is_lvar32_def var_st_get_lvar_def Suc_length_conv
+            dest: typeof_i32)
     have 1:"(s, locs, ($$* vcsf) @ [$C ConstInt32 c, $Load t (Some (tp,sx)) a off]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4) vcs_is
       by auto
@@ -4183,9 +4158,8 @@ next
     obtain k_g where vcs_is:"vcs = [ConstInt32 k_g]"
       using local_assms(3)
       unfolding ass_wf_def
-      apply (simp add: list_all2_conv_all_nth stack_ass_sat_def is_lvar32_def)
-      apply (metis length_Suc_conv list_exhaust_size_eq0 nth_Cons_0 typeof_i32)
-      done
+      by (auto simp: list_all2_conv_all_nth stack_ass_sat_def is_lvar32_def Suc_length_conv
+            dest: typeof_i32)
     hence 0:"(s, locs, ($$* vcsf) @ [$C ConstInt32 k_g,$Grow_memory]) \<Down>n{(labs@labsf, case_ret ret retf, i)} (s', locs', res)"
       using local_assms(4)
       by simp

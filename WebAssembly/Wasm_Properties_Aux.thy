@@ -1827,7 +1827,7 @@ lemma list_types_agree_imp_e_typing:
   assumes "list_all2 types_agree ts vs"
   shows "\<S>\<bullet>\<C> \<turnstile> $$* vs : ([] _> ts)"
   using assms
-proof (induction rule: list_all2_induct)
+proof (induction rule: list.rel_induct)
   case Nil
   thus ?case
     using b_e_typing.empty e_typing_s_typing.intros(1)
@@ -1838,7 +1838,7 @@ next
     using types_agree_imp_e_typing
     by fastforce
   thus ?case
-    using e_typing_s_typing.intros(3)[OF Cons(3), of "[t]"] e_type_comp_conc
+    using e_typing_s_typing.intros(3)[OF Cons(2), of "[t]"] e_type_comp_conc
     by fastforce
 qed
 

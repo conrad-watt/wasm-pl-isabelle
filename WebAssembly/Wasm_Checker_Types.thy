@@ -991,11 +991,9 @@ proof -
   then obtain cts' where "consume (TopType cts) [TAny, TAny, TSome T_i32] = TopType cts'"
     by simp
   thus ?thesis
-    using nat_def select_return_top_exists
-    apply (cases "select_return_top cts (cts ! Suc nat) (cts ! nat)")
-      apply simp_all
-    apply blast
-    done
+    using nat_def
+    by (cases "select_return_top cts (cts ! Suc nat) (cts ! nat)";
+        auto dest: select_return_top_exists)
 qed
 
 lemma select_return_top_ct_eq:
